@@ -4,12 +4,27 @@ import { FieldValue, getFirestore, Timestamp } from "firebase-admin/firestore";
 
 let cachedDb: ReturnType<typeof getFirestore> | null | undefined;
 
+function normalizeEnvValue(value: string | undefined) {
+  if (!value) return "";
+  let normalized = value.trim();
+  if (
+    normalized.length >= 2 &&
+    ((normalized.startsWith('"') && normalized.endsWith('"')) ||
+      (normalized.startsWith("'") && normalized.endsWith("'")))
+  ) {
+    normalized = normalized.slice(1, -1);
+  }
+  return normalized.trim();
+}
+
 export function getAdminFirestore() {
   if (cachedDb !== undefined) return cachedDb;
 
-  const projectId = process.env.FIREBASE_PROJECT_ID?.trim();
-  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL?.trim();
-  const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n").trim();
+  const projectId = normalizeEnvValue(process.env.FIREBASE_PROJECT_ID);
+  const clientEmail = normalizeEnvValue(process.env.FIREBASE_CLIENT_EMAIL);
+  const privateKey = normalizeEnvValue(process.env.FIREBASE_PRIVATE_KEY)
+    .replace(/\\n/g, "\n")
+    .replace(/\\r/g, "");
 
   if (!projectId || !clientEmail || !privateKey) {
     cachedDb = null;
