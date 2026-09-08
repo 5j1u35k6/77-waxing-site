@@ -2,7 +2,8 @@ import { getApp, getApps } from "https://www.gstatic.com/firebasejs/12.18.0/fire
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
 import { collection, doc, getDoc, getDocs, getFirestore, onSnapshot, query, where } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
 
-const DEFAULT_APPS_SCRIPT_EMAIL_URL='https://script.google.com/macros/s/AKfycby1y-oojBtmNsT8T1UPMydCTPkaZIjRss7QvxXkWi2duOs4mKI8p3tbIzvhi2xwd_Zb/exec';
+const DEFAULT_APPS_SCRIPT_EMAIL_URL='https://script.google.com/macros/s/AKfycbx6iC26KXbHWYte5XhLGNRMmG16Yydx2vPHDxYpmp4rmWn3plk__6Qwwr7Y09hLptTW/exec';
+const LEGACY_APPS_SCRIPT_EMAIL_URL='https://script.google.com/macros/s/AKfycby1y-oojBtmNsT8T1UPMydCTPkaZIjRss7QvxXkWi2duOs4mKI8p3tbIzvhi2xwd_Zb/exec';
 let started=false;
 let adminUnsub=null;
 let statusMap=new Map();
@@ -12,7 +13,8 @@ function appReady(){return getApps().length?getApp():null;}
 async function emailUrl(db){
   const snap=await getDoc(doc(db,'settings','general')).catch(()=>null);
   const configured=snap?.exists()?String(snap.data().appsScriptEmailUrl||'').trim():'';
-  return configured||DEFAULT_APPS_SCRIPT_EMAIL_URL;
+  if(!configured||configured===LEGACY_APPS_SCRIPT_EMAIL_URL)return DEFAULT_APPS_SCRIPT_EMAIL_URL;
+  return configured;
 }
 async function dispatchBooking(user,db,bookingId){
   if(!user||!bookingId)return false;
