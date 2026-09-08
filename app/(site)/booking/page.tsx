@@ -1,4 +1,4 @@
-import { BookingWizard } from "@/components/booking-wizard";
+import { BookingWizardV2 } from "@/components/booking-wizard-v2";
 
 export const metadata = { title: "預約" };
 
@@ -13,7 +13,7 @@ export default function BookingPage() {
           </h1>
           <p className="muted">每 30 分鐘顯示一格；送出後先暫時保留，待 77 後台確認後才正式成立。</p>
         </div>
-        <BookingWizard />
+        <BookingWizardV2 />
       </div>
     </section>
   );

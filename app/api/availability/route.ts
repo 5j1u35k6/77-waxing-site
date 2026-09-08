@@ -22,18 +22,26 @@ function addDays(value: string, days: number) {
 }
 
 function taipeiToday() {
-  const parts = new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Taipei", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date());
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Taipei",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
   const map = Object.fromEntries(parts.map((part) => [part.type, part.value]));
   return `${map.year}-${map.month}-${map.day}`;
 }
 
 type AvailabilityState = "available" | "held";
+type LockState = "held" | "hidden";
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const serviceName = url.searchParams.get("service") || undefined;
   const requestedAnchor = url.searchParams.get("anchor") || addDays(taipeiToday(), 1);
-  if (!parseCalendarDate(requestedAnchor)) return NextResponse.json({ error: "日期格式不正確。" }, { status: 400 });
+  if (!parseCalendarDate(requestedAnchor)) {
+    return NextResponse.json({ error: "日期格式不正確。" }, { status: 400 });
+  }
 
   const config = await getBookingRuntimeConfig(serviceName);
   const blockMinutes = config.durationMinutes + config.bufferMinutes;
@@ -44,42 +52,67 @@ export async function GET(request: Request) {
   const endDate = addDays(startDate, 6);
   const dates = Array.from({ length: 7 }, (_, index) => addDays(startDate, index));
   const allSlots = allStartTimes(config.firstStartTime, config.lastStartTime);
-  const stateByDate = new Map<string, Map<string, "held" | "hidden">>();
+  const stateByDate = new Map<string, Map<string, LockState>>();
   const db = getAdminFirestore();
   let demoMode = false;
 
   if (db) {
-    const snapshot = await db.collection("availabilityLocks").where("date", ">=", startDate).where("date", "<=", endDate).get();
+    // availabilityLocks is intentionally shared by every service. 77 is currently
+    // the single operator, so one booking occupies the same timeline for all items.
+    const snapshot = await db
+      .collection("availabilityLocks")
+      .where("date", ">=", startDate)
+      .where("date", "<=", endDate)
+      .get();
+
     for (const doc of snapshot.docs) {
       const lock = doc.data();
       const date = String(lock.date || "");
       const time = String(lock.time || "").slice(0, 5);
       if (!date || !/^\d{2}:\d{2}$/.test(time)) continue;
-      const dayMap = stateByDate.get(date) || new Map<string, "held" | "hidden">();
+      const dayMap = stateByDate.get(date) || new Map<string, LockState>();
       dayMap.set(time, lock.state === "confirmed" ? "hidden" : "held");
       stateByDate.set(date, dayMap);
     }
   } else {
     demoMode = true;
-    const dayMap = new Map<string, "held" | "hidden">();
+    const dayMap = new Map<string, LockState>();
     for (const time of blockedTimesFromStart("13:00", blockMinutes)) dayMap.set(time, "held");
     stateByDate.set(anchor, dayMap);
   }
 
   const days = dates.map((date) => {
-    const dayMap = stateByDate.get(date) || new Map<string, "held" | "hidden">();
-    const slots = allSlots.filter((time) => dayMap.get(time) !== "hidden").map((time) => ({
-      time,
-      state: (dayMap.get(time) === "held" ? "held" : "available") as AvailabilityState,
-    }));
+    const dayMap = stateByDate.get(date) || new Map<string, LockState>();
+
+    // A start time is unavailable when any part of the selected service would
+    // overlap an existing booking. This prevents cross-service overlaps before submit.
+    const slots = allSlots.flatMap((time) => {
+      const occupiedStates = blockedTimesFromStart(time, blockMinutes)
+        .map((blockedTime) => dayMap.get(blockedTime))
+        .filter((state): state is LockState => Boolean(state));
+
+      if (occupiedStates.includes("hidden")) return [];
+      return [{
+        time,
+        state: (occupiedStates.includes("held") ? "held" : "available") as AvailabilityState,
+      }];
+    });
+
     return { date, isPast: false, slots };
   });
 
-  return NextResponse.json({
-    anchor, earliestDate, startDate, endDate, demoMode,
-    durationMinutes: config.durationMinutes,
-    turnoverBufferMinutes: config.bufferMinutes,
-    blockMinutes,
-    days,
-  });
+  return NextResponse.json(
+    {
+      anchor,
+      earliestDate,
+      startDate,
+      endDate,
+      demoMode,
+      durationMinutes: config.durationMinutes,
+      turnoverBufferMinutes: config.bufferMinutes,
+      blockMinutes,
+      days,
+    },
+    { headers: { "Cache-Control": "no-store, max-age=0" } },
+  );
 }
