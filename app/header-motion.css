@@ -40,24 +40,28 @@
 .nav-label {
   display: grid;
   justify-items: center;
-  gap: 3px;
+  gap: 4px;
   line-height: 1;
 }
 
 .nav-zh {
   display: block;
-  font-size: .98rem;
-  font-weight: 760;
-  letter-spacing: .08em;
+  font-family: "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+  font-size: 1rem;
+  font-weight: 520;
+  letter-spacing: .045em;
+  line-height: 1.08;
   white-space: nowrap;
 }
 
 .nav-en {
   display: block;
-  font-size: .58rem;
-  font-weight: 650;
-  letter-spacing: .18em;
-  opacity: .5;
+  font-family: Inter, "Helvetica Neue", Arial, sans-serif;
+  font-size: .57rem;
+  font-weight: 500;
+  letter-spacing: .2em;
+  line-height: 1;
+  opacity: .48;
   white-space: nowrap;
 }
 
@@ -110,16 +114,18 @@
 
   .site-nav .nav-label {
     justify-items: start;
-    gap: 4px;
+    gap: 5px;
   }
 
   .site-nav .nav-zh {
     font-size: 1.08rem;
-    letter-spacing: .08em;
+    font-weight: 500;
+    letter-spacing: .035em;
   }
 
   .site-nav .nav-en {
-    font-size: .62rem;
+    font-size: .61rem;
+    font-weight: 500;
   }
 
   .site-nav .nav-booking {
