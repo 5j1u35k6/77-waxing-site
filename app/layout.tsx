@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import "./booking-calendar.css";
+import "./booking-v3.css";
+import "./header-motion.css";
 
 export const metadata: Metadata = {
   title: { default: "77美學工作室｜77waxing", template: "%s｜77waxing" },
