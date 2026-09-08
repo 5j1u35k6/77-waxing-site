@@ -32,6 +32,10 @@ export async function POST(request: Request) {
   const db = getAdminFirestore();
   if (!db) return back(request, { demoAction: action });
 
+  const settingsSnapshot = action === "confirm_deposit" ? await db.collection("settings").doc("general").get() : null;
+  const depositAmount = settingsSnapshot?.exists && settingsSnapshot.data()?.firstVisitDepositAmount != null
+    ? Number(settingsSnapshot.data()?.firstVisitDepositAmount)
+    : null;
   const bookingRef = db.collection("bookings").doc(bookingId);
 
   try {
@@ -58,6 +62,7 @@ export async function POST(request: Request) {
         if (status !== "pending_confirmation") throw new Error("INVALID_STATUS");
         Object.assign(update, {
           depositRequired: true,
+          depositAmount,
           paymentStatus: "pending",
           status: "pending_payment",
           confirmedAt: FieldValue.serverTimestamp(),
@@ -70,6 +75,7 @@ export async function POST(request: Request) {
         if (isFirstVisit) throw new Error("FIRST_VISIT_REQUIRES_DEPOSIT");
         Object.assign(update, {
           depositRequired: false,
+          depositAmount: null,
           paymentStatus: "not_requested",
           status: "confirmed",
           confirmedAt: FieldValue.serverTimestamp(),
