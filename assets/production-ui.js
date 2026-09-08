@@ -1,7 +1,9 @@
 (()=>{
   const REPO_BASE='/77-waxing-site';
-  const bookingUrl=location.hostname.endsWith('github.io')?`${REPO_BASE}/booking/`:'/booking/';
-  const siteUrl=location.hostname.endsWith('github.io')?`${REPO_BASE}/`:'/';
+  const onGithubPages=location.hostname.endsWith('github.io');
+  const bookingUrl=onGithubPages?`${REPO_BASE}/booking/`:'/booking/';
+  const adminUrl=onGithubPages?`${REPO_BASE}/admin/`:'/admin/';
+  const siteUrl=onGithubPages?`${REPO_BASE}/`:'/';
   const DURATION_MINUTES=90;
 
   function setText(node,value){
@@ -79,23 +81,18 @@
   }
 
   function fixBookingReturn(){
-    document.querySelectorAll('#booking .success a').forEach((anchor)=>{
-      if(!/預約|時段/.test(anchor.textContent||''))return;
-      setText(anchor,'回到預約頁面');
-      if(anchor.getAttribute('href')!==bookingUrl)anchor.setAttribute('href',bookingUrl);
-      if(anchor.dataset.bookingReturnBound!=='1'){
-        anchor.dataset.bookingReturnBound='1';
-        anchor.onclick=(event)=>{
-          event.preventDefault();
-          window.location.assign(bookingUrl);
-        };
-      }
+    document.querySelectorAll('#booking .success a,#booking .success button').forEach((control)=>{
+      if(!/預約|時段/.test(control.textContent||''))return;
+      setText(control,'回到預約頁面');
+      if(control.tagName==='A'&&control.getAttribute('href')!==bookingUrl)control.setAttribute('href',bookingUrl);
+      control.dataset.bookingReturn='1';
     });
+
     document.querySelectorAll('a[href*="netlify.app"]').forEach((anchor)=>{
       try{
         const url=new URL(anchor.href);
-        const target=url.pathname.includes('/admin')?(location.hostname.endsWith('github.io')?`${REPO_BASE}/admin/`:'/admin/'):url.pathname.includes('/booking')?bookingUrl:siteUrl;
-        if(anchor.getAttribute('href')!==target)anchor.setAttribute('href',target);
+        const target=url.pathname.includes('/admin')?adminUrl:url.pathname.includes('/booking')?bookingUrl:siteUrl;
+        anchor.setAttribute('href',target);
       }catch{}
     });
   }
@@ -118,7 +115,7 @@
     links.forEach((link,index)=>{
       const [key,label]=items[index];
       setText(link,label);
-      if(link.getAttribute('href')!==`#${key}`)link.setAttribute('href',`#${key}`);
+      link.setAttribute('href',`#${key}`);
       link.dataset.adminView=key;
       if(!location.hash)link.classList.toggle('on',key==='dashboard');
     });
@@ -185,11 +182,28 @@
   }
 
   document.addEventListener('click',(event)=>{
+    const returnControl=event.target.closest?.('[data-booking-return],#booking .success a,#booking .success button');
+    if(returnControl&&/預約|時段/.test(returnControl.textContent||'')){
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      window.location.replace(bookingUrl);
+      return;
+    }
+
     const anchor=event.target.closest?.('a[href]');
     if(!anchor)return;
     let url;
     try{url=new URL(anchor.href,location.href);}catch{return;}
-    if(location.hostname.endsWith('github.io')&&url.origin===location.origin&&url.pathname===`${REPO_BASE}/booking/`&&location.pathname!==`${REPO_BASE}/booking/`){
+
+    if(url.hostname.endsWith('netlify.app')){
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      const target=url.pathname.includes('/admin')?adminUrl:url.pathname.includes('/booking')?bookingUrl:siteUrl;
+      window.location.assign(target);
+      return;
+    }
+
+    if(onGithubPages&&url.origin===location.origin&&url.pathname===bookingUrl&&location.pathname!==bookingUrl){
       event.preventDefault();
       event.stopImmediatePropagation();
       window.location.assign(bookingUrl);
