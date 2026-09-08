@@ -13,6 +13,24 @@ function rangesOverlap(startA: number, endA: number, startB: number, endB: numbe
   return startA < endB && endA > startB;
 }
 
+function taipeiToday() {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Taipei",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const map = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${map.year}-${map.month}-${map.day}`;
+}
+
+function nextCalendarDate(value: string) {
+  const [year, month, day] = value.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  date.setUTCDate(date.getUTCDate() + 1);
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}-${String(date.getUTCDate()).padStart(2, "0")}`;
+}
+
 export async function POST(request: Request) {
   const body = await request.json();
   const required = ["service", "date", "time", "name", "phone"];
@@ -24,6 +42,11 @@ export async function POST(request: Request) {
   const time = String(body.time).slice(0, 5);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !allStartTimes().includes(time)) {
     return NextResponse.json({ error: "請重新選擇可預約的日期與時間。" }, { status: 400 });
+  }
+
+  const earliestDate = nextCalendarDate(taipeiToday());
+  if (date < earliestDate) {
+    return NextResponse.json({ error: "最早只能預約明天，請重新選擇日期。" }, { status: 400 });
   }
 
   const supabase = getAdminSupabase();
