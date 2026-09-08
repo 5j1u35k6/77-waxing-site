@@ -1,8 +1,149 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // The website and admin currently access Firestore only through the
-    // server-side Firebase Admin SDK. Client-side direct reads/writes are denied.
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return signedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    function bookingAfter(bookingId) {
+      return getAfter(/databases/$(database)/documents/bookings/$(bookingId));
+    }
+
+    function lockAfter(lockId) {
+      return getAfter(/databases/$(database)/documents/availabilityLocks/$(lockId));
+    }
+
+    function validLockAfter(bookingId, lockId) {
+      return lockAfter(lockId).data.bookingId == bookingId
+        && lockAfter(lockId).data.date == request.resource.data.preferredDate
+        && lockAfter(lockId).data.time in request.resource.data.lockTimes
+        && lockAfter(lockId).data.state == 'held';
+    }
+
+    function validPublicBookingCreate(bookingId) {
+      return signedIn()
+        && request.resource.data.keys().hasOnly([
+          'ownerUid',
+          'customerName',
+          'customerPhone',
+          'customerLineId',
+          'serviceName',
+          'preferredDate',
+          'preferredTime',
+          'status',
+          'isFirstVisit',
+          'depositRequired',
+          'depositAmount',
+          'paymentStatus',
+          'durationMinutes',
+          'bufferMinutes',
+          'lockIds',
+          'lockTimes',
+          'note',
+          'createdAt',
+          'updatedAt'
+        ])
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.customerName is string
+        && request.resource.data.customerName.size() > 0
+        && request.resource.data.customerName.size() <= 80
+        && request.resource.data.customerPhone is string
+        && request.resource.data.customerPhone.size() > 0
+        && request.resource.data.customerPhone.size() <= 30
+        && (request.resource.data.customerLineId == null || (request.resource.data.customerLineId is string && request.resource.data.customerLineId.size() <= 100))
+        && request.resource.data.serviceName is string
+        && request.resource.data.serviceName.size() > 0
+        && request.resource.data.serviceName.size() <= 80
+        && request.resource.data.preferredDate is string
+        && request.resource.data.preferredDate.matches('^\\d{4}-\\d{2}-\\d{2}$')
+        && request.resource.data.preferredTime is string
+        && request.resource.data.preferredTime.matches('^\\d{2}:\\d{2}$')
+        && request.resource.data.status == 'pending_confirmation'
+        && request.resource.data.isFirstVisit is bool
+        && request.resource.data.depositRequired == null
+        && request.resource.data.depositAmount == null
+        && request.resource.data.paymentStatus == 'not_requested'
+        && request.resource.data.durationMinutes == 90
+        && request.resource.data.bufferMinutes == 30
+        && request.resource.data.lockIds is list
+        && request.resource.data.lockIds.size() == 4
+        && request.resource.data.lockTimes is list
+        && request.resource.data.lockTimes.size() == 4
+        && (request.resource.data.note == null || (request.resource.data.note is string && request.resource.data.note.size() <= 1000))
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time
+        && validLockAfter(bookingId, request.resource.data.lockIds[0])
+        && validLockAfter(bookingId, request.resource.data.lockIds[1])
+        && validLockAfter(bookingId, request.resource.data.lockIds[2])
+        && validLockAfter(bookingId, request.resource.data.lockIds[3]);
+    }
+
+    function validPublicLockCreate(lockId) {
+      return signedIn()
+        && request.resource.data.keys().hasOnly([
+          'bookingId',
+          'date',
+          'time',
+          'state',
+          'createdAt',
+          'updatedAt'
+        ])
+        && request.resource.data.bookingId is string
+        && request.resource.data.date is string
+        && request.resource.data.date.matches('^\\d{4}-\\d{2}-\\d{2}$')
+        && request.resource.data.time is string
+        && request.resource.data.time.matches('^\\d{2}:\\d{2}$')
+        && request.resource.data.state == 'held'
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time
+        && bookingAfter(request.resource.data.bookingId).data.ownerUid == request.auth.uid
+        && bookingAfter(request.resource.data.bookingId).data.preferredDate == request.resource.data.date
+        && lockId in bookingAfter(request.resource.data.bookingId).data.lockIds
+        && request.resource.data.time in bookingAfter(request.resource.data.bookingId).data.lockTimes;
+    }
+
+    match /bookings/{bookingId} {
+      allow create: if validPublicBookingCreate(bookingId);
+      allow read, update, delete: if isAdmin();
+    }
+
+    match /availabilityLocks/{lockId} {
+      allow read: if signedIn();
+      allow create: if validPublicLockCreate(lockId);
+      allow update, delete: if isAdmin();
+    }
+
+    match /services/{serviceId} {
+      allow read: if signedIn();
+      allow write: if isAdmin();
+    }
+
+    match /settings/{settingId} {
+      allow read: if signedIn();
+      allow write: if isAdmin();
+    }
+
+    match /customers/{customerId} {
+      allow read, write: if isAdmin();
+    }
+
+    match /customerPhoneIndex/{indexId} {
+      allow read, write: if isAdmin();
+    }
+
+    match /customerImportBatches/{batchId} {
+      allow read, write: if isAdmin();
+    }
+
+    match /admins/{uid} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }
