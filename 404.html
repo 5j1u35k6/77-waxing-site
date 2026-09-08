@@ -1,1 +1,10 @@
-<!doctype html><meta charset="utf-8"><script>const b='/77-waxing-site',p=location.pathname.startsWith(b)?location.pathname.slice(b.length):location.pathname;location.replace(b+'/?p='+encodeURIComponent(p)+(location.hash||''))</script><p>Redirecting…</p>
+<!doctype html><meta charset="utf-8"><script>
+const b='/77-waxing-site';
+const prod='https://77waxing.netlify.app';
+const p=location.pathname.startsWith(b)?location.pathname.slice(b.length):location.pathname;
+if(p==='/booking'||p.startsWith('/booking/')||p==='/admin'||p.startsWith('/admin/')){
+  location.replace(prod+p+(location.search||'')+(location.hash||''));
+}else{
+  location.replace(b+'/?p='+encodeURIComponent(p)+(location.hash||''));
+}
+</script><p>Redirecting…</p>
