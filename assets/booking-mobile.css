@@ -1,0 +1,22 @@
+@media (max-width:850px){
+  .booking .step[data-step="2"]{overflow:visible!important;margin-inline:0!important;padding-bottom:4px}
+  .booking [data-dayrail]{display:grid!important;grid-template-columns:repeat(7,minmax(0,1fr))!important;gap:5px!important;width:100%!important;min-width:0!important;overflow:visible!important;margin-top:14px}
+  .booking [data-dayrail] .daycol{display:contents!important}
+  .booking [data-dayrail] .dayhead{grid-row:1;min-width:0;width:100%;min-height:66px;padding:8px 2px;border:1px solid rgba(58,56,54,.14);border-radius:12px;background:#fffdf9;color:#3a3836;display:grid;align-content:center;justify-items:center;gap:2px}
+  .booking [data-dayrail] .dayhead small{font-size:9px;line-height:1.1;opacity:.58;white-space:nowrap}
+  .booking [data-dayrail] .dayhead b{font-size:13px;line-height:1.1;white-space:nowrap}
+  .booking [data-dayrail] .dayhead em{display:none}
+  .booking [data-dayrail] .daycol.on .dayhead{background:#3a3836;color:#f9f6f0;border-color:#3a3836;box-shadow:0 7px 18px rgba(58,56,54,.11)}
+  .booking [data-dayrail] .times{display:none!important}
+  .booking [data-dayrail] .daycol.on .times{display:grid!important;grid-column:1/-1;grid-row:2;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;padding:14px 0 2px}
+  .booking [data-dayrail] .slot{min-height:46px;border-radius:12px}
+  .booking [data-dayrail] .slot b{font-size:13px}
+  .booking [data-dayrail] .slot small{font-size:9px}
+  .booking .slotlegend{margin-top:14px}
+}
+@media (max-width:390px){
+  .booking [data-dayrail]{gap:4px!important}
+  .booking [data-dayrail] .dayhead{min-height:62px;padding-inline:1px;border-radius:10px}
+  .booking [data-dayrail] .dayhead small{font-size:8px}
+  .booking [data-dayrail] .dayhead b{font-size:12px}
+}
