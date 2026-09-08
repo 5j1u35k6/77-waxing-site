@@ -25,7 +25,9 @@ function item(name, durationMinutes, durationLabel) {
     name,
     durationMinutes,
     durationLabel,
-    blockMinutes: Math.ceil(durationMinutes / 30) * 30,
+    // A slot whose start time equals the service end is also held for cleanup / customer wrap-up.
+    // 75 min => 90 min held; 90 min => 120 min held.
+    blockMinutes: (Math.floor(durationMinutes / 30) + 1) * 30,
   };
 }
 
@@ -236,7 +238,7 @@ function bookingMarkup() {
       <div class="actions"><button class="btn dark" type="button" data-next disabled>下一步</button></div>
     </section>
     <section class="step" data-step="2"><h2>先從月曆選基準日期，再比較固定 7 天</h2><p class="muted">月曆選定後，下面 7 天會鎖定。要更換這組日期，請回月曆重新選基準日期。</p><div class="flight-calendar"><div class="calbar"><button type="button" data-month-prev>←</button><b data-month-label></b><button type="button" data-month-next>→</button></div><div class="calweek">${"日一二三四五六".split("").map((weekday) => `<span>${weekday}</span>`).join("")}</div><div class="calgrid" data-calgrid></div></div><div class="slotlegend"><span><i class="free"></i>可選</span><span><i class="hold"></i>其他顧客預約中</span><span><i class="pick"></i>你的選擇</span></div><div class="booking-sync" data-booking-sync>正在確認可預約時段…</div><div class="dayrail" data-dayrail></div><div class="notice"><b>時段保留方式</b><p data-booking-block-note></p></div><div class="actions"><button class="btn" type="button" data-prev>上一步</button><button class="btn dark" type="button" data-next>下一步</button></div></section>
-    <section class="step" data-step="3"><h2>留下聯絡方式</h2><p class="muted">不用建立會員帳號，填寫資料後即可送出預約需求。</p><div class="fields"><label>姓名<input name="name" autocomplete="name"></label><label>手機<input name="phone" inputmode="tel" autocomplete="tel"></label><label>LINE ID<input name="line"></label><label>第一次來店？<select name="first"><option value="yes">是</option><option value="no">曾經來過</option></select></label></div><label class="full">備註<textarea name="note" rows="3"></textarea></label><p><label><input style="width:auto" type="checkbox" name="ok"> 同意 77美學工作室為處理本次預約使用我填寫的聯絡資料。</label></p><div class="actions"><button class="btn" type="button" data-prev>上一步</button><button class="btn dark" type="button" data-next>確認內容</button></div></section>
+    <section class="step" data-step="3"><h2>留下聯絡方式</h2><p class="muted">不用建立會員帳號，填寫資料後即可送出預約需求。</p><div class="fields"><label>姓名<input name="name" autocomplete="name"></label><label>手機<input name="phone" inputmode="tel" autocomplete="tel"></label><label>Email<input name="email" type="email" autocomplete="email" placeholder="用於接收預約確認信"></label><label>LINE ID<input name="line"></label><label>第一次來店？<select name="first"><option value="yes">是</option><option value="no">曾經來過</option></select></label></div><label class="full">備註<textarea name="note" rows="3"></textarea></label><p><label><input style="width:auto" type="checkbox" name="ok"> 同意 77美學工作室為處理本次預約使用我填寫的聯絡資料。</label></p><div class="actions"><button class="btn" type="button" data-prev>上一步</button><button class="btn dark" type="button" data-next>確認內容</button></div></section>
     <section class="step" data-step="4"><h2>確認預約需求</h2><div class="summary"></div><div class="notice"><b>送出後先保留</b><p>成功送出後，對應時段會先變成「保留中」，等待 77 後台確認。</p></div><div class="actions"><button class="btn" type="button" data-prev>上一步</button><button class="btn dark" type="button" data-submit>送出預約需求</button></div></section>
     <section class="success"><h2>預約需求已建立</h2><p>預約需求已送出，該時段已暫時保留，等待 77 確認。</p><div class="btns" style="justify-content:center"><a class="btn" href="${B}/booking/">回到預約頁面</a></div></section>`;
 }
@@ -266,7 +268,7 @@ async function mount(root) {
 
   const drawItems = () => {
     const target = root.querySelector("[data-booking-items]");
-    target.innerHTML = selectedCategory.groups.map((group) => `<section class="booking-item-group"><h3>${group.name}</h3><div>${group.items.map((serviceItem) => `<button type="button" class="booking-item ${selectedItem?.id === serviceItem.id ? "on" : ""}" data-booking-item="${serviceItem.id}"><span><b>${serviceItem.name}</b><small>施作時間｜${serviceItem.durationLabel}</small></span><em>${serviceItem.blockMinutes === serviceItem.durationMinutes ? `${serviceItem.blockMinutes} 分鐘` : `時段保留 ${serviceItem.blockMinutes} 分鐘`}</em></button>`).join("")}</div></section>`).join("");
+    target.innerHTML = selectedCategory.groups.map((group) => `<section class="booking-item-group"><h3>${group.name}</h3><div>${group.items.map((serviceItem) => `<button type="button" class="booking-item ${selectedItem?.id === serviceItem.id ? "on" : ""}" data-booking-item="${serviceItem.id}"><span><b>${serviceItem.name}</b><small>施作時間｜${serviceItem.durationLabel}</small></span><em>時段保留 ${serviceItem.blockMinutes} 分鐘</em></button>`).join("")}</div></section>`).join("");
     root.querySelector("[data-booking-service-note]").textContent = selectedCategory.note || "";
     target.querySelectorAll("[data-booking-item]").forEach((button) => {
       button.onclick = () => {
@@ -294,7 +296,8 @@ async function mount(root) {
     root.querySelectorAll(".step").forEach((element) => element.classList.toggle("on", Number(element.dataset.step) === nextStep));
     root.querySelectorAll(".steps span").forEach((element, index) => element.classList.toggle("on", index === nextStep - 1));
     if (nextStep === 2) {
-      root.querySelector("[data-booking-block-note]").textContent = `${selectedItem.durationLabel}的施作時間會依 30 分鐘時段向上保留；本項目會保留 ${selectedItem.blockMinutes} 分鐘。所有服務共用同一條工作時間軸。`;
+      const cleanup = selectedItem.blockMinutes - selectedItem.durationMinutes;
+      root.querySelector("[data-booking-block-note]").textContent = `${selectedItem.durationLabel}施作結束後，結束邊界的半小時時段也會保留給環境整理與顧客善後。本項目共保留 ${selectedItem.blockMinutes} 分鐘${cleanup > 0 ? `（比施作時間多保留約 ${cleanup} 分鐘）` : ""}。`;
       refreshAvailability();
     }
   };
@@ -373,8 +376,10 @@ async function mount(root) {
       if (step === 3) {
         const name = root.querySelector('[name="name"]').value.trim();
         const phone = root.querySelector('[name="phone"]').value.trim();
+        const email = root.querySelector('[name="email"]').value.trim();
         const accepted = root.querySelector('[name="ok"]').checked;
-        if (!name || !phone || !accepted) return alert("請填寫姓名、手機並勾選同意。");
+        if (!name || !phone || !email || !accepted) return alert("請填寫姓名、手機、Email 並勾選同意。");
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return alert("請確認 Email 格式。");
         const endTime = addMinutesToTime(selectedTime, selectedItem.durationMinutes);
         const summary = {
           服務分類: selectedCategory.name,
@@ -385,6 +390,7 @@ async function mount(root) {
           結束時間: `${endTime}（${selectedItem.durationLabel}）`,
           姓名: name,
           手機: phone,
+          Email: email,
           來店: root.querySelector('[name="first"]').value === "yes" ? "第一次" : "回訪",
         };
         root.querySelector(".summary").innerHTML = Object.entries(summary).map(([key, value]) => `<div><small>${key}</small><b>${value}</b></div>`).join("");
@@ -405,6 +411,7 @@ async function mount(root) {
       const user = await ensureSignedIn();
       const name = root.querySelector('[name="name"]').value.trim();
       const phone = root.querySelector('[name="phone"]').value.replace(/[\s()-]/g, "").trim();
+      const email = root.querySelector('[name="email"]').value.trim().toLowerCase();
       const lineId = root.querySelector('[name="line"]').value.trim();
       const note = root.querySelector('[name="note"]').value.trim();
       const firstVisit = root.querySelector('[name="first"]').value === "yes";
@@ -422,6 +429,7 @@ async function mount(root) {
           ownerUid: user.uid,
           customerName: name,
           customerPhone: phone,
+          customerEmail: email,
           customerLineId: lineId || null,
           serviceName: `${selectedCategory.name}｜${selectedItem.name}`,
           preferredDate: selectedDate,
@@ -432,7 +440,7 @@ async function mount(root) {
           depositAmount: null,
           paymentStatus: "not_requested",
           durationMinutes: selectedItem.durationMinutes,
-          bufferMinutes: 0,
+          bufferMinutes: selectedItem.blockMinutes - selectedItem.durationMinutes,
           lockIds,
           lockTimes,
           note: note || null,
