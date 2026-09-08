@@ -1,12 +1,14 @@
 const PROJECT_ID = 'waxing-86909';
 const FIRESTORE_BASE = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
-const SCRIPT_VERSION = '2026-09-08-email-v3';
+const STORE_EMAIL = '77waxing.mail@gmail.com';
+const SCRIPT_VERSION = '2026-09-08-email-v4';
 
 function doGet() {
   return json_({
     ok: true,
     service: '77waxing-email',
     version: SCRIPT_VERSION,
+    storeEmail: STORE_EMAIL,
     remainingDailyQuota: MailApp.getRemainingDailyQuota(),
   });
 }
@@ -60,7 +62,7 @@ function dispatchKey_(bookingId, status) {
 
 function sendForStatus_(b, s) {
   const customerEmail = String(b.customerEmail || '').trim();
-  const storeEmail = String(s.storeEmail || '').trim();
+  const storeEmail = String(s.storeEmail || STORE_EMAIL).trim() || STORE_EMAIL;
   const status = String(b.status || '');
   const customerName = String(b.customerName || '顧客').trim() || '顧客';
   let sent = false;
