@@ -1,0 +1,332 @@
+.choice-card small {
+  display: block;
+  margin-top: 7px;
+  color: rgba(58, 56, 54, .56);
+  font-weight: 500;
+}
+
+.booking-time-step {
+  margin-inline: -4px;
+}
+
+.booking-calendar {
+  margin-top: 26px;
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, rgba(255,253,249,.94), rgba(249,246,240,.78));
+  border-radius: 24px;
+  padding: 20px;
+  box-shadow: 0 16px 38px rgba(58,56,54,.05);
+}
+
+.calendar-toolbar {
+  display: grid;
+  grid-template-columns: 42px 1fr 42px;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.calendar-toolbar strong {
+  text-align: center;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1.15rem;
+  font-weight: 500;
+}
+
+.calendar-arrow {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  cursor: pointer;
+  transition: .2s ease;
+}
+
+.calendar-arrow:hover {
+  border-color: var(--oak);
+  transform: translateY(-1px);
+}
+
+.calendar-weekdays,
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.calendar-weekdays {
+  margin-bottom: 7px;
+  color: rgba(58,56,54,.48);
+  font-size: .76rem;
+  text-align: center;
+}
+
+.calendar-day,
+.calendar-empty {
+  aspect-ratio: 1;
+  min-width: 0;
+}
+
+.calendar-day {
+  border: 0;
+  border-radius: 13px;
+  background: transparent;
+  cursor: pointer;
+  font-weight: 650;
+  transition: background .18s ease, transform .18s ease, color .18s ease;
+}
+
+.calendar-day:hover:not(:disabled) {
+  background: var(--linen);
+  transform: translateY(-1px);
+}
+
+.calendar-day.today {
+  box-shadow: inset 0 0 0 1px var(--oak);
+}
+
+.calendar-day.selected {
+  background: var(--charcoal);
+  color: var(--warm-white);
+  box-shadow: none;
+}
+
+.calendar-day:disabled {
+  color: rgba(58,56,54,.22);
+  cursor: not-allowed;
+}
+
+.availability-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px 16px;
+  margin: 20px 2px 12px;
+  color: rgba(58,56,54,.64);
+  font-size: .78rem;
+}
+
+.availability-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+  box-shadow: inset 0 0 0 1px rgba(58,56,54,.12);
+}
+
+.legend-dot.available { background: var(--paper); }
+.legend-dot.held { background: #d8d4cc; }
+.legend-dot.selected { background: var(--charcoal); }
+
+.availability-loading {
+  padding: 36px 12px;
+  text-align: center;
+  color: rgba(58,56,54,.55);
+}
+
+.booking-demo-banner {
+  margin-bottom: 12px;
+}
+
+.seven-day-scroll {
+  overflow-x: auto;
+  padding: 2px 2px 12px;
+  margin-inline: -2px;
+  scrollbar-width: thin;
+}
+
+.seven-day-grid {
+  min-width: 980px;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(122px, 1fr));
+  gap: 10px;
+}
+
+.availability-day {
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: rgba(255,253,249,.76);
+  overflow: hidden;
+  transition: border-color .2s ease, transform .2s ease;
+}
+
+.availability-day.selected-day {
+  border-color: var(--oak);
+  box-shadow: 0 12px 30px rgba(197,160,112,.13);
+  transform: translateY(-2px);
+}
+
+.availability-day.past-day {
+  opacity: .38;
+}
+
+.availability-day-head {
+  width: 100%;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: var(--linen);
+  padding: 13px 8px 12px;
+  display: grid;
+  gap: 1px;
+  place-items: center;
+  cursor: pointer;
+}
+
+.availability-day.selected-day .availability-day-head {
+  background: #d8c7aa;
+}
+
+.availability-day-head:disabled {
+  cursor: not-allowed;
+}
+
+.availability-day-head small {
+  font-size: .72rem;
+  color: rgba(58,56,54,.55);
+}
+
+.availability-day-head strong {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1.15rem;
+}
+
+.availability-day-head span {
+  font-size: .65rem;
+  margin-top: 3px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(249,246,240,.78);
+}
+
+.slot-list {
+  display: grid;
+  gap: 7px;
+  padding: 10px;
+}
+
+.time-slot {
+  min-height: 46px;
+  border: 1px solid rgba(58,56,54,.11);
+  border-radius: 12px;
+  background: var(--paper);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  gap: 0;
+  padding: 6px 5px;
+  transition: transform .15s ease, border-color .15s ease, background .15s ease;
+}
+
+.time-slot:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: var(--oak);
+}
+
+.time-slot.selected {
+  background: var(--charcoal);
+  color: var(--warm-white);
+  border-color: var(--charcoal);
+}
+
+.time-slot.held {
+  background: #d8d4cc;
+  color: rgba(58,56,54,.56);
+  border-color: transparent;
+  cursor: not-allowed;
+}
+
+.time-slot:disabled:not(.held) {
+  opacity: .28;
+  cursor: not-allowed;
+}
+
+.time-slot span {
+  font-weight: 700;
+  font-size: .86rem;
+}
+
+.time-slot small {
+  font-size: .61rem;
+  line-height: 1.2;
+}
+
+.no-slots {
+  margin: 12px 4px;
+  text-align: center;
+  font-size: .75rem;
+  color: rgba(58,56,54,.44);
+}
+
+.booking-rule-note {
+  border-left: 3px solid var(--oak);
+}
+
+.admin-action-cell {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.admin-action-cell form {
+  margin: 0;
+}
+
+.admin-mini-action {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--warm-white);
+  padding: 6px 9px;
+  cursor: pointer;
+  font-size: .76rem;
+}
+
+.admin-mini-action.primary {
+  background: var(--charcoal);
+  border-color: var(--charcoal);
+  color: var(--warm-white);
+}
+
+@media (max-width: 620px) {
+  .booking-calendar {
+    padding: 15px;
+    border-radius: 19px;
+  }
+
+  .calendar-weekdays,
+  .calendar-grid {
+    gap: 4px;
+  }
+
+  .calendar-day {
+    border-radius: 10px;
+    font-size: .84rem;
+  }
+
+  .seven-day-scroll {
+    margin-inline: -16px;
+    padding-inline: 16px;
+    scroll-snap-type: x proximity;
+  }
+
+  .seven-day-grid {
+    min-width: 0;
+    width: max-content;
+    grid-template-columns: repeat(7, 116px);
+  }
+
+  .availability-day {
+    scroll-snap-align: center;
+  }
+
+  .availability-legend {
+    font-size: .72rem;
+  }
+}
