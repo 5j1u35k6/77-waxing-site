@@ -1,27 +1,52 @@
 const PROJECT_ID = 'waxing-86909';
 const FIRESTORE_BASE = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
+const SCRIPT_VERSION = '2026-09-08-email-v2';
+
+function doGet() {
+  return json_({
+    ok: true,
+    service: '77waxing-email',
+    version: SCRIPT_VERSION,
+    remainingDailyQuota: MailApp.getRemainingDailyQuota(),
+  });
+}
+
+function testSelfEmail() {
+  const to = String(Session.getEffectiveUser().getEmail() || '').trim();
+  if (!to) throw new Error('Cannot determine the Google account email for this script.');
+  MailApp.sendEmail({
+    to,
+    subject: '77美學工作室｜Email 系統測試成功',
+    body: '77waxing Email 系統測試成功。',
+    htmlBody: shell_('Email 系統測試成功', '<p>如果你收到這封信，代表 Google Apps Script 的寄信權限與 MailApp 都正常。</p>'),
+    name: '77美學工作室',
+  });
+  return `sent:${to}`;
+}
 
 function doPost(e) {
   try {
     const payload = JSON.parse((e && e.postData && e.postData.contents) || '{}');
     const bookingId = String(payload.bookingId || '').trim();
     const idToken = String(payload.idToken || '').trim();
-    if (!bookingId || !idToken) return json_({ ok:false, error:'missing_data' });
+    console.log(JSON.stringify({ event: 'email_request', bookingId, hasToken: Boolean(idToken), version: SCRIPT_VERSION }));
+    if (!bookingId || !idToken) return json_({ ok:false, error:'missing_data', version:SCRIPT_VERSION });
 
-    const booking = fetchDoc_(`bookings/${encodeURIComponent(bookingId)}`, idToken);
-    const settings = fetchDoc_('settings/general', idToken);
-    if (!booking) return json_({ ok:false, error:'booking_not_found' });
+    const booking = fetchDoc_(`bookings/${encodeURIComponent(bookingId)}`, idToken, false);
+    const settings = fetchDoc_('settings/general', idToken, true) || {};
+    if (!booking) return json_({ ok:false, error:'booking_not_found', version:SCRIPT_VERSION });
 
     const key = dispatchKey_(bookingId, booking.status);
     const props = PropertiesService.getScriptProperties();
-    if (props.getProperty(key) === '1') return json_({ ok:true, duplicate:true });
+    if (props.getProperty(key) === '1') return json_({ ok:true, duplicate:true, version:SCRIPT_VERSION });
 
-    const sent = sendForStatus_(booking, settings || {});
+    const sent = sendForStatus_(booking, settings);
     if (sent) props.setProperty(key, '1');
-    return json_({ ok:true, sent });
+    console.log(JSON.stringify({ event: 'email_result', bookingId, status: booking.status, sent }));
+    return json_({ ok:true, sent, status:booking.status, version:SCRIPT_VERSION });
   } catch (err) {
-    console.error(err);
-    return json_({ ok:false, error:String(err && err.message || err) });
+    console.error(err && err.stack ? err.stack : String(err));
+    return json_({ ok:false, error:String(err && err.message || err), version:SCRIPT_VERSION });
   }
 }
 
@@ -69,13 +94,18 @@ function sendForStatus_(b, s) {
   return false;
 }
 
-function fetchDoc_(path, idToken) {
+function fetchDoc_(path, idToken, allowMissing) {
   const response = UrlFetchApp.fetch(`${FIRESTORE_BASE}/${path}`, {
     method:'get',
     headers:{ Authorization:`Bearer ${idToken}` },
     muteHttpExceptions:true,
   });
-  if (response.getResponseCode() !== 200) throw new Error(`firestore_${response.getResponseCode()}`);
+  const code = response.getResponseCode();
+  if (code === 404 && allowMissing) return null;
+  if (code !== 200) {
+    const detail = response.getContentText().slice(0, 500);
+    throw new Error(`firestore_${code}:${detail}`);
+  }
   const body = JSON.parse(response.getContentText());
   return decodeMap_(body.fields || {});
 }
@@ -98,7 +128,13 @@ function decodeValue_(v) {
 }
 
 function send_(to, subject, html) {
-  GmailApp.sendEmail(to, subject, html.replace(/<[^>]+>/g,' '), { htmlBody:html, name:'77美學工作室' });
+  MailApp.sendEmail({
+    to,
+    subject,
+    body: html.replace(/<[^>]+>/g,' '),
+    htmlBody: html,
+    name: '77美學工作室',
+  });
 }
 function serviceRange_(b) {
   const start = b.preferredTime || '—';
