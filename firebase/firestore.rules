@@ -25,12 +25,13 @@ service cloud.firestore {
     }
 
     function validRoundedLockCount(durationMinutes, lockCount) {
-      return (durationMinutes > 0 && durationMinutes <= 30 && lockCount == 1)
-        || (durationMinutes > 30 && durationMinutes <= 60 && lockCount == 2)
-        || (durationMinutes > 60 && durationMinutes <= 90 && lockCount == 3)
-        || (durationMinutes > 90 && durationMinutes <= 120 && lockCount == 4)
-        || (durationMinutes > 120 && durationMinutes <= 150 && lockCount == 5)
-        || (durationMinutes > 150 && durationMinutes <= 180 && lockCount == 6);
+      return (durationMinutes > 0 && durationMinutes < 30 && lockCount == 1)
+        || (durationMinutes >= 30 && durationMinutes < 60 && lockCount == 2)
+        || (durationMinutes >= 60 && durationMinutes < 90 && lockCount == 3)
+        || (durationMinutes >= 90 && durationMinutes < 120 && lockCount == 4)
+        || (durationMinutes >= 120 && durationMinutes < 150 && lockCount == 5)
+        || (durationMinutes >= 150 && durationMinutes < 180 && lockCount == 6)
+        || (durationMinutes == 180 && lockCount == 7);
     }
 
     function validAllBookingLocks(bookingId) {
@@ -40,7 +41,8 @@ service cloud.firestore {
         && (count < 3 || validLockAfter(bookingId, request.resource.data.lockIds[2]))
         && (count < 4 || validLockAfter(bookingId, request.resource.data.lockIds[3]))
         && (count < 5 || validLockAfter(bookingId, request.resource.data.lockIds[4]))
-        && (count < 6 || validLockAfter(bookingId, request.resource.data.lockIds[5]));
+        && (count < 6 || validLockAfter(bookingId, request.resource.data.lockIds[5]))
+        && (count < 7 || validLockAfter(bookingId, request.resource.data.lockIds[6]));
     }
 
     function validPublicBookingCreate(bookingId) {
@@ -49,6 +51,7 @@ service cloud.firestore {
           'ownerUid',
           'customerName',
           'customerPhone',
+          'customerEmail',
           'customerLineId',
           'serviceName',
           'preferredDate',
@@ -73,6 +76,10 @@ service cloud.firestore {
         && request.resource.data.customerPhone is string
         && request.resource.data.customerPhone.size() > 0
         && request.resource.data.customerPhone.size() <= 30
+        && request.resource.data.customerEmail is string
+        && request.resource.data.customerEmail.size() > 3
+        && request.resource.data.customerEmail.size() <= 160
+        && request.resource.data.customerEmail.matches('^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$')
         && (request.resource.data.customerLineId == null || (request.resource.data.customerLineId is string && request.resource.data.customerLineId.size() <= 100))
         && request.resource.data.serviceName is string
         && request.resource.data.serviceName.size() > 0
@@ -89,12 +96,14 @@ service cloud.firestore {
         && request.resource.data.durationMinutes is int
         && request.resource.data.durationMinutes > 0
         && request.resource.data.durationMinutes <= 180
-        && request.resource.data.bufferMinutes == 0
+        && request.resource.data.bufferMinutes is int
+        && request.resource.data.bufferMinutes >= 0
+        && request.resource.data.bufferMinutes <= 30
         && request.resource.data.lockIds is list
         && request.resource.data.lockTimes is list
         && request.resource.data.lockIds.size() == request.resource.data.lockTimes.size()
         && request.resource.data.lockIds.size() >= 1
-        && request.resource.data.lockIds.size() <= 6
+        && request.resource.data.lockIds.size() <= 7
         && validRoundedLockCount(request.resource.data.durationMinutes, request.resource.data.lockIds.size())
         && (request.resource.data.note == null || (request.resource.data.note is string && request.resource.data.note.size() <= 1000))
         && request.resource.data.createdAt == request.time
