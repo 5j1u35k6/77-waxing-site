@@ -1,0 +1,59 @@
+export const BOOKING_TIMEZONE = "Asia/Taipei";
+export const SLOT_INTERVAL_MINUTES = 30;
+export const DEFAULT_SERVICE_DURATION_MINUTES = 90;
+export const TURNOVER_BUFFER_MINUTES = 30;
+export const TOTAL_BLOCK_MINUTES = DEFAULT_SERVICE_DURATION_MINUTES + TURNOVER_BUFFER_MINUTES;
+export const BLOCK_SLOT_COUNT = TOTAL_BLOCK_MINUTES / SLOT_INTERVAL_MINUTES;
+export const OPENING_TIME = "10:00";
+export const CLOSING_TIME = "20:00";
+
+export const ACTIVE_BLOCKING_STATUSES = [
+  "pending_confirmation",
+  "pending_payment",
+  "confirmed",
+] as const;
+
+export const CONFIRMED_HIDDEN_STATUSES = ["pending_payment", "confirmed"] as const;
+
+export function timeToMinutes(time: string) {
+  const match = /^(\d{2}):(\d{2})$/.exec(time);
+  if (!match) return null;
+  const hour = Number(match[1]);
+  const minute = Number(match[2]);
+  if (hour > 23 || minute > 59) return null;
+  return hour * 60 + minute;
+}
+
+export function minutesToTime(total: number) {
+  const hour = Math.floor(total / 60);
+  const minute = total % 60;
+  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+}
+
+export function allStartTimes() {
+  const open = timeToMinutes(OPENING_TIME)!;
+  const close = timeToMinutes(CLOSING_TIME)!;
+  const lastStart = close - TOTAL_BLOCK_MINUTES;
+  const result: string[] = [];
+  for (let minute = open; minute <= lastStart; minute += SLOT_INTERVAL_MINUTES) {
+    result.push(minutesToTime(minute));
+  }
+  return result;
+}
+
+export function blockedTimesFromStart(startTime: string) {
+  const start = timeToMinutes(startTime);
+  if (start === null) return [];
+  return Array.from({ length: BLOCK_SLOT_COUNT }, (_, index) =>
+    minutesToTime(start + index * SLOT_INTERVAL_MINUTES),
+  );
+}
+
+export function toTaipeiIso(date: string, time: string) {
+  return `${date}T${time}:00+08:00`;
+}
+
+export function addMinutesToTaipeiIso(date: string, time: string, minutes: number) {
+  const start = new Date(toTaipeiIso(date, time));
+  return new Date(start.getTime() + minutes * 60_000).toISOString();
+}
