@@ -105,7 +105,7 @@ export default async function AdminPage() {
             <a className="active" href="/admin">Dashboard</a>
             <a href="#bookings">預約管理</a>
             <a href="#calendar">預約行事曆</a>
-            <a href="#customers">顧客資料</a>
+            <a href="/admin/customers">顧客資料</a>
             <a href="#services">服務管理</a>
             <a href="#prices">價格管理</a>
             <a href="#settings">網站設定</a>
@@ -156,7 +156,7 @@ export default async function AdminPage() {
           </section>
 
           <div className="card-grid" style={{ marginTop: 20 }}>
-            <article className="card" id="customers"><span className="eyebrow">CUSTOMERS</span><h3>顧客資料</h3><p className="muted">姓名、電話、LINE、首次來店、回訪次數與歷史預約。下一階段加入搜尋、顧客詳情與「回訪是否預設收訂金」。</p></article>
+            <article className="card" id="customers"><span className="eyebrow">CUSTOMERS</span><h3>顧客資料</h3><p className="muted">已開始改成真實資料庫版本：網站新客、回訪客與紙本舊客會整合到同一份顧客資料。</p><a className="button secondary" href="/admin/customers">進入顧客資料庫</a></article>
             <article className="card" id="services"><span className="eyebrow">SERVICES</span><h3>服務與價格管理</h3><p className="muted">待最新價目補上後，建立正式可編輯服務、時間與價格。</p></article>
             <article className="card" id="calendar"><span className="eyebrow">CALENDAR</span><h3>行事曆</h3><p className="muted">後續加入日／週／月檢視、休假與可預約時段設定。</p></article>
           </div>
