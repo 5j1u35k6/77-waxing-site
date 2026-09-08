@@ -17,7 +17,9 @@ jobs:
         with:
           node-version: 24
       - name: Check GitHub Pages JavaScript
-        run: node --check assets/pages.js
+        run: |
+          node --check assets/pages.js
+          node --check assets/experience-v3.js
       - name: Install dependencies
         run: npm install --no-audit --no-fund
       - name: Build Next.js
