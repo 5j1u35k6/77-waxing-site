@@ -2,6 +2,7 @@ import { getApp, getApps, initializeApp } from "https://www.gstatic.com/firebase
 import {
   browserLocalPersistence,
   getAuth,
+  onAuthStateChanged,
   setPersistence,
   signInWithEmailAndPassword,
   signOut,
@@ -13,6 +14,7 @@ const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 let submitting = false;
+let remounting = false;
 
 function readableAuthError(error) {
   const code = String(error?.code || "");
@@ -32,6 +34,25 @@ async function hasAdminAccess(user) {
     return false;
   }
 }
+
+function remountAdmin() {
+  if (remounting) return;
+  const root = document.querySelector("#admin-preview");
+  if (!root) return;
+  remounting = true;
+  delete root.dataset.firebaseMounted;
+  const url = new URL(window.location.href);
+  url.searchParams.delete("admin_session");
+  url.hash = "dashboard";
+  history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+  window.dispatchEvent(new PopStateEvent("popstate"));
+  window.setTimeout(() => { remounting = false; }, 400);
+}
+
+onAuthStateChanged(auth, async (user) => {
+  if (!(await hasAdminAccess(user))) return;
+  if (document.querySelector("[data-admin-login]")) remountAdmin();
+});
 
 document.addEventListener("submit", async (event) => {
   const form = event.target instanceof HTMLFormElement ? event.target : null;
@@ -66,13 +87,7 @@ document.addEventListener("submit", async (event) => {
     }
 
     message.textContent = "登入成功，正在開啟管理後台…";
-    // Force a fresh document load so old DOM observers cannot leave the login screen stuck.
-    window.setTimeout(() => {
-      const url = new URL(window.location.href);
-      url.searchParams.set("admin_session", Date.now().toString());
-      url.hash = "dashboard";
-      window.location.replace(url.toString());
-    }, 120);
+    remountAdmin();
   } catch (error) {
     console.error("Firebase admin login failed", error);
     message.textContent = readableAuthError(error);
