@@ -1,0 +1,13 @@
+title: 77waxing
+exclude:
+  - app
+  - components
+  - lib
+  - supabase
+  - middleware.ts
+  - next.config.mjs
+  - next-env.d.ts
+  - tsconfig.json
+  - package.json
+  - node_modules
+  - README.md
