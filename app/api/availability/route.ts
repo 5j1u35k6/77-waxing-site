@@ -40,14 +40,17 @@ type AvailabilityState = "available" | "held";
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
-  const anchor = url.searchParams.get("anchor") || taipeiToday();
-  if (!parseCalendarDate(anchor)) {
+  const requestedAnchor = url.searchParams.get("anchor") || addDays(taipeiToday(), 1);
+  if (!parseCalendarDate(requestedAnchor)) {
     return NextResponse.json({ error: "日期格式不正確。" }, { status: 400 });
   }
 
-  const startDate = addDays(anchor, -3);
-  const endDate = addDays(anchor, 3);
-  const dates = Array.from({ length: 7 }, (_, index) => addDays(anchor, index - 3));
+  const earliestDate = addDays(taipeiToday(), 1);
+  const anchor = requestedAnchor < earliestDate ? earliestDate : requestedAnchor;
+  const naturalStart = addDays(anchor, -3);
+  const startDate = naturalStart < earliestDate ? earliestDate : naturalStart;
+  const endDate = addDays(startDate, 6);
+  const dates = Array.from({ length: 7 }, (_, index) => addDays(startDate, index));
   const allSlots = allStartTimes();
   const stateByDate = new Map<string, Map<string, "held" | "hidden">>();
 
@@ -78,7 +81,6 @@ export async function GET(request: Request) {
     stateByDate.set(anchor, dayMap);
   }
 
-  const today = taipeiToday();
   const days = dates.map((date) => {
     const dayMap = stateByDate.get(date) || new Map<string, "held" | "hidden">();
     const slots = allSlots
@@ -87,11 +89,12 @@ export async function GET(request: Request) {
         time,
         state: (dayMap.get(time) === "held" ? "held" : "available") as AvailabilityState,
       }));
-    return { date, isPast: date < today, slots };
+    return { date, isPast: false, slots };
   });
 
   return NextResponse.json({
     anchor,
+    earliestDate,
     startDate,
     endDate,
     demoMode,
