@@ -23,6 +23,9 @@ type AvailabilityDay = {
 };
 type AvailabilityResponse = {
   anchor: string;
+  earliestDate: string;
+  startDate: string;
+  endDate: string;
   demoMode: boolean;
   durationMinutes: number;
   turnoverBufferMinutes: number;
@@ -103,19 +106,16 @@ function shortDateLabel(value: string) {
   return {
     weekday: `週${weekdays[date.getUTCDay()]}`,
     date: `${date.getUTCMonth() + 1}/${date.getUTCDate()}`,
+    day: String(date.getUTCDate()),
   };
 }
 
-function isPastMoment(date: string, time: string) {
-  const timestamp = new Date(`${date}T${time}:00+08:00`).getTime();
-  return timestamp <= Date.now();
-}
-
 export function BookingWizard() {
-  const defaultDate = useMemo(() => addDays(taipeiToday(), 1), []);
+  const today = useMemo(() => taipeiToday(), []);
+  const earliestDate = useMemo(() => addDays(today, 1), [today]);
   const [step, setStep] = useState(1);
-  const [form, setForm] = useState<FormState>({ ...emptyForm, date: defaultDate });
-  const [calendarMonth, setCalendarMonth] = useState(monthStart(defaultDate));
+  const [form, setForm] = useState<FormState>({ ...emptyForm, date: earliestDate });
+  const [calendarMonth, setCalendarMonth] = useState(monthStart(earliestDate));
   const [availability, setAvailability] = useState<AvailabilityResponse | null>(null);
   const [availabilityLoading, setAvailabilityLoading] = useState(false);
   const [availabilityRefresh, setAvailabilityRefresh] = useState(0);
@@ -123,8 +123,11 @@ export function BookingWizard() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
 
-  const today = useMemo(() => taipeiToday(), []);
   const cells = useMemo(() => calendarCells(calendarMonth), [calendarMonth]);
+  const selectedAvailabilityDay = useMemo(
+    () => availability?.days.find((day) => day.date === form.date) || availability?.days[0] || null,
+    [availability, form.date],
+  );
   const update = (key: keyof FormState, value: string | boolean) => setForm((state) => ({ ...state, [key]: value }));
 
   useEffect(() => {
@@ -146,7 +149,7 @@ export function BookingWizard() {
   }, [form.date, availabilityRefresh]);
 
   const chooseDate = (date: string) => {
-    if (date < today) return;
+    if (date < earliestDate) return;
     setForm((state) => ({ ...state, date, time: "" }));
     setCalendarMonth(monthStart(date));
     setMessage("");
@@ -223,6 +226,28 @@ export function BookingWizard() {
     );
   }
 
+  const renderSlots = (day: AvailabilityDay, mobile = false) => (
+    <div className={mobile ? "mobile-slot-grid" : "slot-list"}>
+      {day.slots.map((slot) => {
+        const held = slot.state === "held";
+        const selectedSlot = form.date === day.date && form.time === slot.time;
+        return (
+          <button
+            type="button"
+            key={`${day.date}-${slot.time}`}
+            disabled={held}
+            className={`time-slot${held ? " held" : ""}${selectedSlot ? " selected" : ""}`}
+            onClick={() => chooseSlot(day.date, slot.time)}
+          >
+            <span>{slot.time}</span>
+            {held && <small>保留中</small>}
+          </button>
+        );
+      })}
+      {!day.slots.length && <p className="no-slots">目前無可顯示時段</p>}
+    </div>
+  );
+
   return (
     <div className="booking-shell">
       <div className="booking-progress" aria-label="預約進度">
@@ -258,28 +283,14 @@ export function BookingWizard() {
         {step === 2 && (
           <section className="booking-step booking-time-step">
             <span className="eyebrow">STEP 02</span>
-            <h2>先選日期，再比較前後 3 天空檔</h2>
-            <p className="muted">像訂機票一樣：先從月曆挑想來的日期，下方會同時列出前三天、當天與後三天的半小時時段。</p>
+            <h2>先選想來的日期，再看前後空檔</h2>
+            <p className="muted">最早只能預約明天。若選擇的日期前面不足 3 天，日期帶會從最早可預約日開始往後補滿 7 天。</p>
 
             <div className="booking-calendar">
               <div className="calendar-toolbar">
-                <button
-                  type="button"
-                  className="calendar-arrow"
-                  aria-label="上個月"
-                  onClick={() => setCalendarMonth((value) => moveMonth(value, -1))}
-                >
-                  ←
-                </button>
+                <button type="button" className="calendar-arrow" aria-label="上個月" onClick={() => setCalendarMonth((value) => moveMonth(value, -1))}>←</button>
                 <strong>{monthLabel(calendarMonth)}</strong>
-                <button
-                  type="button"
-                  className="calendar-arrow"
-                  aria-label="下個月"
-                  onClick={() => setCalendarMonth((value) => moveMonth(value, 1))}
-                >
-                  →
-                </button>
+                <button type="button" className="calendar-arrow" aria-label="下個月" onClick={() => setCalendarMonth((value) => moveMonth(value, 1))}>→</button>
               </div>
               <div className="calendar-weekdays">
                 {weekdays.map((weekday) => <span key={weekday}>{weekday}</span>)}
@@ -288,13 +299,13 @@ export function BookingWizard() {
                 {cells.map((date, index) => {
                   if (!date) return <span key={`empty-${index}`} className="calendar-empty" />;
                   const day = parseCalendarDate(date).getUTCDate();
-                  const past = date < today;
+                  const unavailable = date < earliestDate;
                   const selected = date === form.date;
                   return (
                     <button
                       type="button"
                       key={date}
-                      disabled={past}
+                      disabled={unavailable}
                       className={`calendar-day${selected ? " selected" : ""}${date === today ? " today" : ""}`}
                       onClick={() => chooseDate(date)}
                     >
@@ -303,6 +314,7 @@ export function BookingWizard() {
                   );
                 })}
               </div>
+              <p className="calendar-min-note">今天不開放當日預約，最早可選 {shortDateLabel(earliestDate).date}。</p>
             </div>
 
             <div className="availability-legend" aria-label="時段狀態說明">
@@ -311,54 +323,61 @@ export function BookingWizard() {
               <span><i className="legend-dot selected" />你目前選擇</span>
             </div>
 
-            {availabilityLoading && <div className="availability-loading">正在讀取前後 7 天空檔…</div>}
+            {availabilityLoading && <div className="availability-loading">正在讀取 7 天空檔…</div>}
 
             {!availabilityLoading && availability && (
               <>
-                {availability.demoMode && (
-                  <div className="demo-banner booking-demo-banner">DEMO DATA｜13:00–14:30 先用灰色保留示範</div>
-                )}
-                <div className="seven-day-scroll">
-                  <div className="seven-day-grid">
+                {availability.demoMode && <div className="demo-banner booking-demo-banner">DEMO DATA｜13:00–14:30 先用灰色保留示範</div>}
+
+                <div className="desktop-seven-day">
+                  <div className="seven-day-scroll">
+                    <div className="seven-day-grid">
+                      {availability.days.map((day) => {
+                        const label = shortDateLabel(day.date);
+                        const selectedDay = day.date === form.date;
+                        return (
+                          <article key={day.date} className={`availability-day${selectedDay ? " selected-day" : ""}`}>
+                            <button type="button" className="availability-day-head" onClick={() => chooseDate(day.date)}>
+                              <small>{label.weekday}</small>
+                              <strong>{label.date}</strong>
+                              {selectedDay && <span>想去這天</span>}
+                            </button>
+                            {renderSlots(day)}
+                          </article>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mobile-booking-flow">
+                  <div className="mobile-date-strip" aria-label="前後七天日期">
                     {availability.days.map((day) => {
                       const label = shortDateLabel(day.date);
                       const selectedDay = day.date === form.date;
                       return (
-                        <article key={day.date} className={`availability-day${selectedDay ? " selected-day" : ""}${day.isPast ? " past-day" : ""}`}>
-                          <button
-                            type="button"
-                            className="availability-day-head"
-                            disabled={day.isPast}
-                            onClick={() => chooseDate(day.date)}
-                          >
-                            <small>{label.weekday}</small>
-                            <strong>{label.date}</strong>
-                            {selectedDay && <span>想去這天</span>}
-                          </button>
-                          <div className="slot-list">
-                            {day.slots.map((slot) => {
-                              const held = slot.state === "held";
-                              const pastMoment = isPastMoment(day.date, slot.time);
-                              const selectedSlot = form.date === day.date && form.time === slot.time;
-                              return (
-                                <button
-                                  type="button"
-                                  key={`${day.date}-${slot.time}`}
-                                  disabled={day.isPast || held || pastMoment}
-                                  className={`time-slot${held ? " held" : ""}${selectedSlot ? " selected" : ""}`}
-                                  onClick={() => chooseSlot(day.date, slot.time)}
-                                >
-                                  <span>{slot.time}</span>
-                                  {held && <small>保留中</small>}
-                                </button>
-                              );
-                            })}
-                            {!day.slots.length && <p className="no-slots">目前無可顯示時段</p>}
-                          </div>
-                        </article>
+                        <button
+                          type="button"
+                          key={day.date}
+                          className={`mobile-date-chip${selectedDay ? " selected" : ""}`}
+                          onClick={() => chooseDate(day.date)}
+                        >
+                          <small>{label.weekday}</small>
+                          <strong>{label.day}</strong>
+                          <span>{parseCalendarDate(day.date).getUTCMonth() + 1}月</span>
+                        </button>
                       );
                     })}
                   </div>
+                  {selectedAvailabilityDay && (
+                    <div className="mobile-slot-panel">
+                      <div className="mobile-slot-heading">
+                        <div><small>已選日期</small><strong>{shortDateLabel(selectedAvailabilityDay.date).date} {shortDateLabel(selectedAvailabilityDay.date).weekday}</strong></div>
+                        <span>請選時段</span>
+                      </div>
+                      {renderSlots(selectedAvailabilityDay, true)}
+                    </div>
+                  )}
                 </div>
               </>
             )}
