@@ -4,6 +4,10 @@
   const siteUrl=location.hostname.endsWith('github.io')?`${REPO_BASE}/`:'/';
   const DURATION_MINUTES=90;
 
+  function setText(node,value){
+    if(node&&node.textContent!==value)node.textContent=value;
+  }
+
   function addMinutes(time,amount){
     const [hours,minutes]=String(time||'').split(':').map(Number);
     if(!Number.isFinite(hours)||!Number.isFinite(minutes))return '';
@@ -20,8 +24,8 @@
       const start=startRow.querySelector('b')?.textContent.trim();
       const end=addMinutes(start,DURATION_MINUTES);
       if(!end)return;
-      reserveRow.querySelector('small').textContent='結束時間';
-      reserveRow.querySelector('b').textContent=`${end}（${DURATION_MINUTES} 分鐘）`;
+      setText(reserveRow.querySelector('small'),'結束時間');
+      setText(reserveRow.querySelector('b'),`${end}（${DURATION_MINUTES} 分鐘）`);
     });
   }
 
@@ -30,66 +34,68 @@
 
     document.querySelectorAll('[data-booking-sync]').forEach((node)=>{
       const text=node.textContent||'';
-      if(text.includes('正在讀取 Firestore')) node.textContent='正在確認可預約時段…';
-      else if(text.startsWith('固定日期範圍：')) node.textContent=text.replace('固定日期範圍：','可選日期範圍：');
-      else if(text.includes('無法讀取 Firestore')) node.textContent='目前無法取得可預約時段，請稍後再試。';
+      if(text.includes('正在讀取 Firestore')) setText(node,'正在確認可預約時段…');
+      else if(text.startsWith('固定日期範圍：')) setText(node,text.replace('固定日期範圍：','可選日期範圍：'));
+      else if(text.includes('無法讀取 Firestore')) setText(node,'目前無法取得可預約時段，請稍後再試。');
     });
 
     document.querySelectorAll('#booking .muted').forEach((node)=>{
       const text=node.textContent||'';
-      if(text.includes('匿名 Firebase')) node.textContent='不用建立會員帳號，填寫資料後即可送出預約需求。';
+      if(text.includes('匿名 Firebase')) setText(node,'不用建立會員帳號，填寫資料後即可送出預約需求。');
     });
 
     document.querySelectorAll('#booking .notice p').forEach((node)=>{
       const text=node.textContent||'';
-      if(text.includes('寫入 Firestore')) node.textContent='成功送出後，該時段會先標示為「保留中」，等待 77 確認。';
+      if(text.includes('寫入 Firestore')) setText(node,'成功送出後，該時段會先標示為「保留中」，等待 77 確認。');
     });
 
     document.querySelectorAll('#booking .success p').forEach((node)=>{
-      if((node.textContent||'').includes('Firestore')) node.textContent='預約需求已送出，該時段已暫時保留，等待 77 確認。';
+      if((node.textContent||'').includes('Firestore')) setText(node,'預約需求已送出，該時段已暫時保留，等待 77 確認。');
     });
 
     const adminLogin=document.querySelector('.admin-login-card');
     if(adminLogin){
       const description=adminLogin.querySelector('.muted');
-      if(description&&(description.textContent||'').includes('Firebase')) description.textContent='請使用管理員帳號登入。';
+      if(description&&(description.textContent||'').includes('Firebase')) setText(description,'請使用管理員帳號登入。');
     }
 
     document.querySelectorAll('.admin-topline .tag').forEach((node)=>{
-      if((node.textContent||'').includes('FIRESTORE')) node.textContent='ADMIN';
+      if((node.textContent||'').includes('FIRESTORE')) setText(node,'ADMIN');
     });
-    document.querySelectorAll('.firebase-live').forEach((node)=>{node.textContent='● 即時同步';});
+    document.querySelectorAll('.firebase-live').forEach((node)=>setText(node,'● 即時同步'));
     document.querySelectorAll('.panel .muted').forEach((node)=>{
       const text=node.textContent||'';
-      if(text.includes('Firestore')) node.textContent='待確認會顯示保留中；確認後重疊時段將不再提供預約；取消／完成／未到店會重新釋出時段。';
+      if(text.includes('Firestore')) setText(node,'待確認會顯示保留中；確認後重疊時段將不再提供預約；取消／完成／未到店會重新釋出時段。');
     });
 
     document.querySelectorAll('[data-admin-message]').forEach((node)=>{
       const text=node.textContent||'';
-      if(text.includes('Firebase Authentication 找不到')) node.textContent='Email 或密碼不正確，請重新確認後再試。';
-      else if(text.includes('Email/Password 登入尚未啟用')) node.textContent='目前無法登入，請稍後再試。';
-      else if(text.includes('尚未取得後台權限')||text.includes('缺少 admins/')) node.textContent='帳號密碼正確，但目前沒有後台權限，請確認管理員帳號設定。';
-      else if(text.includes('正在驗證 Firebase Authentication')) node.textContent='正在登入…';
-      else if(text.includes('正在確認後台權限')) node.textContent='正在確認管理員權限…';
+      if(text.includes('Firebase Authentication 找不到')) setText(node,'Email 或密碼不正確，請重新確認後再試。');
+      else if(text.includes('Email/Password 登入尚未啟用')) setText(node,'目前無法登入，請稍後再試。');
+      else if(text.includes('尚未取得後台權限')||text.includes('缺少 admins/')) setText(node,'帳號密碼正確，但目前沒有後台權限，請確認管理員帳號設定。');
+      else if(text.includes('正在驗證 Firebase Authentication')) setText(node,'正在登入…');
+      else if(text.includes('正在確認後台權限')) setText(node,'正在確認管理員權限…');
     });
   }
 
   function fixBookingReturn(){
     document.querySelectorAll('#booking .success a').forEach((anchor)=>{
       if(!/預約|時段/.test(anchor.textContent||''))return;
-      anchor.textContent='回到預約頁面';
-      anchor.setAttribute('href',bookingUrl);
-      anchor.onclick=(event)=>{
-        event.preventDefault();
-        window.location.assign(bookingUrl);
-      };
+      setText(anchor,'回到預約頁面');
+      if(anchor.getAttribute('href')!==bookingUrl)anchor.setAttribute('href',bookingUrl);
+      if(anchor.dataset.bookingReturnBound!=='1'){
+        anchor.dataset.bookingReturnBound='1';
+        anchor.onclick=(event)=>{
+          event.preventDefault();
+          window.location.assign(bookingUrl);
+        };
+      }
     });
     document.querySelectorAll('a[href*="netlify.app"]').forEach((anchor)=>{
       try{
         const url=new URL(anchor.href);
-        if(url.pathname.includes('/admin'))anchor.href=location.hostname.endsWith('github.io')?`${REPO_BASE}/admin/`:'/admin/';
-        else if(url.pathname.includes('/booking'))anchor.href=bookingUrl;
-        else anchor.href=siteUrl;
+        const target=url.pathname.includes('/admin')?(location.hostname.endsWith('github.io')?`${REPO_BASE}/admin/`:'/admin/'):url.pathname.includes('/booking')?bookingUrl:siteUrl;
+        if(anchor.getAttribute('href')!==target)anchor.setAttribute('href',target);
       }catch{}
     });
   }
@@ -111,10 +117,10 @@
     const links=[...sidebar.querySelectorAll('a')].slice(0,items.length);
     links.forEach((link,index)=>{
       const [key,label]=items[index];
-      link.textContent=label;
-      link.href=`#${key}`;
+      setText(link,label);
+      if(link.getAttribute('href')!==`#${key}`)link.setAttribute('href',`#${key}`);
       link.dataset.adminView=key;
-      link.classList.toggle('on',key==='dashboard');
+      if(!location.hash)link.classList.toggle('on',key==='dashboard');
     });
 
     const logout=sidebar.querySelector('[data-admin-logout]');
@@ -138,9 +144,7 @@
 
     const metrics=dash.querySelector('.metrics');
     const panel=dash.querySelector('.panel:not(.admin-placeholder)');
-    if(panel&&!panel.dataset.originalTitle){
-      panel.dataset.originalTitle=panel.querySelector('h3')?.textContent||'預約與時段狀態';
-    }
+    if(panel&&!panel.dataset.originalTitle)panel.dataset.originalTitle=panel.querySelector('h3')?.textContent||'預約與時段狀態';
 
     links.forEach((link)=>{
       if(link.dataset.boundAdminView==='1')return;
@@ -156,7 +160,8 @@
           if(panel)panel.hidden=false;
           if(metrics)metrics.hidden=view!=='dashboard';
           const title=panel?.querySelector('h3');
-          if(title)title.textContent=view==='calendar'?'預約行事曆':view==='bookings'?'預約管理':panel.dataset.originalTitle;
+          const targetTitle=view==='calendar'?'預約行事曆':view==='bookings'?'預約管理':panel?.dataset.originalTitle;
+          if(title&&targetTitle)setText(title,targetTitle);
           if(view!=='dashboard')panel?.scrollIntoView({behavior:'smooth',block:'start'});
           else window.scrollTo({top:0,behavior:'smooth'});
           return;
@@ -166,7 +171,8 @@
         if(panel)panel.hidden=true;
         const labels={customers:'顧客資料',services:'服務管理',pricing:'價格管理',settings:'網站設定'};
         placeholder.hidden=false;
-        placeholder.innerHTML=`<h3>${labels[view]||'管理功能'}</h3><p class="muted">此功能已保留在後台功能列，接下來會依序補上管理內容。</p>`;
+        const html=`<h3>${labels[view]||'管理功能'}</h3><p class="muted">此功能已保留在後台功能列，接下來會依序補上管理內容。</p>`;
+        if(placeholder.innerHTML!==html)placeholder.innerHTML=html;
       });
     });
   }
