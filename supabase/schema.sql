@@ -1,14 +1,21 @@
--- 77waxing first-edition data model
+-- 77waxing production-oriented data model
 create extension if not exists pgcrypto;
 
 create table if not exists customers (
   id uuid primary key default gen_random_uuid(),
   name text not null,
-  phone text not null unique,
+  phone text unique,
   line_id text,
+  email text,
   visit_count integer not null default 0,
   default_deposit_required boolean,
   notes text,
+  source text not null default 'online' check (source in ('online','admin','paper_import')),
+  legacy_ref text unique,
+  paper_record_ref text unique,
+  first_visit_date date,
+  last_visit_date date,
+  imported_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -45,12 +52,38 @@ create table if not exists bookings (
   updated_at timestamptz not null default now()
 );
 
--- Safe upgrades when the first schema has already been executed.
+create table if not exists customer_import_batches (
+  id uuid primary key default gen_random_uuid(),
+  filename text,
+  row_count integer not null default 0,
+  imported_count integer not null default 0,
+  updated_count integer not null default 0,
+  skipped_count integer not null default 0,
+  created_at timestamptz not null default now()
+);
+
+-- Safe upgrades when an earlier schema has already been executed.
+alter table customers alter column phone drop not null;
+alter table customers add column if not exists email text;
+alter table customers add column if not exists source text not null default 'online';
+alter table customers add column if not exists legacy_ref text;
+alter table customers add column if not exists paper_record_ref text;
+alter table customers add column if not exists first_visit_date date;
+alter table customers add column if not exists last_visit_date date;
+alter table customers add column if not exists imported_at timestamptz;
+
 alter table services add column if not exists duration_minutes integer not null default 90;
 alter table bookings add column if not exists duration_minutes integer not null default 90;
 alter table bookings add column if not exists buffer_minutes integer not null default 30;
 alter table bookings add column if not exists slot_start timestamptz;
 alter table bookings add column if not exists slot_end timestamptz;
+
+-- These indexes also act as de-duplication keys for paper-record imports.
+create unique index if not exists customers_phone_unique_idx on customers(phone) where phone is not null and phone <> '';
+create unique index if not exists customers_legacy_ref_unique_idx on customers(legacy_ref) where legacy_ref is not null and legacy_ref <> '';
+create unique index if not exists customers_paper_record_ref_unique_idx on customers(paper_record_ref) where paper_record_ref is not null and paper_record_ref <> '';
+create index if not exists customers_name_idx on customers(name);
+create index if not exists customers_source_idx on customers(source);
 
 update services set duration_minutes = 90;
 
