@@ -1,17 +1,12 @@
 import { NextResponse } from "next/server";
-import { getAdminSupabase } from "@/lib/supabase";
+import { FieldValue, availabilityLockId, customerIdFromPhone, getAdminFirestore } from "@/lib/firebase-admin";
 import {
-  ACTIVE_BLOCKING_STATUSES,
   TOTAL_BLOCK_MINUTES,
   addMinutesToTaipeiIso,
   allStartTimes,
-  timeToMinutes,
+  blockedTimesFromStart,
   toTaipeiIso,
 } from "@/lib/booking-config";
-
-function rangesOverlap(startA: number, endA: number, startB: number, endB: number) {
-  return startA < endB && endA > startB;
-}
 
 function taipeiToday() {
   const parts = new Intl.DateTimeFormat("en-US", {
@@ -31,6 +26,10 @@ function nextCalendarDate(value: string) {
   return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}-${String(date.getUTCDate()).padStart(2, "0")}`;
 }
 
+function normalizePhone(value: string) {
+  return value.replace(/[\s()-]/g, "").trim();
+}
+
 export async function POST(request: Request) {
   const body = await request.json();
   const required = ["service", "date", "time", "name", "phone"];
@@ -40,8 +39,9 @@ export async function POST(request: Request) {
 
   const date = String(body.date);
   const time = String(body.time).slice(0, 5);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !allStartTimes().includes(time)) {
-    return NextResponse.json({ error: "請重新選擇可預約的日期與時間。" }, { status: 400 });
+  const normalizedPhone = normalizePhone(String(body.phone));
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !allStartTimes().includes(time) || !normalizedPhone) {
+    return NextResponse.json({ error: "請重新確認日期、時間與手機資料。" }, { status: 400 });
   }
 
   const earliestDate = nextCalendarDate(taipeiToday());
@@ -49,8 +49,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "最早只能預約明天，請重新選擇日期。" }, { status: 400 });
   }
 
-  const supabase = getAdminSupabase();
-  if (!supabase) {
+  const db = getAdminFirestore();
+  if (!db) {
     return NextResponse.json({
       ok: true,
       demoMode: true,
@@ -59,102 +59,84 @@ export async function POST(request: Request) {
     });
   }
 
+  const bookingRef = db.collection("bookings").doc();
+  const customerRef = db.collection("customers").doc(customerIdFromPhone(normalizedPhone));
+  const blockedTimes = blockedTimesFromStart(time);
+  const lockRefs = blockedTimes.map((blockedTime) =>
+    db.collection("availabilityLocks").doc(availabilityLockId(date, blockedTime)),
+  );
   const slotStart = new Date(toTaipeiIso(date, time)).toISOString();
   const slotEnd = addMinutesToTaipeiIso(date, time, TOTAL_BLOCK_MINUTES);
 
-  const rangeCheck = await supabase
-    .from("bookings")
-    .select("id")
-    .in("status", [...ACTIVE_BLOCKING_STATUSES])
-    .lt("slot_start", slotEnd)
-    .gt("slot_end", slotStart)
-    .limit(1);
+  try {
+    await db.runTransaction(async (transaction) => {
+      const lockSnapshots = [];
+      for (const lockRef of lockRefs) lockSnapshots.push(await transaction.get(lockRef));
+      if (lockSnapshots.some((snapshot) => snapshot.exists)) {
+        throw new Error("SLOT_CONFLICT");
+      }
 
-  let conflict = Boolean(rangeCheck.data?.length);
+      const customerSnapshot = await transaction.get(customerRef);
+      const existingCustomer = customerSnapshot.exists ? customerSnapshot.data() || {} : {};
+      const visitCount = Number(existingCustomer.visitCount || 0);
+      const isFirstVisit = !customerSnapshot.exists || visitCount === 0;
 
-  if (rangeCheck.error) {
-    const fallback = await supabase
-      .from("bookings")
-      .select("preferred_time, status")
-      .eq("preferred_date", date)
-      .in("status", [...ACTIVE_BLOCKING_STATUSES]);
+      const customerPayload: Record<string, unknown> = {
+        name: String(body.name).trim(),
+        phone: normalizedPhone,
+        phoneNormalized: normalizedPhone,
+        lineId: body.lineId ? String(body.lineId).trim() : null,
+        visitCount,
+        updatedAt: FieldValue.serverTimestamp(),
+      };
+      if (!customerSnapshot.exists) {
+        customerPayload.source = "online";
+        customerPayload.createdAt = FieldValue.serverTimestamp();
+        customerPayload.defaultDepositRequired = null;
+      }
+      transaction.set(customerRef, customerPayload, { merge: true });
 
-    const requestedStart = timeToMinutes(time)!;
-    const requestedEnd = requestedStart + TOTAL_BLOCK_MINUTES;
-    conflict = (fallback.data || []).some((booking) => {
-      const existingStart = timeToMinutes(String(booking.preferred_time || "").slice(0, 5));
-      return existingStart !== null && rangesOverlap(
-        requestedStart,
-        requestedEnd,
-        existingStart,
-        existingStart + TOTAL_BLOCK_MINUTES,
-      );
+      transaction.set(bookingRef, {
+        customerId: customerRef.id,
+        customerName: String(body.name).trim(),
+        customerPhone: normalizedPhone,
+        customerLineId: body.lineId ? String(body.lineId).trim() : null,
+        serviceName: String(body.service),
+        preferredDate: date,
+        preferredTime: time,
+        status: "pending_confirmation",
+        isFirstVisit,
+        depositRequired: null,
+        depositAmount: null,
+        paymentStatus: "not_requested",
+        durationMinutes: 90,
+        bufferMinutes: 30,
+        slotStart,
+        slotEnd,
+        lockIds: lockRefs.map((ref) => ref.id),
+        note: body.note ? String(body.note).trim() : null,
+        createdAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+
+      lockRefs.forEach((lockRef, index) => {
+        transaction.set(lockRef, {
+          bookingId: bookingRef.id,
+          date,
+          time: blockedTimes[index],
+          state: "held",
+          createdAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+      });
     });
-  }
-
-  if (conflict) {
-    return NextResponse.json({ error: "這個時段剛被其他預約保留，請改選其他時間。" }, { status: 409 });
-  }
-
-  const normalizedPhone = String(body.phone).replace(/\s|-/g, "");
-  let customerId: string | null = null;
-  let visitCount = 0;
-
-  const existing = await supabase
-    .from("customers")
-    .select("id, visit_count")
-    .eq("phone", normalizedPhone)
-    .maybeSingle();
-
-  if (existing.data) {
-    customerId = existing.data.id;
-    visitCount = existing.data.visit_count || 0;
-    await supabase
-      .from("customers")
-      .update({ name: body.name, line_id: body.lineId || null, updated_at: new Date().toISOString() })
-      .eq("id", customerId);
-  } else {
-    const created = await supabase
-      .from("customers")
-      .insert({ name: body.name, phone: normalizedPhone, line_id: body.lineId || null, visit_count: 0 })
-      .select("id")
-      .single();
-    if (created.error) return NextResponse.json({ error: "顧客資料建立失敗。" }, { status: 500 });
-    customerId = created.data.id;
-  }
-
-  const serviceRecord = await supabase.from("services").select("id").eq("name", body.service).maybeSingle();
-
-  const bookingPayload = {
-    customer_id: customerId,
-    service_id: serviceRecord.data?.id || null,
-    service_name_snapshot: body.service,
-    preferred_date: date,
-    preferred_time: time,
-    status: "pending_confirmation",
-    is_first_visit: visitCount === 0,
-    deposit_required: null,
-    payment_status: "not_requested",
-    duration_minutes: 90,
-    buffer_minutes: 30,
-    slot_start: slotStart,
-    slot_end: slotEnd,
-    note: body.note || null,
-  };
-
-  let booking = await supabase.from("bookings").insert(bookingPayload).select("id").single();
-
-  if (booking.error && /slot_start|slot_end|duration_minutes|buffer_minutes/i.test(booking.error.message || "")) {
-    const { slot_start: _start, slot_end: _end, duration_minutes: _duration, buffer_minutes: _buffer, ...legacyPayload } = bookingPayload;
-    booking = await supabase.from("bookings").insert(legacyPayload).select("id").single();
-  }
-
-  if (booking.error) {
-    if (booking.error.code === "23P01") {
+  } catch (error) {
+    if (error instanceof Error && error.message === "SLOT_CONFLICT") {
       return NextResponse.json({ error: "這個時段剛被其他預約保留，請改選其他時間。" }, { status: 409 });
     }
-    return NextResponse.json({ error: "預約建立失敗。" }, { status: 500 });
+    console.error("booking-create", error);
+    return NextResponse.json({ error: "預約建立失敗，請稍後再試。" }, { status: 500 });
   }
 
-  return NextResponse.json({ ok: true, bookingId: booking.data.id, status: "pending_confirmation" });
+  return NextResponse.json({ ok: true, bookingId: bookingRef.id, status: "pending_confirmation" });
 }
