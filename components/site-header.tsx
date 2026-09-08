@@ -5,6 +5,24 @@ import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { brand, navItems } from "@/lib/site-data";
 
+const englishLabels: Record<string, string> = {
+  "/about": "ABOUT",
+  "/services": "SERVICES",
+  "/menu": "MENU",
+  "/space": "SPACE",
+  "/courses": "COURSES",
+  "/booking": "BOOKING",
+};
+
+function NavLabel({ zh, en }: { zh: string; en: string }) {
+  return (
+    <span className="nav-label">
+      <strong className="nav-zh">{zh}</strong>
+      <small className="nav-en">{en}</small>
+    </span>
+  );
+}
+
 export function SiteHeader() {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
@@ -32,12 +50,18 @@ export function SiteHeader() {
     moveIndicator(linkRefs.current[key] || null);
   }, [moveIndicator, pathname]);
 
+  const closeMenu = useCallback(() => setOpen(false), []);
+
+  useEffect(() => {
+    closeMenu();
+  }, [pathname, closeMenu]);
+
   useEffect(() => {
     const frame = requestAnimationFrame(() => {
-      if (window.innerWidth > 820 || open) moveToCurrent();
+      if (window.innerWidth > 900 || open) moveToCurrent();
     });
     const onResize = () => {
-      if (window.innerWidth > 820 || open) moveToCurrent();
+      if (window.innerWidth > 900 || open) moveToCurrent();
       else if (indicatorRef.current) indicatorRef.current.style.opacity = "0";
     };
     window.addEventListener("resize", onResize);
@@ -47,7 +71,19 @@ export function SiteHeader() {
     };
   }, [moveToCurrent, open]);
 
-  const closeMenu = () => setOpen(false);
+  useEffect(() => {
+    if (!open) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") closeMenu();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [open, closeMenu]);
 
   return (
     <header className="site-header">
@@ -55,11 +91,23 @@ export function SiteHeader() {
         <Link href="/" className="brand-mark" onClick={closeMenu}>
           <span className="brand-77">77</span>waxing
         </Link>
-        <button className="menu-toggle" aria-label="切換選單" aria-expanded={open} onClick={() => setOpen(!open)}>
+        <button
+          className={open ? "menu-toggle is-open" : "menu-toggle"}
+          aria-label={open ? "關閉選單" : "開啟選單"}
+          aria-expanded={open}
+          aria-controls="primary-navigation"
+          onClick={() => setOpen((value) => !value)}
+        >
           <span />
           <span />
         </button>
-        <nav ref={navRef} className={open ? "site-nav is-open" : "site-nav"} onMouseLeave={moveToCurrent}>
+        {open && <button className="site-nav-backdrop" aria-label="關閉選單" onClick={closeMenu} />}
+        <nav
+          id="primary-navigation"
+          ref={navRef}
+          className={open ? "site-nav is-open" : "site-nav"}
+          onMouseLeave={moveToCurrent}
+        >
           <span ref={indicatorRef} className="nav-motion-indicator" aria-hidden="true" />
           {navItems.filter(([, href]) => href !== "/booking").map(([label, href]) => (
             <Link
@@ -71,7 +119,7 @@ export function SiteHeader() {
               onFocus={(event) => moveIndicator(event.currentTarget)}
               onClick={closeMenu}
             >
-              {label}
+              <NavLabel zh={label} en={englishLabels[href] || ""} />
             </Link>
           ))}
           <Link
@@ -82,7 +130,7 @@ export function SiteHeader() {
             onFocus={(event) => moveIndicator(event.currentTarget)}
             onClick={closeMenu}
           >
-            立即預約
+            <NavLabel zh="立即預約" en="BOOKING" />
           </Link>
         </nav>
       </div>
