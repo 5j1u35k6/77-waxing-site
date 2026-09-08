@@ -1,8 +1,9 @@
 <!doctype html><meta charset="utf-8"><script>
 const b='/77-waxing-site';
+const v='20260908-1545';
 let p=location.pathname.startsWith(b)?location.pathname.slice(b.length):location.pathname;
 if(!p.startsWith('/'))p='/'+p;
 if(p==='/admin'||p.startsWith('/admin/'))p='/admin/';
 if(p==='/booking'||p.startsWith('/booking/'))p='/booking/';
-location.replace(b+'/?p='+encodeURIComponent(p)+(location.hash||''));
+location.replace(b+'/?p='+encodeURIComponent(p)+'&v='+v+(location.hash||''));
 </script><p>Redirecting…</p>

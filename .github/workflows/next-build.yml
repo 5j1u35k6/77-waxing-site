@@ -20,6 +20,9 @@ jobs:
         run: |
           node --check assets/pages.js
           node --check assets/experience-v3.js
+          node --check assets/firebase-bootstrap.js
+          cp assets/firebase-pages.js /tmp/firebase-pages.mjs
+          node --check /tmp/firebase-pages.mjs
       - name: Install dependencies
         run: npm install --no-audit --no-fund
       - name: Build Next.js
