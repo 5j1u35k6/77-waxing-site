@@ -2,7 +2,6 @@
   const REPO_BASE='/77-waxing-site';
   const onGithubPages=location.hostname.endsWith('github.io');
   const bookingUrl=onGithubPages?`${REPO_BASE}/booking/`:'/booking/';
-  const adminUrl=onGithubPages?`${REPO_BASE}/admin/`:'/admin/';
   const siteUrl=onGithubPages?`${REPO_BASE}/`:'/';
   const DURATION_MINUTES=90;
 
@@ -84,16 +83,8 @@
     document.querySelectorAll('#booking .success a,#booking .success button').forEach((control)=>{
       if(!/預約|時段/.test(control.textContent||''))return;
       setText(control,'回到預約頁面');
-      if(control.tagName==='A'&&control.getAttribute('href')!==bookingUrl)control.setAttribute('href',bookingUrl);
+      if(control.tagName==='A')control.setAttribute('href',bookingUrl);
       control.dataset.bookingReturn='1';
-    });
-
-    document.querySelectorAll('a[href*="netlify.app"]').forEach((anchor)=>{
-      try{
-        const url=new URL(anchor.href);
-        const target=url.pathname.includes('/admin')?adminUrl:url.pathname.includes('/booking')?bookingUrl:siteUrl;
-        anchor.setAttribute('href',target);
-      }catch{}
     });
   }
 
@@ -194,15 +185,6 @@
     if(!anchor)return;
     let url;
     try{url=new URL(anchor.href,location.href);}catch{return;}
-
-    if(url.hostname.endsWith('netlify.app')){
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      const target=url.pathname.includes('/admin')?adminUrl:url.pathname.includes('/booking')?bookingUrl:siteUrl;
-      window.location.assign(target);
-      return;
-    }
-
     if(onGithubPages&&url.origin===location.origin&&url.pathname===bookingUrl&&location.pathname!==bookingUrl){
       event.preventDefault();
       event.stopImmediatePropagation();
