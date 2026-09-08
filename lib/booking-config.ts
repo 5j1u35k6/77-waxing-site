@@ -3,16 +3,10 @@ export const SLOT_INTERVAL_MINUTES = 30;
 export const DEFAULT_SERVICE_DURATION_MINUTES = 90;
 export const TURNOVER_BUFFER_MINUTES = 30;
 export const TOTAL_BLOCK_MINUTES = DEFAULT_SERVICE_DURATION_MINUTES + TURNOVER_BUFFER_MINUTES;
-export const BLOCK_SLOT_COUNT = TOTAL_BLOCK_MINUTES / SLOT_INTERVAL_MINUTES;
 export const FIRST_START_TIME = "10:00";
 export const LAST_START_TIME = "20:00";
 
-export const ACTIVE_BLOCKING_STATUSES = [
-  "pending_confirmation",
-  "pending_payment",
-  "confirmed",
-] as const;
-
+export const ACTIVE_BLOCKING_STATUSES = ["pending_confirmation", "pending_payment", "confirmed"] as const;
 export const CONFIRMED_HIDDEN_STATUSES = ["pending_payment", "confirmed"] as const;
 
 export function timeToMinutes(time: string) {
@@ -31,22 +25,20 @@ export function minutesToTime(total: number) {
   return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
 }
 
-export function allStartTimes() {
-  const first = timeToMinutes(FIRST_START_TIME)!;
-  const last = timeToMinutes(LAST_START_TIME)!;
+export function allStartTimes(firstTime = FIRST_START_TIME, lastTime = LAST_START_TIME) {
+  const first = timeToMinutes(firstTime);
+  const last = timeToMinutes(lastTime);
+  if (first === null || last === null || first > last) return [];
   const result: string[] = [];
-  for (let minute = first; minute <= last; minute += SLOT_INTERVAL_MINUTES) {
-    result.push(minutesToTime(minute));
-  }
+  for (let minute = first; minute <= last; minute += SLOT_INTERVAL_MINUTES) result.push(minutesToTime(minute));
   return result;
 }
 
-export function blockedTimesFromStart(startTime: string) {
+export function blockedTimesFromStart(startTime: string, blockMinutes = TOTAL_BLOCK_MINUTES) {
   const start = timeToMinutes(startTime);
   if (start === null) return [];
-  return Array.from({ length: BLOCK_SLOT_COUNT }, (_, index) =>
-    minutesToTime(start + index * SLOT_INTERVAL_MINUTES),
-  );
+  const slotCount = Math.max(1, Math.ceil(blockMinutes / SLOT_INTERVAL_MINUTES));
+  return Array.from({ length: slotCount }, (_, index) => minutesToTime(start + index * SLOT_INTERVAL_MINUTES));
 }
 
 export function toTaipeiIso(date: string, time: string) {
