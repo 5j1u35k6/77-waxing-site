@@ -6,6 +6,7 @@ import {
   customerIdFromPaperRef,
   customerIdFromPhone,
   getAdminFirestore,
+  phoneIndexId,
 } from "@/lib/firebase-admin";
 
 function parseCsv(text: string) {
@@ -83,8 +84,15 @@ export async function POST(request: Request) {
     if (!name || (!phone && !legacyRef && !paperRecordRef)) { skipped += 1; continue; }
 
     try {
-      let targetRef = phone ? db.collection("customers").doc(customerIdFromPhone(phone)) : null;
-      let existing = targetRef ? await targetRef.get() : null;
+      let targetRef = null as FirebaseFirestore.DocumentReference | null;
+      let existing = null as FirebaseFirestore.DocumentSnapshot | null;
+
+      if (phone) {
+        const indexSnapshot = await db.collection("customerPhoneIndex").doc(phoneIndexId(phone)).get();
+        const indexedId = indexSnapshot.exists ? String(indexSnapshot.data()?.customerId || "") : "";
+        targetRef = db.collection("customers").doc(indexedId || customerIdFromPhone(phone));
+        existing = await targetRef.get();
+      }
 
       if ((!existing || !existing.exists) && legacyRef) {
         const match = await db.collection("customers").where("legacyRef", "==", legacyRef).limit(1).get();
@@ -121,7 +129,18 @@ export async function POST(request: Request) {
         updatedAt: FieldValue.serverTimestamp(),
       };
       if (!existing?.exists) payload.createdAt = FieldValue.serverTimestamp();
-      await targetRef.set(payload, { merge: true });
+
+      const batch = db.batch();
+      batch.set(targetRef, payload, { merge: true });
+      if (phone) {
+        batch.set(db.collection("customerPhoneIndex").doc(phoneIndexId(phone)), {
+          customerId: targetRef.id,
+          phone,
+          updatedAt: FieldValue.serverTimestamp(),
+        }, { merge: true });
+      }
+      await batch.commit();
+
       if (existing?.exists) updated += 1;
       else imported += 1;
     } catch (error) {
