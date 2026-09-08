@@ -40,6 +40,12 @@
  hamb.setAttribute('aria-controls','static-primary-navigation');
  nav.id='static-primary-navigation';
  hamb.addEventListener('click',()=>requestAnimationFrame(sync));
+ nav.addEventListener('click',event=>{
+   if(innerWidth>850)return;
+   const link=event.target.closest?.('a[href]');
+   if(!link||!nav.contains(link))return;
+   requestAnimationFrame(close);
+ });
  nav.addEventListener('mouseleave',()=>moveCursor(current()));
  nav.addEventListener('focusout',e=>{if(!nav.contains(e.relatedTarget))moveCursor(current())});
  backdrop.addEventListener('click',close);
