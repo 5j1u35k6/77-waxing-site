@@ -4,8 +4,8 @@ export const DEFAULT_SERVICE_DURATION_MINUTES = 90;
 export const TURNOVER_BUFFER_MINUTES = 30;
 export const TOTAL_BLOCK_MINUTES = DEFAULT_SERVICE_DURATION_MINUTES + TURNOVER_BUFFER_MINUTES;
 export const BLOCK_SLOT_COUNT = TOTAL_BLOCK_MINUTES / SLOT_INTERVAL_MINUTES;
-export const OPENING_TIME = "10:00";
-export const CLOSING_TIME = "20:00";
+export const FIRST_START_TIME = "10:00";
+export const LAST_START_TIME = "20:00";
 
 export const ACTIVE_BLOCKING_STATUSES = [
   "pending_confirmation",
@@ -25,17 +25,17 @@ export function timeToMinutes(time: string) {
 }
 
 export function minutesToTime(total: number) {
-  const hour = Math.floor(total / 60);
-  const minute = total % 60;
+  const normalized = ((total % 1440) + 1440) % 1440;
+  const hour = Math.floor(normalized / 60);
+  const minute = normalized % 60;
   return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
 }
 
 export function allStartTimes() {
-  const open = timeToMinutes(OPENING_TIME)!;
-  const close = timeToMinutes(CLOSING_TIME)!;
-  const lastStart = close - TOTAL_BLOCK_MINUTES;
+  const first = timeToMinutes(FIRST_START_TIME)!;
+  const last = timeToMinutes(LAST_START_TIME)!;
   const result: string[] = [];
-  for (let minute = open; minute <= lastStart; minute += SLOT_INTERVAL_MINUTES) {
+  for (let minute = first; minute <= last; minute += SLOT_INTERVAL_MINUTES) {
     result.push(minutesToTime(minute));
   }
   return result;
