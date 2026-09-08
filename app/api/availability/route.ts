@@ -1,11 +1,6 @@
 import { NextResponse } from "next/server";
-import { getAdminSupabase } from "@/lib/supabase";
-import {
-  ACTIVE_BLOCKING_STATUSES,
-  CONFIRMED_HIDDEN_STATUSES,
-  allStartTimes,
-  blockedTimesFromStart,
-} from "@/lib/booking-config";
+import { getAdminFirestore } from "@/lib/firebase-admin";
+import { allStartTimes, blockedTimesFromStart } from "@/lib/booking-config";
 
 function parseCalendarDate(value: string) {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
@@ -54,24 +49,22 @@ export async function GET(request: Request) {
   const allSlots = allStartTimes();
   const stateByDate = new Map<string, Map<string, "held" | "hidden">>();
 
-  const supabase = getAdminSupabase();
+  const db = getAdminFirestore();
   let demoMode = false;
 
-  if (supabase) {
-    const { data } = await supabase
-      .from("bookings")
-      .select("preferred_date, preferred_time, status")
-      .gte("preferred_date", startDate)
-      .lte("preferred_date", endDate)
-      .in("status", [...ACTIVE_BLOCKING_STATUSES]);
+  if (db) {
+    const snapshot = await db.collection("availabilityLocks")
+      .where("date", ">=", startDate)
+      .where("date", "<=", endDate)
+      .get();
 
-    for (const booking of data || []) {
-      const date = String(booking.preferred_date || "");
-      const start = String(booking.preferred_time || "").slice(0, 5);
-      if (!date || !/^\d{2}:\d{2}$/.test(start)) continue;
+    for (const doc of snapshot.docs) {
+      const lock = doc.data();
+      const date = String(lock.date || "");
+      const time = String(lock.time || "").slice(0, 5);
+      if (!date || !/^\d{2}:\d{2}$/.test(time)) continue;
       const dayMap = stateByDate.get(date) || new Map<string, "held" | "hidden">();
-      const nextState = (CONFIRMED_HIDDEN_STATUSES as readonly string[]).includes(String(booking.status)) ? "hidden" : "held";
-      for (const time of blockedTimesFromStart(start)) dayMap.set(time, nextState);
+      dayMap.set(time, lock.state === "confirmed" ? "hidden" : "held");
       stateByDate.set(date, dayMap);
     }
   } else {
