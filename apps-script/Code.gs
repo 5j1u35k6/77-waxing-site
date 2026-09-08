@@ -1,29 +1,60 @@
 const PROJECT_ID = 'waxing-86909';
 const FIRESTORE_BASE = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
 const STORE_EMAIL = '77waxing.mail@gmail.com';
-const SCRIPT_VERSION = '2026-09-08-email-v4';
+const SCRIPT_VERSION = '2026-09-08-email-v5';
+
+function senderStatus_() {
+  const effectiveEmail = String(Session.getEffectiveUser().getEmail() || '').trim().toLowerCase();
+  let aliases = [];
+  try {
+    aliases = GmailApp.getAliases().map(v => String(v || '').trim().toLowerCase()).filter(Boolean);
+  } catch (err) {
+    aliases = [];
+  }
+  const target = STORE_EMAIL.toLowerCase();
+  return {
+    effectiveEmail,
+    aliases,
+    canSendAsStore: !effectiveEmail || effectiveEmail === target || aliases.includes(target),
+  };
+}
+
+function senderOptions_() {
+  const status = senderStatus_();
+  const target = STORE_EMAIL.toLowerCase();
+  if (status.effectiveEmail && status.effectiveEmail !== target && !status.aliases.includes(target)) {
+    throw new Error(`WRONG_GAS_SENDER:${status.effectiveEmail}. Please deploy/authorize this Apps Script as ${STORE_EMAIL}.`);
+  }
+  const options = {
+    name: '77waxing',
+    replyTo: STORE_EMAIL,
+  };
+  if (status.effectiveEmail !== target && status.aliases.includes(target)) {
+    options.from = STORE_EMAIL;
+  }
+  return options;
+}
 
 function doGet() {
+  const sender = senderStatus_();
   return json_({
     ok: true,
     service: '77waxing-email',
     version: SCRIPT_VERSION,
     storeEmail: STORE_EMAIL,
+    effectiveSender: sender.effectiveEmail || null,
+    canSendAsStore: sender.canSendAsStore,
     remainingDailyQuota: MailApp.getRemainingDailyQuota(),
   });
 }
 
 function testSelfEmail() {
-  const to = String(Session.getEffectiveUser().getEmail() || '').trim();
-  if (!to) throw new Error('Cannot determine the Google account email for this script.');
-  MailApp.sendEmail({
-    to,
-    subject: '77waxing｜Email 系統測試成功',
-    body: '77waxing Email 系統測試成功。',
-    htmlBody: shell_('Email 系統測試成功', '<p>如果你收到這封信，代表 Google Apps Script 的寄信權限與 MailApp 都正常。</p>'),
-    name: '77waxing',
-  });
-  return `sent:${to}`;
+  send_(
+    STORE_EMAIL,
+    '77waxing｜Email 系統測試成功',
+    shell_('Email 系統測試成功', '<p>如果你收到這封信，代表 Google Apps Script 已使用 77waxing 店家信箱寄信。</p>')
+  );
+  return `sent:${STORE_EMAIL}`;
 }
 
 function doPost(e) {
@@ -155,13 +186,9 @@ function decodeValue_(v) {
 }
 
 function send_(to, subject, html) {
-  MailApp.sendEmail({
-    to,
-    subject,
-    body: htmlToText_(html),
-    htmlBody: html,
-    name: '77waxing',
-  });
+  const options = senderOptions_();
+  options.htmlBody = html;
+  GmailApp.sendEmail(to, subject, htmlToText_(html), options);
 }
 
 function serviceRange_(b) {
