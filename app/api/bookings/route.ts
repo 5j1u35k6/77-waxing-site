@@ -1,5 +1,11 @@
 import { NextResponse } from "next/server";
-import { FieldValue, availabilityLockId, customerIdFromPhone, getAdminFirestore } from "@/lib/firebase-admin";
+import {
+  FieldValue,
+  availabilityLockId,
+  customerIdFromPhone,
+  getAdminFirestore,
+  phoneIndexId,
+} from "@/lib/firebase-admin";
 import {
   TOTAL_BLOCK_MINUTES,
   addMinutesToTaipeiIso,
@@ -51,20 +57,13 @@ export async function POST(request: Request) {
 
   const db = getAdminFirestore();
   if (!db) {
-    return NextResponse.json({
-      ok: true,
-      demoMode: true,
-      bookingId: `DEMO-${Date.now()}`,
-      status: "pending_confirmation",
-    });
+    return NextResponse.json({ ok: true, demoMode: true, bookingId: `DEMO-${Date.now()}`, status: "pending_confirmation" });
   }
 
   const bookingRef = db.collection("bookings").doc();
-  const customerRef = db.collection("customers").doc(customerIdFromPhone(normalizedPhone));
+  const phoneIndexRef = db.collection("customerPhoneIndex").doc(phoneIndexId(normalizedPhone));
   const blockedTimes = blockedTimesFromStart(time);
-  const lockRefs = blockedTimes.map((blockedTime) =>
-    db.collection("availabilityLocks").doc(availabilityLockId(date, blockedTime)),
-  );
+  const lockRefs = blockedTimes.map((blockedTime) => db.collection("availabilityLocks").doc(availabilityLockId(date, blockedTime)));
   const slotStart = new Date(toTaipeiIso(date, time)).toISOString();
   const slotEnd = addMinutesToTaipeiIso(date, time, TOTAL_BLOCK_MINUTES);
 
@@ -72,10 +71,11 @@ export async function POST(request: Request) {
     await db.runTransaction(async (transaction) => {
       const lockSnapshots = [];
       for (const lockRef of lockRefs) lockSnapshots.push(await transaction.get(lockRef));
-      if (lockSnapshots.some((snapshot) => snapshot.exists)) {
-        throw new Error("SLOT_CONFLICT");
-      }
+      if (lockSnapshots.some((snapshot) => snapshot.exists)) throw new Error("SLOT_CONFLICT");
 
+      const phoneIndexSnapshot = await transaction.get(phoneIndexRef);
+      const indexedCustomerId = phoneIndexSnapshot.exists ? String(phoneIndexSnapshot.data()?.customerId || "") : "";
+      const customerRef = db.collection("customers").doc(indexedCustomerId || customerIdFromPhone(normalizedPhone));
       const customerSnapshot = await transaction.get(customerRef);
       const existingCustomer = customerSnapshot.exists ? customerSnapshot.data() || {} : {};
       const visitCount = Number(existingCustomer.visitCount || 0);
@@ -95,6 +95,11 @@ export async function POST(request: Request) {
         customerPayload.defaultDepositRequired = null;
       }
       transaction.set(customerRef, customerPayload, { merge: true });
+      transaction.set(phoneIndexRef, {
+        customerId: customerRef.id,
+        phone: normalizedPhone,
+        updatedAt: FieldValue.serverTimestamp(),
+      }, { merge: true });
 
       transaction.set(bookingRef, {
         customerId: customerRef.id,
