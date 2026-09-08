@@ -6,6 +6,7 @@ import {
   customerIdFromPaperRef,
   customerIdFromPhone,
   getAdminFirestore,
+  phoneIndexId,
   stableDocId,
 } from "@/lib/firebase-admin";
 
@@ -33,6 +34,14 @@ export async function POST(request: Request) {
 
   if (!name) return NextResponse.redirect(new URL("/admin/customers?error=姓名為必填", request.url), 303);
 
+  if (phone) {
+    const indexSnapshot = await db.collection("customerPhoneIndex").doc(phoneIndexId(phone)).get();
+    if (indexSnapshot.exists) {
+      const customerId = String(indexSnapshot.data()?.customerId || "");
+      if (customerId) return NextResponse.redirect(new URL(`/admin/customers/${customerId}?error=此手機已存在顧客資料`, request.url), 303);
+    }
+  }
+
   let docId = "";
   if (phone) docId = customerIdFromPhone(phone);
   else if (legacyRef) docId = customerIdFromLegacyRef(legacyRef);
@@ -43,7 +52,8 @@ export async function POST(request: Request) {
   const existing = await ref.get();
   if (existing.exists) return NextResponse.redirect(new URL(`/admin/customers/${ref.id}?error=顧客可能已存在`, request.url), 303);
 
-  await ref.set({
+  const batch = db.batch();
+  batch.set(ref, {
     name,
     phone: phone || null,
     phoneNormalized: phone || null,
@@ -60,6 +70,14 @@ export async function POST(request: Request) {
     createdAt: FieldValue.serverTimestamp(),
     updatedAt: FieldValue.serverTimestamp(),
   });
+  if (phone) {
+    batch.set(db.collection("customerPhoneIndex").doc(phoneIndexId(phone)), {
+      customerId: ref.id,
+      phone,
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+  }
+  await batch.commit();
 
   return NextResponse.redirect(new URL(`/admin/customers/${ref.id}?created=1`, request.url), 303);
 }
