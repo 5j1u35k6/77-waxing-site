@@ -13,6 +13,7 @@
         if(logout){const a=document.createElement('a');a.href='/77-waxing-site/';a.textContent='← 回到網站';a.dataset.adminSiteLink='1';a.className='admin-site-link';sidebar.insertBefore(a,logout);}
       }
     }
+    document.querySelectorAll('body.admin-page > .firebase-state.ok,body.admin-page > .firebase-state.info,#app > .firebase-state.ok,#app > .firebase-state.info').forEach(n=>n.remove());
     root.querySelectorAll('.firebase-state.ok,.firebase-state.info').forEach(n=>n.remove());
     root.querySelectorAll('.admin-topline .tag').forEach(n=>{if(n.textContent.includes('FIRESTORE'))n.textContent='ADMIN';});
     root.querySelectorAll('.firebase-live').forEach(n=>{if(n.textContent!=='● 即時同步')n.textContent='● 即時同步';});
@@ -23,6 +24,6 @@
     }
   }
   function schedule(){if(scheduled)return;scheduled=true;requestAnimationFrame(run);}
-  new MutationObserver(schedule).observe(document.querySelector('#admin-preview')||document.body,{childList:true,subtree:true});
+  new MutationObserver(schedule).observe(document.body,{childList:true,subtree:true});
   run();
 })();
