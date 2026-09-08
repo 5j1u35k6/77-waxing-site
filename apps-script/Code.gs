@@ -1,6 +1,6 @@
 const PROJECT_ID = 'waxing-86909';
 const FIRESTORE_BASE = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
-const SCRIPT_VERSION = '2026-09-08-email-v2';
+const SCRIPT_VERSION = '2026-09-08-email-v3';
 
 function doGet() {
   return json_({
@@ -16,10 +16,10 @@ function testSelfEmail() {
   if (!to) throw new Error('Cannot determine the Google account email for this script.');
   MailApp.sendEmail({
     to,
-    subject: '77美學工作室｜Email 系統測試成功',
+    subject: '77waxing｜Email 系統測試成功',
     body: '77waxing Email 系統測試成功。',
     htmlBody: shell_('Email 系統測試成功', '<p>如果你收到這封信，代表 Google Apps Script 的寄信權限與 MailApp 都正常。</p>'),
-    name: '77美學工作室',
+    name: '77waxing',
   });
   return `sent:${to}`;
 }
@@ -62,11 +62,17 @@ function sendForStatus_(b, s) {
   const customerEmail = String(b.customerEmail || '').trim();
   const storeEmail = String(s.storeEmail || '').trim();
   const status = String(b.status || '');
+  const customerName = String(b.customerName || '顧客').trim() || '顧客';
   let sent = false;
 
   if (status === 'pending_confirmation') {
     if (customerEmail) {
-      send_(customerEmail, '77美學工作室｜已收到你的預約需求', shell_('已收到你的預約需求', `<p>你的預約需求已送出，目前正在等待店家確認。</p>${bookingTable_(b)}<p>確認完成後，我們會再寄一封 Email 通知你。</p>`));
+      const title = `您好 ${customerName}，已收到你的預約`;
+      const body = `<p>你的預約需求已送出，這是您這次的預約明細。</p>
+        ${bookingInfo_(b)}
+        <p>77waxing確認完成後，我們會再寄一封 Email 通知你。</p>
+        <p>若預約資訊需要調整，也可以直接與 77waxing 聯繫。</p>`;
+      send_(customerEmail, '77waxing｜已收到你的預約需求', shell_(title, body));
       sent = true;
     }
     if (storeEmail) {
@@ -77,20 +83,38 @@ function sendForStatus_(b, s) {
   }
 
   if (!customerEmail) return false;
+
   if (status === 'pending_payment') {
-    const amount = b.depositAmount ? ` NT$${esc_(b.depositAmount)}` : '';
-    const qr = s.depositQrUrl ? `<div style="margin:18px 0"><p><b>請完成訂金：</b>${amount}</p><img src="${esc_(s.depositQrUrl)}" alt="訂金 QR Code" style="max-width:240px;width:100%;height:auto;border-radius:12px"></div>` : `<p><b>請完成訂金：</b>${amount}</p>`;
-    send_(customerEmail, '77美學工作室｜預約已確認，請完成訂金', shell_('預約可安排｜等待訂金', `<p>店家已確認可以安排這次預約，請依下方資訊完成訂金。</p>${bookingTable_(b)}${qr}`));
+    const amount = b.depositAmount ? `NT$${esc_(b.depositAmount)}` : 'NT$—';
+    const qr = s.depositQrUrl
+      ? `<div style="margin:20px 0"><p style="margin:0 0 12px"><b>請完成訂金：${amount}</b></p><img src="${esc_(s.depositQrUrl)}" alt="訂金 QR Code" style="display:block;max-width:240px;width:100%;height:auto;border-radius:12px"></div>`
+      : `<p><b>請完成訂金：${amount}</b></p>`;
+    const title = `您好 ${customerName}，你的預約可安排｜等待支付定金`;
+    const body = `<p>77waxing已確認可以安排這次預約，請依下方資訊完成定金。</p>
+      ${bookingInfo_(b)}
+      ${qr}`;
+    send_(customerEmail, '77waxing｜預約已確認，請支付定金', shell_(title, body));
     return true;
   }
+
   if (status === 'confirmed') {
-    send_(customerEmail, '77美學工作室｜預約已確認', shell_('預約已確認', `<p>店家已確認可以安排這次預約。</p>${bookingTable_(b)}<p>期待見到你。</p>`));
+    const title = `您好 ${customerName}，預約已確認`;
+    const body = `<p>77waxing已確認可以安排這次預約，無需支付定金。</p>
+      ${bookingInfo_(b)}
+      <p>好期待到時見到你呀 ♡</p>`;
+    send_(customerEmail, '77waxing｜預約已確認', shell_(title, body));
     return true;
   }
+
   if (status === 'cancelled' && b.rejectionReasonCode) {
-    send_(customerEmail, '77美學工作室｜預約安排通知', shell_('這次預約無法安排', `<p>${esc_(rejectionText_(b))}</p>${bookingTable_(b)}<p>謝謝你的理解。</p>`));
+    const title = `您好 ${customerName}，這次預約無法安排`;
+    const body = `<p>${esc_(rejectionText_(b))}</p>
+      ${bookingInfo_(b)}
+      <p>多謝你嘅理解。</p>`;
+    send_(customerEmail, '77waxing｜預約安排通知', shell_(title, body));
     return true;
   }
+
   return false;
 }
 
@@ -115,6 +139,7 @@ function decodeMap_(fields) {
   Object.keys(fields || {}).forEach(k => out[k] = decodeValue_(fields[k]));
   return out;
 }
+
 function decodeValue_(v) {
   if ('stringValue' in v) return v.stringValue;
   if ('integerValue' in v) return Number(v.integerValue);
@@ -131,33 +156,89 @@ function send_(to, subject, html) {
   MailApp.sendEmail({
     to,
     subject,
-    body: html.replace(/<[^>]+>/g,' '),
+    body: htmlToText_(html),
     htmlBody: html,
-    name: '77美學工作室',
+    name: '77waxing',
   });
 }
+
 function serviceRange_(b) {
   const start = b.preferredTime || '—';
   const mins = Number(b.actualDurationMinutes || b.durationMinutes || 0);
   return mins ? `${start}–${addMinutes_(start, mins)}` : start;
 }
+
 function addMinutes_(time, amount) {
   const p = String(time || '').split(':').map(Number);
   if (p.length !== 2 || !isFinite(p[0]) || !isFinite(p[1])) return '—';
   const total = p[0]*60+p[1]+Number(amount||0);
   return `${String(Math.floor(total/60)%24).padStart(2,'0')}:${String(total%60).padStart(2,'0')}`;
 }
+
+function displayDate_(value) {
+  const raw = String(value || '').trim();
+  return /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw.replace(/-/g, '/') : (raw || '—');
+}
+
+function bookingInfo_(b) {
+  return `<div style="margin:22px 0;padding:18px 20px;background:#f9f6f0;border-radius:14px">
+    <div style="font-size:13px;font-weight:700;letter-spacing:.08em;margin-bottom:12px">預約資訊</div>
+    ${infoLine_('日期', displayDate_(b.preferredDate))}
+    ${infoLine_('時間', serviceRange_(b))}
+    ${infoLine_('項目', b.serviceName || '—')}
+    ${infoLine_('姓名', b.customerName || '—')}
+  </div>`;
+}
+
+function infoLine_(label, value) {
+  return `<div style="margin:7px 0;line-height:1.7"><span style="display:inline-block;min-width:52px;color:#777">${esc_(label)}｜</span><span>${esc_(value)}</span></div>`;
+}
+
 function bookingTable_(b) {
   return `<table style="border-collapse:collapse;margin:16px 0">${line_('日期', b.preferredDate || '—')}${line_('時間', serviceRange_(b))}${line_('服務', b.serviceName || '—')}${line_('姓名', b.customerName || '—')}</table>`;
 }
+
 function rejectionText_(b) {
   const code = b.rejectionReasonCode || 'other';
   if (code === 'conflict') return '目前該時段已有安排，這次無法接受此預約。';
   if (code === 'reschedule') return '目前需要調整預約時間，請重新選擇其他可預約時段。';
-  if (code === 'safety_or_fit') return '很抱歉，本次預約目前無法受理。如有需要，請直接與店家聯繫。';
+  if (code === 'safety_or_fit') return '很抱歉，本次預約目前無法受理。如有需要，請直接與77waxing聯繫。';
   return b.rejectionPublicReason || '很抱歉，本次預約目前無法受理。';
 }
-function line_(label, value) { return `<tr><td style="padding:6px 12px 6px 0;color:#777">${esc_(label)}</td><td style="padding:6px 0;font-weight:600">${esc_(value)}</td></tr>`; }
-function shell_(title, body) { return `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#3a3836;max-width:620px;margin:auto;padding:28px"><div style="font-family:Georgia,serif;font-size:28px;margin-bottom:20px"><b style="color:#c5a070">77</b>waxing</div><h2 style="font-size:21px">${esc_(title)}</h2>${body}<p style="margin-top:26px;color:#777;font-size:12px">77美學工作室</p></div>`; }
-function esc_(value) { return String(value == null ? '' : value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-function json_(obj) { return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON); }
+
+function line_(label, value) {
+  return `<tr><td style="padding:6px 12px 6px 0;color:#777">${esc_(label)}</td><td style="padding:6px 0;font-weight:600">${esc_(value)}</td></tr>`;
+}
+
+function shell_(title, body) {
+  return `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang TC',sans-serif;color:#3a3836;max-width:620px;margin:auto;padding:30px 24px;line-height:1.75">
+    <div style="font-family:Georgia,serif;font-size:28px;margin-bottom:22px"><b style="color:#c5a070">77</b>waxing</div>
+    <h2 style="font-size:20px;line-height:1.5;margin:0 0 18px">${esc_(title)}</h2>
+    ${body}
+    <p style="margin-top:30px;color:#777;font-size:12px">77waxing</p>
+  </div>`;
+}
+
+function htmlToText_(html) {
+  return String(html || '')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/p>/gi, '\n\n')
+    .replace(/<\/div>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+function esc_(value) {
+  return String(value == null ? '' : value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function json_(obj) {
+  return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
+}
