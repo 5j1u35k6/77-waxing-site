@@ -1,0 +1,10 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // The website and admin currently access Firestore only through the
+    // server-side Firebase Admin SDK. Client-side direct reads/writes are denied.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
