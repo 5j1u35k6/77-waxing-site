@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { AdminSidebar } from "@/components/admin-sidebar";
 import { allStartTimes, blockedTimesFromStart } from "@/lib/booking-config";
+import { getBookingRuntimeConfig } from "@/lib/booking-runtime";
 import { getAdminFirestore } from "@/lib/firebase-admin";
 
 export const dynamic = "force-dynamic";
@@ -36,6 +37,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
   const params = await searchParams;
   const selectedDate = /^\d{4}-\d{2}-\d{2}$/.test(params.date || "") ? String(params.date) : taipeiToday();
   const db = getAdminFirestore();
+  const runtime = await getBookingRuntimeConfig();
 
   const rows: Array<Record<string, any>> = [];
   if (db) {
@@ -46,13 +48,14 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
 
   const occupancy = new Map<string, Record<string, any>>();
   rows.filter((row) => ["pending_confirmation", "pending_payment", "confirmed"].includes(String(row.status))).forEach((row) => {
-    for (const time of blockedTimesFromStart(String(row.preferredTime || ""))) occupancy.set(time, row);
+    const blockMinutes = Number(row.durationMinutes || runtime.durationMinutes) + Number(row.bufferMinutes ?? runtime.bufferMinutes);
+    for (const time of blockedTimesFromStart(String(row.preferredTime || ""), blockMinutes)) occupancy.set(time, row);
   });
 
   return <div className="admin-body"><div className="admin-shell">
     <AdminSidebar active="calendar" />
     <main className="admin-main">
-      <div className="admin-top"><div><span className="eyebrow">CALENDAR</span><h1>預約行事曆</h1><p className="muted">一天一格查看 30 分鐘時段；目前服務以 90 分鐘＋30 分鐘整理時間鎖定。</p></div>{!db && <div className="demo-banner">尚未連接 Firebase</div>}</div>
+      <div className="admin-top"><div><span className="eyebrow">CALENDAR</span><h1>預約行事曆</h1><p className="muted">每 30 分鐘一格；占用長度會依該筆預約實際的施作時間＋整理緩衝顯示。</p></div>{!db && <div className="demo-banner">尚未連接 Firebase</div>}</div>
 
       <section className="admin-panel">
         <div className="admin-panel-head admin-calendar-toolbar">
@@ -63,7 +66,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
         <div className="admin-calendar-day">
           <div className="admin-calendar-date"><small>SELECTED DATE</small><strong>{selectedDate}</strong><span>{rows.length} 筆預約紀錄</span></div>
           <div className="admin-time-grid">
-            {allStartTimes().map((time) => {
+            {allStartTimes(runtime.firstStartTime, runtime.lastStartTime).map((time) => {
               const booking = occupancy.get(time);
               const start = booking && String(booking.preferredTime) === time;
               const status = booking ? String(booking.status || "") : "";
