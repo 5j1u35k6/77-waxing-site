@@ -2,6 +2,7 @@ import { getApp, getApps, initializeApp } from "https://www.gstatic.com/firebase
 import {
   browserLocalPersistence,
   getAuth,
+  onAuthStateChanged,
   setPersistence,
   signInWithEmailAndPassword,
   signOut,
@@ -26,6 +27,30 @@ function readableAuthError(error) {
   }
   return `登入失敗（${code || "unknown"}）。`;
 }
+
+function requestAdminRemount() {
+  const root = document.querySelector("#admin-preview");
+  if (!root) return;
+  delete root.dataset.firebaseMounted;
+  window.dispatchEvent(new PopStateEvent("popstate"));
+}
+
+async function hasAdminAccess(user) {
+  if (!user || user.isAnonymous) return false;
+  try {
+    const snapshot = await getDoc(doc(db, "admins", user.uid));
+    return snapshot.exists();
+  } catch (error) {
+    console.error("Admin permission check failed", error);
+    return false;
+  }
+}
+
+onAuthStateChanged(auth, async (user) => {
+  if (!(await hasAdminAccess(user))) return;
+  const loginForm = document.querySelector("[data-admin-login]");
+  if (loginForm) requestAdminRemount();
+});
 
 document.addEventListener("submit", async (event) => {
   const form = event.target instanceof HTMLFormElement ? event.target : null;
@@ -66,7 +91,11 @@ document.addEventListener("submit", async (event) => {
     }
 
     message.textContent = "登入成功，正在開啟管理後台…";
-    window.location.reload();
+    requestAdminRemount();
+
+    window.setTimeout(() => {
+      if (document.querySelector("[data-admin-login]")) requestAdminRemount();
+    }, 500);
   } catch (error) {
     console.error("Firebase admin login failed", error);
     message.textContent = readableAuthError(error);
