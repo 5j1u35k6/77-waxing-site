@@ -36,6 +36,10 @@ export function customerIdFromPhone(phone: string) {
   return stableDocId("customer-phone", phone);
 }
 
+export function phoneIndexId(phone: string) {
+  return stableDocId("customer-phone-index", phone);
+}
+
 export function customerIdFromLegacyRef(value: string) {
   return stableDocId("customer-legacy", value);
 }
