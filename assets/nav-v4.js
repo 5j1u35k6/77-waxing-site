@@ -1,25 +1,4 @@
 (()=>{
- const PROD='https://77waxing.netlify.app';
- const BASE='/77-waxing-site';
- const productionPath=href=>{
-  try{
-   const url=new URL(href,location.href);
-   if(url.origin!==location.origin)return null;
-   const path=url.pathname.startsWith(BASE)?url.pathname.slice(BASE.length):url.pathname;
-   if(path==='/booking'||path.startsWith('/booking/')||path==='/admin'||path.startsWith('/admin/'))return `${PROD}${path}${url.search}${url.hash}`;
-  }catch{}
-  return null;
- };
- document.addEventListener('click',event=>{
-  const target=event.target instanceof Element?event.target.closest('a[href]'):null;
-  if(!(target instanceof HTMLAnchorElement))return;
-  const destination=productionPath(target.href);
-  if(!destination)return;
-  event.preventDefault();
-  event.stopImmediatePropagation();
-  location.href=destination;
- },true);
-
  const header=document.querySelector('.header');
  const nav=header?.querySelector('nav');
  const hamb=header?.querySelector('.hamb');
