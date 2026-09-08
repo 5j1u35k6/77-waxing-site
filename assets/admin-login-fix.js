@@ -66,12 +66,12 @@ document.addEventListener("submit", async (event) => {
     }
 
     message.textContent = "登入成功，正在開啟管理後台…";
-    // A clean reload avoids competing mount/remount observers leaving the login card stuck.
+    // Force a fresh document load so old DOM observers cannot leave the login screen stuck.
     window.setTimeout(() => {
       const url = new URL(window.location.href);
+      url.searchParams.set("admin_session", Date.now().toString());
       url.hash = "dashboard";
       window.location.replace(url.toString());
-      window.location.reload();
     }, 120);
   } catch (error) {
     console.error("Firebase admin login failed", error);
