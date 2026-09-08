@@ -15,12 +15,8 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: npm
+          node-version: 24
       - name: Install dependencies
         run: npm install --no-audit --no-fund
       - name: Build Next.js
-        env:
-          ADMIN_PASSWORD: build-check-only
-          ADMIN_SESSION_TOKEN: build-check-only-session-token
         run: npm run build
