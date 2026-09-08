@@ -17,15 +17,15 @@ type BookingRow = {
   deposit: string;
 };
 
-const statusLabel = (status: string) => ({
+const statusLabels: Record<string, string> = {
   pending_confirmation: "待確認",
   pending_payment: "待付款",
   confirmed: "已確認",
   completed: "已完成",
   cancelled: "已取消",
   no_show: "未到店",
-}[status] || status);
-
+};
+const statusLabel = (status: string) => statusLabels[status] || status;
 const isStatus = (status: string, code: string, zh: string) => status === code || status.includes(zh);
 
 async function loadBookings(): Promise<{ rows: BookingRow[]; demo: boolean }> {
