@@ -10,6 +10,7 @@
    ['肌膚管理','skin-care'],
    ['美胸保養','bust-care']
  ];
+ const isDesktop=()=>innerWidth>850;
  let backdrop=document.querySelector('.static-nav-backdrop');
  if(!backdrop){backdrop=document.createElement('button');backdrop.className='static-nav-backdrop';backdrop.setAttribute('aria-label','關閉選單');header.after(backdrop)}
  let cursor=nav.querySelector('.nav-cursor');
@@ -36,8 +37,7 @@
  let hoverTarget=null;
  const hideCursor=()=>{if(cursor)cursor.style.opacity='0'};
  const moveCursor=(target,instant=false)=>{
-   if(!target||!cursor){hideCursor();return}
-   if(innerWidth<=850){hideCursor();return}
+   if(!target||!cursor||!isDesktop()||target.classList?.contains('book')){hideCursor();return}
    const nr=nav.getBoundingClientRect();
    const r=target.getBoundingClientRect();
    if(!r.width||!r.height){hideCursor();return}
@@ -48,14 +48,20 @@
    cursor.style.opacity='1';
    if(instant)requestAnimationFrame(()=>cursor.style.removeProperty('transition'));
  };
- const setCursor=(target)=>{hoverTarget=target;moveCursor(target)};
+ const setCursor=(target)=>{
+   if(!isDesktop()){hideCursor();return}
+   if(!target||target.classList?.contains('book')){hoverTarget=null;hideCursor();return}
+   hoverTarget=target;
+   moveCursor(target);
+ };
  const syncCursor=(instant=false)=>{
-   if(innerWidth<=850){hideCursor();return}
-   moveCursor(hoverTarget||current(),instant);
+   if(!isDesktop()){hideCursor();return}
+   const target=hoverTarget&&document.body.contains(hoverTarget)?hoverTarget:current();
+   moveCursor(target,instant);
  };
  let serviceCloseTimer=0;
  const positionServiceMenu=()=>{
-   if(!serviceLink||!serviceMenu||innerWidth<=850)return;
+   if(!serviceLink||!serviceMenu||!isDesktop())return;
    const nr=nav.getBoundingClientRect();
    const r=serviceLink.getBoundingClientRect();
    serviceMenu.style.left=`${r.left-nr.left+r.width/2}px`;
@@ -80,17 +86,50 @@
    clearTimeout(serviceCloseTimer);
    serviceCloseTimer=setTimeout(hideServiceMenu,130);
  };
+ const directNavLink=(target)=>{
+   const a=target?.closest?.('a[href]');
+   return a&&a.parentElement===nav?a:null;
+ };
+ const activateDesktopLink=(link)=>{
+   if(!isDesktop()||!link)return;
+   if(link.classList.contains('book')){
+     hoverTarget=null;
+     hideServiceMenu();
+     hideCursor();
+     return;
+   }
+   setCursor(link);
+   if(link===serviceLink)showServiceMenu();else hideServiceMenu();
+ };
+ nav.addEventListener('mouseover',event=>{
+   if(!isDesktop())return;
+   if(event.target.closest?.('.service-flyout')){
+     clearTimeout(serviceCloseTimer);
+     if(serviceLink)setCursor(serviceLink);
+     return;
+   }
+   activateDesktopLink(directNavLink(event.target));
+ });
+ nav.addEventListener('pointermove',event=>{
+   if(!isDesktop())return;
+   if(event.target.closest?.('.service-flyout')){
+     if(serviceLink)setCursor(serviceLink);
+     return;
+   }
+   const link=directNavLink(event.target);
+   if(link&&link!==hoverTarget)activateDesktopLink(link);
+ });
  if(serviceMenu){
    serviceMenu.addEventListener('mouseenter',()=>{clearTimeout(serviceCloseTimer);if(serviceLink)setCursor(serviceLink)});
    serviceMenu.addEventListener('mouseleave',scheduleServiceHide);
    serviceMenu.addEventListener('focusin',()=>{clearTimeout(serviceCloseTimer);if(serviceLink)setCursor(serviceLink)});
    serviceMenu.addEventListener('focusout',event=>{if(!serviceMenu.contains(event.relatedTarget))scheduleServiceHide()});
-   serviceMenu.addEventListener('click',()=>{hideServiceMenu();hoverTarget=null;if(innerWidth<=850)requestAnimationFrame(()=>close())});
+   serviceMenu.addEventListener('click',()=>{hideServiceMenu();hoverTarget=null;if(!isDesktop())requestAnimationFrame(()=>close())});
  }
  if(serviceLink){
    serviceLink.addEventListener('mouseleave',scheduleServiceHide);
    serviceLink.addEventListener('click',event=>{
-     if(innerWidth>850)return;
+     if(isDesktop())return;
      event.preventDefault();
      event.stopPropagation();
      if(serviceMenu?.classList.contains('on'))hideServiceMenu();else showServiceMenu();
@@ -116,12 +155,22 @@
      a.addEventListener('click',()=>requestAnimationFrame(()=>{hoverTarget=null;syncCursor()}));
    });
  };
- const sync=()=>{const open=nav.classList.contains('open');hamb.classList.toggle('is-open',open);hamb.setAttribute('aria-expanded',String(open));hamb.setAttribute('aria-label',open?'關閉選單':'開啟選單');backdrop.classList.toggle('on',open);document.body.style.overflow=open&&innerWidth<=850?'hidden':'';bindCursorLinks();if(serviceMenu?.classList.contains('on'))positionServiceMenu();requestAnimationFrame(()=>syncCursor())};
+ const sync=()=>{
+   const open=nav.classList.contains('open');
+   hamb.classList.toggle('is-open',open);
+   hamb.setAttribute('aria-expanded',String(open));
+   hamb.setAttribute('aria-label',open?'關閉選單':'開啟選單');
+   backdrop.classList.toggle('on',open);
+   document.body.style.overflow=open&&!isDesktop()?'hidden':'';
+   bindCursorLinks();
+   if(serviceMenu?.classList.contains('on'))positionServiceMenu();
+   requestAnimationFrame(()=>syncCursor());
+ };
  const close=()=>{nav.classList.remove('open');hideServiceMenu();hoverTarget=null;sync()};
  hamb.setAttribute('aria-controls','static-primary-navigation');
  nav.id='static-primary-navigation';
  hamb.addEventListener('click',event=>{
-   if(innerWidth>850)return;
+   if(isDesktop())return;
    event.preventDefault();
    event.stopPropagation();
    const opening=!nav.classList.contains('open');
@@ -130,7 +179,7 @@
    sync();
  });
  nav.addEventListener('click',event=>{
-   if(innerWidth>850)return;
+   if(isDesktop())return;
    const link=event.target.closest?.('a[href]');
    if(!link||!nav.contains(link)||link===serviceLink)return;
    requestAnimationFrame(close);
@@ -139,7 +188,7 @@
  nav.addEventListener('focusout',e=>{if(!nav.contains(e.relatedTarget)){hoverTarget=null;scheduleServiceHide();syncCursor()}});
  backdrop.addEventListener('click',close);
  document.addEventListener('keydown',e=>{if(e.key==='Escape'){hideServiceMenu();close()}});
- addEventListener('resize',()=>{hideServiceMenu();hoverTarget=null;if(innerWidth>850)close();else sync();requestAnimationFrame(()=>syncCursor(true))});
+ addEventListener('resize',()=>{hideServiceMenu();hoverTarget=null;if(isDesktop())close();else sync();requestAnimationFrame(()=>syncCursor(true))});
  new MutationObserver(()=>{bindCursorLinks();if(serviceMenu?.classList.contains('on'))positionServiceMenu();requestAnimationFrame(()=>syncCursor())}).observe(nav,{childList:true,subtree:true,attributes:true,attributeFilter:['class']});
  bindCursorLinks();
  sync();
