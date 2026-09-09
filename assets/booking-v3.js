@@ -2,7 +2,7 @@ import { getApp, getApps, initializeApp } from "https://www.gstatic.com/firebase
 import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
 import { collection, doc, getDocsFromServer, getFirestore, query, runTransaction, serverTimestamp, where } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
 import { firebaseConfig, firebaseConfigured } from "./firebase-config.js";
-import { loadCatalog, publicCatalog } from "./service-catalog-store.js";
+import { loadCatalog, publicCatalog } from "./service-catalog-store.js?v=20260909-2035";
 
 const REPO_BASE = "/77-waxing-site";
 const B = location.hostname.endsWith("github.io") ? REPO_BASE : "";
