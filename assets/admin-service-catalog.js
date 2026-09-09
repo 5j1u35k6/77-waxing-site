@@ -1,8 +1,8 @@
 import { getApp, getApps } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
-import { DEFAULT_CATALOG, loadCatalog, makeCatalogId, makeSlug, saveCatalog, watchCatalog } from "./service-catalog-store.js";
+import { DEFAULT_CATALOG, loadCatalog, makeCatalogId, makeSlug, saveCatalog, watchCatalog } from "./service-catalog-store.js?v=20260909-2035";
 
-const VERSION = "20260909-2025";
+const VERSION = "20260909-2035";
 let catalog = JSON.parse(JSON.stringify(DEFAULT_CATALOG));
 let hydrated = false;
 let hydrating = false;
@@ -123,7 +123,9 @@ async function commitChange(mutator, title) {
     render();
   } catch (error) {
     console.error("77waxing catalog write failed", error);
-    alert(`更新失敗：${error?.code || error?.name || "WRITE_ERROR"}`);
+    const code = error?.code || error?.name || "WRITE_ERROR";
+    const detail = error?.message ? `\n${String(error.message).slice(0, 220)}` : "";
+    alert(`更新失敗：${code}${detail}`);
   } finally {
     actionBusy = false;
     setBusy(false);
