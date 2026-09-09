@@ -1,0 +1,27 @@
+*{box-sizing:border-box}
+:root{--intro-cream:#F9F6F0;--intro-ink:#3A3836;--intro-deep:#262422;--intro-gold:#C5A070}
+html.intro-active,html.intro-active body{overflow:hidden!important}
+.home-intro{position:fixed;inset:0;z-index:9999;display:none;place-items:center;overflow:hidden;background:var(--intro-deep);color:var(--intro-cream);font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC","PingFang TC",sans-serif;isolation:isolate}
+html.intro-active .home-intro{display:grid}
+.home-intro::before{content:"";position:absolute;left:50%;top:50%;width:min(900px,92vw);height:min(900px,92vw);transform:translate(-50%,-50%);border-radius:50%;background:radial-gradient(circle,rgba(197,160,112,.13),rgba(197,160,112,0) 68%);filter:blur(7px);pointer-events:none}
+.home-intro-copy{position:absolute;top:clamp(52px,9vh,92px);left:50%;z-index:4;width:min(880px,calc(100% - 36px));transform:translateX(-50%);text-align:center}
+.home-intro-copy small{display:block;margin-bottom:11px;color:#cdbda8;font-size:11px;font-weight:700;letter-spacing:.24em}
+.home-intro-copy h1{margin:0;color:var(--intro-cream);font:500 clamp(24px,4vw,54px)/1.18 Georgia,"Noto Serif TC",serif;letter-spacing:.01em;white-space:nowrap}
+.home-intro-copy>p{margin:13px 0 0;color:#b9ada1;font-size:14px}
+.home-intro-copy .home-intro-warmline{margin-top:10px;color:#ead8bc;font-size:15px;opacity:0;transform:translateY(6px)}
+.home-intro-lamp-wrap{position:relative;z-index:3;width:min(430px,86vw);height:470px;display:grid;place-items:center;margin-top:72px}
+.home-intro-lamp{position:relative;width:250px;height:340px;transform-origin:50% 24px}
+.home-intro-glow{position:absolute;left:50%;top:100px;width:520px;height:520px;transform:translate(-50%,-50%) scale(.25);border-radius:50%;background:radial-gradient(circle,rgba(255,224,164,.52) 0%,rgba(232,195,132,.29) 28%,rgba(197,160,112,.09) 58%,rgba(197,160,112,0) 72%);filter:blur(4px);opacity:0;pointer-events:none}
+.home-intro-shade{position:absolute;left:50%;top:62px;width:205px;height:92px;transform:translateX(-50%);background:var(--intro-cream);clip-path:polygon(24% 0,76% 0,100% 82%,91% 100%,9% 100%,0 82%);filter:drop-shadow(0 8px 14px rgba(0,0,0,.18))}
+.home-intro-shade::after{content:"";position:absolute;inset:auto 9% 0;height:12px;border-radius:50%;background:#e3ddd5}
+.home-intro-stem{position:absolute;top:149px;left:50%;width:12px;height:158px;transform:translateX(-50%);border-radius:999px;background:linear-gradient(90deg,#d4cdc4,#f7f0e7 55%,#bcb4aa)}
+.home-intro-base{position:absolute;left:50%;top:300px;width:86px;height:14px;transform:translateX(-50%);border-radius:999px;background:linear-gradient(180deg,#f6f0e7,#bdb5aa)}
+.home-intro-cord-hit{position:absolute;top:128px;left:64%;width:86px;height:205px;border:0;background:transparent;cursor:pointer;padding:0;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+.home-intro-cord{position:absolute;left:50%;top:0;width:2px;height:118px;transform:translateX(-50%);background:#9e8d79;transform-origin:top}
+.home-intro-knob{position:absolute;left:50%;top:112px;width:16px;height:16px;transform:translateX(-50%);border-radius:50%;background:var(--intro-gold);box-shadow:0 2px 8px rgba(0,0,0,.28)}
+.home-intro-skip{position:absolute;right:28px;top:24px;z-index:10;border:1px solid rgba(249,246,240,.18);background:rgba(255,255,255,.03);color:#d3c8bb;border-radius:999px;padding:8px 13px;font-size:12px;cursor:pointer}
+.home-intro.is-revealing{pointer-events:none}
+@media(max-width:850px){.home-intro-copy{top:14svh}.home-intro-lamp-wrap{height:420px;margin-top:116px}.home-intro-lamp{transform:scale(.92)}.home-intro-skip{right:16px;top:16px}}
+@media(max-width:520px){.home-intro-copy{top:17svh;width:calc(100% - 28px)}.home-intro-copy small{font-size:10px;margin-bottom:9px}.home-intro-copy h1{font-size:clamp(22px,6.5vw,26px)}.home-intro-copy>p{font-size:13px;margin-top:11px}.home-intro-copy .home-intro-warmline{font-size:13px}.home-intro-lamp-wrap{height:385px;margin-top:155px}.home-intro-lamp{transform:scale(.82)}}
+@media(max-height:690px) and (max-width:520px){.home-intro-copy{top:12svh}.home-intro-lamp-wrap{margin-top:145px;transform:scale(.9)}}
+@media(prefers-reduced-motion:reduce){.home-intro{display:none!important}html.intro-active,html.intro-active body{overflow:auto!important}}
