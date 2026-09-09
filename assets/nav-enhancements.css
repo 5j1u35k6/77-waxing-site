@@ -27,5 +27,13 @@
   .header nav .about-flyout a:first-child{background:transparent;color:#3a3836}
   .header nav .about-flyout a span{font-size:16px;font-weight:500}
   .header nav .about-flyout a small{font-size:10px;color:#9b9b88}
+
+  /* Hidden submenu nodes must occupy zero layout space. Preserve the normal top-level rhythm with margins instead of flex gap. */
+  .header nav{gap:0!important}
+  .header nav>a{margin:0 0 16px!important}
+  .header nav>a.service-open{margin-bottom:0!important}
+  .header nav>.about-flyout,.header nav>.service-flyout{margin:0!important}
+  .header nav>.about-flyout.on,.header nav>.service-flyout.on{margin:-4px 0 5px!important}
+  .header nav>.book{margin-top:8px!important;margin-bottom:0!important}
 }
 @media(prefers-reduced-motion:reduce){.about-flyout{transition:none}}
