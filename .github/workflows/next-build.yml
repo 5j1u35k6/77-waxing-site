@@ -31,6 +31,15 @@ jobs:
           node --check assets/booking-prefill-direct.js
           node --check assets/booking-display-fix.js
           node --check assets/booking-addons.js
+          node --check assets/booking-choice-ui.js
+          cp assets/admin-v2.js /tmp/admin-v2.mjs
+          node --check /tmp/admin-v2.mjs
+          cp assets/admin-time-range.js /tmp/admin-time-range.mjs
+          node --check /tmp/admin-time-range.mjs
+          cp assets/admin-dashboard-v3.js /tmp/admin-dashboard-v3.mjs
+          node --check /tmp/admin-dashboard-v3.mjs
+          cp assets/admin-record-actions.js /tmp/admin-record-actions.mjs
+          node --check /tmp/admin-record-actions.mjs
           cp assets/email-dispatch.js /tmp/email-dispatch.mjs
           node --check /tmp/email-dispatch.mjs
       - name: Install dependencies
