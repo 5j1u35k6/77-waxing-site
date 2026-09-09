@@ -22,7 +22,7 @@ const hero=(tag,title,copy)=>`<section class="pagehero"><div class="wrap narrow"
 function home(){
   return `<section class="hero"><div class="wrap hero-grid"><div><span class="tag">77WAXING · KEELUNG BEAUTY STUDIO</span><h1>把第一次的緊張，<br>交給 77 的細心與溫柔。</h1><p class="lead">怕痛、害羞、不知道第一次要準備什麼，都不用先變成專家。把服務、流程、價目與預約說清楚，讓你在決定以前就先感到安心。</p><div class="btns"><a class="btn dark" href="${B}/booking/">24H 送出預約需求</a><a class="btn" data-link href="${B}/services/">先看看適合的服務</a></div></div><div class="art" aria-hidden="true"></div></div></section>
   <section class="section soft"><div class="wrap"><div class="head"><div><span class="tag">START HERE</span><h2>第一次，不需要一次懂全部。</h2></div><p>先看服務內容，再到價目頁確認價格；決定好之後就能直接查看可預約時段。</p></div><div class="grid4">${SERVICE_CARDS.map(([name,desc,slug],i)=>`<article class="card"><div class="num">0${i+1}</div><h3>${name}</h3><p>${desc}</p><a href="${B}/services/${slug}/" data-catalog-link>了解服務 →</a></article>`).join('')}</div></div></section>
-  <section class="section"><div class="wrap two"><div class="art" aria-hidden="true"></div><div><span class="tag">SAFE SPACE</span><h2>把「會不會尷尬」先放下。</h2><p>第一次來店前，可以先知道接待、諮詢、施作與術後照護會怎麼進行。</p><ol class="flow"><li><b>抵達與接待</b><small>確認今天的需求與身體狀況。</small></li><li><b>諮詢與評估</b><small>不確定服務也沒關係，先把需求說清楚。</small></li><li><b>施作與衛教</b><small>每個步驟先說明，完成後提供居家照護提醒。</small></li></ol><a class="btn" data-link href="${B}/space/">第一次來店流程</a></div></div></section>
+  <section class="section"><div class="wrap two"><div class="art" aria-hidden="true"></div><div><span class="tag">SAFE SPACE</span><h2>把「會不會尷尬」先放下。</h2><p>第一次來店前，可以先知道接待、諮詢、施作與術後照護會怎麼進行。</p><ol class="flow"><li><b>抵達與接待</b><small>確認今天的需求與身體狀況。</small></li><li><b>諮詢與評估</b><small>不確定服務也沒關係，先把需求說清楚。</small></li><li><b>施作與衛教</b><small>每個步驟先說明，完成後提供居家照護提醒。</small></li></ol><a class="btn" data-link href="${B}/about/#first-visit">第一次來店流程</a></div></div></section>
   <section class="section soft"><div class="wrap narrow"><span class="tag">FAQ</span><h2>第一次最常先問的事</h2>${faqs()}</div></section>`;
 }
 function about(){
@@ -30,8 +30,7 @@ function about(){
   `<section class="section"><div class="wrap narrow"><span class="tag">STUDIO</span><h2>一對一的服務節奏</h2><p>77waxing 以預約制安排服務，讓每位顧客都有足夠的諮詢、施作與整理時間。對於怕痛、害羞或第一次接觸服務的人，也會在開始前先說明流程與注意事項。</p><div class="btns"><a class="btn dark" data-link href="${B}/services/">查看服務</a><a class="btn" href="${B}/booking/">立即預約</a></div></div></section>`;
 }
 function space(){
-  return hero('SPACE & EXPERIENCE','第一次來店流程','先知道會發生什麼，通常就能少一點緊張。')+
-  `<section class="section"><div class="wrap narrow"><ol class="flow"><li><b>抵達與接待</b><small>確認預約項目與當天身體狀況。</small></li><li><b>需求諮詢</b><small>第一次、怕痛或有特別在意的地方都可以先說。</small></li><li><b>服務前說明</b><small>開始前確認服務範圍與流程。</small></li><li><b>一對一施作</b><small>過程中有任何不適都可以即時調整。</small></li><li><b>術後照護</b><small>完成後確認居家照護方式與後續建議。</small></li></ol></div></section><section class="section soft"><div class="wrap narrow"><h2>常見問題</h2>${faqs()}</div></section>`;
+  return '';
 }
 function courses(){
   return hero('COURSES','專業教學','教學內容與開課資訊會在確認後於此更新。')+
