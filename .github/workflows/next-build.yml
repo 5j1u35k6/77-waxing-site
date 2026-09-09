@@ -20,20 +20,29 @@ jobs:
         run: |
           node --check assets/pages.js
           node --check assets/nav-v4.js
+          node --check assets/nav-service-catalog-sync.js
           node --check assets/catalog-v1.js
           node --check assets/catalog-scroll-fix.js
           node --check assets/price-row-actions.js
           node --check assets/firebase-bootstrap.js
-          cp assets/firebase-pages.js /tmp/firebase-pages.mjs
-          node --check /tmp/firebase-pages.mjs
-          cp assets/booking-v3.js /tmp/booking-v3.mjs
-          node --check /tmp/booking-v3.mjs
           node --check assets/booking-prefill-direct.js
           node --check assets/booking-display-fix.js
           node --check assets/booking-addons.js
           node --check assets/booking-choice-ui.js
+          cp assets/firebase-pages.js /tmp/firebase-pages.mjs
+          node --check /tmp/firebase-pages.mjs
+          cp assets/service-catalog-store.js /tmp/service-catalog-store.mjs
+          node --check /tmp/service-catalog-store.mjs
+          cp assets/catalog-dynamic.js /tmp/catalog-dynamic.mjs
+          node --check /tmp/catalog-dynamic.mjs
+          cp assets/booking-v3.js /tmp/booking-v3.mjs
+          node --check /tmp/booking-v3.mjs
+          cp assets/runtime-settings.js /tmp/runtime-settings.mjs
+          node --check /tmp/runtime-settings.mjs
           cp assets/admin-v2.js /tmp/admin-v2.mjs
           node --check /tmp/admin-v2.mjs
+          cp assets/admin-service-catalog.js /tmp/admin-service-catalog.mjs
+          node --check /tmp/admin-service-catalog.mjs
           cp assets/admin-time-range.js /tmp/admin-time-range.mjs
           node --check /tmp/admin-time-range.mjs
           cp assets/admin-dashboard-v3.js /tmp/admin-dashboard-v3.mjs
