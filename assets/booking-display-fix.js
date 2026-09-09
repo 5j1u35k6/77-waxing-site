@@ -12,6 +12,9 @@
     document.querySelectorAll('#booking .booking-item small').forEach(el=>{
       el.textContent=el.textContent.replace('施作時間｜','施作時間｜');
     });
+    document.querySelectorAll('#booking [data-step="1"] > p.muted').forEach(el=>{
+      if((el.textContent||'').includes('先選左側服務分類'))el.remove();
+    });
     document.querySelectorAll('#booking [data-step="2"] > h2').forEach(el=>{
       if(el.textContent.includes('基準日期'))el.textContent='選擇日期與時段';
     });
