@@ -22,6 +22,7 @@ jobs:
           node --check assets/nav-v4.js
           node --check assets/catalog-v1.js
           node --check assets/catalog-scroll-fix.js
+          node --check assets/price-row-actions.js
           node --check assets/firebase-bootstrap.js
           cp assets/firebase-pages.js /tmp/firebase-pages.mjs
           node --check /tmp/firebase-pages.mjs
