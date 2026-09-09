@@ -9,9 +9,18 @@
 .header nav .about-flyout a small{font:600 8.5px/1 Inter,"Helvetica Neue",Arial,sans-serif;letter-spacing:.2em;text-transform:uppercase;color:#b79a76;white-space:nowrap}
 .header nav .about-flyout a:not(:first-child) small{color:#9b9b88}
 @media (max-width:850px){
-  .header nav .service-flyout{order:0!important;}
+  /* Keep every mobile-nav row in a deterministic order. This prevents dynamically injected flyouts from jumping above Home. */
+  .header nav>a[href="/77-waxing-site/"]{order:10!important}
+  .header nav>a[href$="/about/"]{order:20!important}
+  .header nav>.about-flyout{order:21!important}
+  .header nav>a[href$="/services/"]{order:30!important}
+  .header nav>.service-flyout{order:31!important}
+  .header nav>a[href$="/menu/"]{order:40!important}
+  .header nav>a[href$="/space/"]{order:50!important}
+  .header nav>a[href$="/courses/"]{order:60!important}
+  .header nav>a[href$="/booking/"]{order:70!important}
   .header nav .service-flyout.on{max-height:420px!important;}
-  .about-flyout{position:static!important;order:0!important;width:100%;padding:0 4px;margin:-4px 0 5px;border:0;border-radius:0;background:transparent;box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none;opacity:0;visibility:hidden;pointer-events:none;transform:none!important;max-height:0;overflow:hidden;transition:max-height .24s ease,opacity .18s ease,visibility 0s linear .24s}
+  .about-flyout{position:static!important;width:100%;padding:0 4px;margin:-4px 0 5px;border:0;border-radius:0;background:transparent;box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none;opacity:0;visibility:hidden;pointer-events:none;transform:none!important;max-height:0;overflow:hidden;transition:max-height .24s ease,opacity .18s ease,visibility 0s linear .24s}
   .about-flyout::before{display:none}
   .about-flyout.on{opacity:1;visibility:visible;pointer-events:auto;max-height:360px;transition-delay:0s}
   .header nav .about-flyout a{padding:11px 12px 11px 25px;border-radius:12px;background:transparent;gap:5px}
