@@ -1,0 +1,5 @@
+/* Additional dropdown behavior for About and mobile submenu hardening. */
+@media (max-width:850px){
+  .header nav .service-flyout{order:0!important;}
+  .header nav .service-flyout.on{max-height:420px!important;}
+}
