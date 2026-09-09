@@ -28,6 +28,7 @@ jobs:
           node --check /tmp/firebase-pages.mjs
           cp assets/booking-v3.js /tmp/booking-v3.mjs
           node --check /tmp/booking-v3.mjs
+          node --check assets/booking-prefill-direct.js
           node --check assets/booking-display-fix.js
           cp assets/email-dispatch.js /tmp/email-dispatch.mjs
           node --check /tmp/email-dispatch.mjs
