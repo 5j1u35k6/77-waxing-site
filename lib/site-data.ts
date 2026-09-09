@@ -18,25 +18,25 @@ export const navItems = [
 export const serviceGroups = [
   {
     title: "女性熱蠟",
-    subtitle: "從第一次 VIO 到日常局部保養，依妳的需求慢慢選。",
+    subtitle: "今次嘅妳想改變啲咩呢？77waxing幫妳實現願望。",
     items: ["VIO 私密處", "腋下", "手部／腿部", "其他局部"],
     pain: "依部位與個人感受不同",
   },
   {
     title: "男士熱蠟",
-    subtitle: "一對一服務、重視隱私，第一次也能先從諮詢開始。",
+    subtitle: "唔使怕醜！專業嘅77waxing一樣可以令你變得更型、更有自信！",
     items: ["男士私密處", "腋下", "手部／腿部", "其他局部"],
     pain: "施作前會先說明流程",
   },
   {
     title: "肌膚管理",
-    subtitle: "依膚況安排適合的日常保養與管理方向。",
+    subtitle: "今天的妳，想讓肌膚回到哪種狀態？交給77waxing，讓每一次保養都更靠近妳喜歡的自己。",
     items: ["肌膚管理諮詢", "保養療程"],
     pain: "舒適保養",
   },
   {
     title: "美胸保養",
-    subtitle: "在安心、尊重與隱私的空間裡進行專業保養。",
+    subtitle: "照顧曲線，也照顧自己的感受。讓77waxing陪妳把自信慢慢找回來。",
     items: ["美胸保養諮詢", "保養療程"],
     pain: "舒適保養",
   },
