@@ -129,9 +129,13 @@
  if(serviceLink){
    serviceLink.addEventListener('mouseleave',scheduleServiceHide);
    serviceLink.addEventListener('click',event=>{
-     if(isDesktop())return;
      event.preventDefault();
-     event.stopPropagation();
+     event.stopImmediatePropagation();
+     if(isDesktop()){
+       setCursor(serviceLink);
+       showServiceMenu();
+       return;
+     }
      if(serviceMenu?.classList.contains('on'))hideServiceMenu();else showServiceMenu();
    });
  }
