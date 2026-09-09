@@ -1,4 +1,38 @@
 (()=>{
+  function applyMenuPrefill(){
+    const booking=document.querySelector('#booking[data-booking-v3-mounted="1"]');
+    if(!booking||booking.dataset.menuPrefillApplied==='1')return;
+    const params=new URLSearchParams(location.search);
+    const wantedCategory=(params.get('category')||'').trim();
+    const wantedItem=(params.get('item')||'').trim();
+    if(!wantedCategory||!wantedItem)return;
+
+    const categoryButton=[...booking.querySelectorAll('[data-booking-category]')]
+      .find(button=>button.dataset.bookingCategory===wantedCategory);
+    if(!categoryButton)return;
+    if(!categoryButton.classList.contains('on')){
+      categoryButton.click();
+      return;
+    }
+
+    const itemButton=[...booking.querySelectorAll('[data-booking-item]')]
+      .find(button=>button.querySelector('b')?.textContent.trim()===wantedItem);
+    if(!itemButton)return;
+    if(!itemButton.classList.contains('on')){
+      itemButton.click();
+      return;
+    }
+
+    const nextButton=booking.querySelector('[data-step="1"] [data-next]');
+    if(nextButton)nextButton.disabled=false;
+    const note=booking.querySelector('[data-booking-prefill-note]');
+    if(note){
+      note.hidden=false;
+      note.textContent=`已從價目表帶入：${categoryButton.textContent.trim()}｜${wantedItem}`;
+    }
+    booking.dataset.menuPrefillApplied='1';
+  }
+
   function apply(){
     document.querySelectorAll('#booking [data-booking-block-note]').forEach(el=>{
       const section=el.closest('.notice');
@@ -21,8 +55,9 @@
     document.querySelectorAll('#booking [data-step="2"] > p.muted').forEach(el=>{
       if(el.textContent.includes('7 天'))el.textContent='先從月曆選日期，再從下方 7 天中選擇實際預約日與時段。';
     });
+    applyMenuPrefill();
   }
   const app=document.querySelector('#app')||document.body;
-  new MutationObserver(()=>requestAnimationFrame(apply)).observe(app,{childList:true,subtree:true});
+  new MutationObserver(()=>requestAnimationFrame(apply)).observe(app,{childList:true,subtree:true,attributes:true});
   apply();
 })();
