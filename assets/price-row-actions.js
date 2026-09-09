@@ -1,5 +1,7 @@
 (()=>{
   const B='/77-waxing-site';
+  const PREFILL_KEY='77waxing-booking-prefill';
+  const BOOKING_CACHE='20260909-1615';
   const SERVICE_SLUGS={
     women:'women-waxing',
     men:'men-waxing',
@@ -9,8 +11,13 @@
 
   const itemHash=(name)=>`#item=${encodeURIComponent(name)}`;
   const bookingHref=(category,item)=>{
-    const query=`category=${encodeURIComponent(category)}&item=${encodeURIComponent(item)}`;
-    return `${B}/booking/?${query}#${query}`;
+    const payload=`category=${encodeURIComponent(category)}&item=${encodeURIComponent(item)}`;
+    return `${B}/booking/?v=${BOOKING_CACHE}&${payload}#${payload}`;
+  };
+  const rememberPrefill=(category,item)=>{
+    try{
+      sessionStorage.setItem(PREFILL_KEY,JSON.stringify({category,item,ts:Date.now()}));
+    }catch{}
   };
 
   function closeRows(except=null){
@@ -44,6 +51,9 @@
       row.appendChild(actions);
       actions.querySelector('.more')?.addEventListener('click',()=>{
         delete document.documentElement.dataset.serviceItemFocus;
+      });
+      actions.querySelector('.booking')?.addEventListener('click',()=>{
+        rememberPrefill(category,name);
       });
 
       const toggle=()=>{
