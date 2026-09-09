@@ -1,7 +1,9 @@
 const PROJECT_ID = 'waxing-86909';
 const FIRESTORE_BASE = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
 const STORE_EMAIL = '77waxing.mail@gmail.com';
-const SCRIPT_VERSION = '2026-09-08-email-v5';
+const SCRIPT_VERSION = '2026-09-09-email-v6';
+const WEBSITE_URL = 'https://5j1u35k6.github.io/77-waxing-site/';
+const EMAIL_FOOTER_IMAGE = 'https://5j1u35k6.github.io/77-waxing-site/assets/email-footer-77waxing.jpg';
 
 function senderStatus_() {
   const effectiveEmail = String(Session.getEffectiveUser().getEmail() || '').trim().toLowerCase();
@@ -244,7 +246,11 @@ function shell_(title, body) {
     <div style="font-family:Georgia,serif;font-size:28px;margin-bottom:22px"><b style="color:#c5a070">77</b>waxing</div>
     <h2 style="font-size:20px;line-height:1.5;margin:0 0 18px">${esc_(title)}</h2>
     ${body}
-    <p style="margin-top:30px;color:#777;font-size:12px">77waxing</p>
+    <div style="margin-top:34px">
+      <a href="${WEBSITE_URL}" target="_blank" style="display:block;text-decoration:none;border:0">
+        <img src="${EMAIL_FOOTER_IMAGE}" alt="77waxing｜基隆・預約制美學服務｜基隆市中正區義一路56號2樓｜前往官方網站" width="620" style="display:block;width:100%;max-width:620px;height:auto;border:0;border-radius:14px">
+      </a>
+    </div>
   </div>`;
 }
 
