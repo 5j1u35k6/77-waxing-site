@@ -32,12 +32,18 @@
   if(!aboutMenu){
     aboutMenu=document.createElement('div');
     aboutMenu.className='about-flyout';
+    aboutMenu.id='about-flyout-menu';
     aboutMenu.setAttribute('aria-label','關於 77 選單');
     aboutMenu.innerHTML=ABOUT_ITEMS.map(([name,anchor,en])=>`<a href="${B}/about/#${anchor}"><span>${name}</span><small>${en}</small></a>`).join('');
     aboutLink.after(aboutMenu);
   }
+
+  // Match the Services parent item: it is a submenu trigger only, not a navigable page link.
+  // pages.js captures [data-link] clicks at document level, so remove that marker before any interaction.
+  aboutLink.removeAttribute('data-link');
   aboutLink.dataset.aboutTrigger='1';
   aboutLink.setAttribute('aria-haspopup','true');
+  aboutLink.setAttribute('aria-controls','about-flyout-menu');
   aboutLink.setAttribute('aria-expanded','false');
 
   let closeTimer=0;
@@ -76,7 +82,10 @@
   aboutLink.addEventListener('click',event=>{
     event.preventDefault();
     event.stopImmediatePropagation();
-    if(isDesktop()){show();return;}
+    if(isDesktop()){
+      show();
+      return;
+    }
     if(aboutMenu.classList.contains('on'))hide();else show();
   },true);
 
