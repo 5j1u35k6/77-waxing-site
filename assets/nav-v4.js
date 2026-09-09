@@ -33,9 +33,11 @@
    serviceLink.setAttribute('aria-expanded','false');
  }
  const current=()=>cursorLinks().find(a=>a.classList.contains('on'))||null;
+ let hoverTarget=null;
  const hideCursor=()=>{if(cursor)cursor.style.opacity='0'};
  const moveCursor=(target,instant=false)=>{
    if(!target||!cursor){hideCursor();return}
+   if(innerWidth<=850){hideCursor();return}
    const nr=nav.getBoundingClientRect();
    const r=target.getBoundingClientRect();
    if(!r.width||!r.height){hideCursor();return}
@@ -46,10 +48,10 @@
    cursor.style.opacity='1';
    if(instant)requestAnimationFrame(()=>cursor.style.removeProperty('transition'));
  };
+ const setCursor=(target)=>{hoverTarget=target;moveCursor(target)};
  const syncCursor=(instant=false)=>{
-   const open=nav.classList.contains('open');
-   if(innerWidth<=850&&!open){hideCursor();return}
-   moveCursor(current(),instant);
+   if(innerWidth<=850){hideCursor();return}
+   moveCursor(hoverTarget||current(),instant);
  };
  let serviceCloseTimer=0;
  const positionServiceMenu=()=>{
@@ -79,11 +81,11 @@
    serviceCloseTimer=setTimeout(hideServiceMenu,130);
  };
  if(serviceMenu){
-   serviceMenu.addEventListener('mouseenter',()=>clearTimeout(serviceCloseTimer));
+   serviceMenu.addEventListener('mouseenter',()=>{clearTimeout(serviceCloseTimer);if(serviceLink)setCursor(serviceLink)});
    serviceMenu.addEventListener('mouseleave',scheduleServiceHide);
-   serviceMenu.addEventListener('focusin',()=>clearTimeout(serviceCloseTimer));
+   serviceMenu.addEventListener('focusin',()=>{clearTimeout(serviceCloseTimer);if(serviceLink)setCursor(serviceLink)});
    serviceMenu.addEventListener('focusout',event=>{if(!serviceMenu.contains(event.relatedTarget))scheduleServiceHide()});
-   serviceMenu.addEventListener('click',()=>{hideServiceMenu();if(innerWidth<=850)requestAnimationFrame(()=>close())});
+   serviceMenu.addEventListener('click',()=>{hideServiceMenu();hoverTarget=null;if(innerWidth<=850)requestAnimationFrame(()=>close())});
  }
  if(serviceLink){
    serviceLink.addEventListener('mouseleave',scheduleServiceHide);
@@ -99,28 +101,29 @@
      if(a.dataset.navMotionBound)return;
      a.dataset.navMotionBound='1';
      if(a.classList.contains('book')){
-       a.addEventListener('mouseenter',()=>{hideServiceMenu();hideCursor()});
-       a.addEventListener('focus',()=>{hideServiceMenu();hideCursor()});
+       a.addEventListener('mouseenter',()=>{hoverTarget=null;hideServiceMenu();hideCursor()});
+       a.addEventListener('focus',()=>{hoverTarget=null;hideServiceMenu();hideCursor()});
        a.addEventListener('click',()=>requestAnimationFrame(()=>hideCursor()));
        return;
      }
      if(a===serviceLink){
-       a.addEventListener('mouseenter',()=>{moveCursor(a);showServiceMenu()});
-       a.addEventListener('focus',()=>{moveCursor(a);showServiceMenu()});
+       a.addEventListener('mouseenter',()=>{setCursor(a);showServiceMenu()});
+       a.addEventListener('focus',()=>{setCursor(a);showServiceMenu()});
      }else{
-       a.addEventListener('mouseenter',()=>{hideServiceMenu();moveCursor(a)});
-       a.addEventListener('focus',()=>{hideServiceMenu();moveCursor(a)});
+       a.addEventListener('mouseenter',()=>{hideServiceMenu();setCursor(a)});
+       a.addEventListener('focus',()=>{hideServiceMenu();setCursor(a)});
      }
-     a.addEventListener('click',()=>requestAnimationFrame(()=>syncCursor()));
+     a.addEventListener('click',()=>requestAnimationFrame(()=>{hoverTarget=null;syncCursor()}));
    });
  };
  const sync=()=>{const open=nav.classList.contains('open');hamb.classList.toggle('is-open',open);hamb.setAttribute('aria-expanded',String(open));hamb.setAttribute('aria-label',open?'關閉選單':'開啟選單');backdrop.classList.toggle('on',open);document.body.style.overflow=open&&innerWidth<=850?'hidden':'';bindCursorLinks();if(serviceMenu?.classList.contains('on'))positionServiceMenu();requestAnimationFrame(()=>syncCursor())};
- const close=()=>{nav.classList.remove('open');hideServiceMenu();sync()};
+ const close=()=>{nav.classList.remove('open');hideServiceMenu();hoverTarget=null;sync()};
  hamb.setAttribute('aria-controls','static-primary-navigation');
  nav.id='static-primary-navigation';
  hamb.addEventListener('click',event=>{
    if(innerWidth>850)return;
    event.preventDefault();
+   event.stopPropagation();
    const opening=!nav.classList.contains('open');
    nav.classList.toggle('open',opening);
    if(!opening)hideServiceMenu();
@@ -132,11 +135,11 @@
    if(!link||!nav.contains(link)||link===serviceLink)return;
    requestAnimationFrame(close);
  });
- nav.addEventListener('mouseleave',()=>{scheduleServiceHide();moveCursor(current())});
- nav.addEventListener('focusout',e=>{if(!nav.contains(e.relatedTarget)){scheduleServiceHide();moveCursor(current())}});
+ nav.addEventListener('mouseleave',()=>{hoverTarget=null;scheduleServiceHide();syncCursor()});
+ nav.addEventListener('focusout',e=>{if(!nav.contains(e.relatedTarget)){hoverTarget=null;scheduleServiceHide();syncCursor()}});
  backdrop.addEventListener('click',close);
  document.addEventListener('keydown',e=>{if(e.key==='Escape'){hideServiceMenu();close()}});
- addEventListener('resize',()=>{hideServiceMenu();if(innerWidth>850)close();else sync();requestAnimationFrame(()=>syncCursor(true))});
+ addEventListener('resize',()=>{hideServiceMenu();hoverTarget=null;if(innerWidth>850)close();else sync();requestAnimationFrame(()=>syncCursor(true))});
  new MutationObserver(()=>{bindCursorLinks();if(serviceMenu?.classList.contains('on'))positionServiceMenu();requestAnimationFrame(()=>syncCursor())}).observe(nav,{childList:true,subtree:true,attributes:true,attributeFilter:['class']});
  bindCursorLinks();
  sync();
