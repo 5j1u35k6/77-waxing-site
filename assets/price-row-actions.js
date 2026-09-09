@@ -1,7 +1,7 @@
 (()=>{
   const B='/77-waxing-site';
   const PREFILL_KEY='77waxing-booking-prefill';
-  const BOOKING_CACHE='20260909-1641';
+  const BOOKING_CACHE='20260909-1655';
   const SERVICE_SLUGS={
     women:'women-waxing',
     men:'men-waxing',
@@ -31,6 +31,9 @@
   function enhancePriceRows(){
     document.querySelectorAll('.price-row:not([data-price-actions-ready])').forEach((row)=>{
       const section=row.closest('[data-price-section]');
+      const group=row.closest('.price-group');
+      const groupTitle=group?.querySelector(':scope > h3')?.textContent?.trim()||'';
+      const isAddon=/加購/.test(groupTitle);
       const category=section?.dataset.priceSection;
       const slug=SERVICE_SLUGS[category];
       const name=row.querySelector(':scope > b')?.textContent?.trim();
@@ -39,6 +42,7 @@
       row.dataset.priceActionsReady='1';
       row.dataset.priceCategory=category;
       row.dataset.priceItem=name;
+      row.dataset.priceAddon=isAddon?'1':'0';
       row.classList.add('price-row-actionable');
       row.tabIndex=0;
       row.setAttribute('role','button');
@@ -48,7 +52,9 @@
       const actions=document.createElement('div');
       actions.className='price-row-actions';
       const href=bookingHref(category,name);
-      actions.innerHTML=`<a class="price-row-action more" href="${B}/services/${slug}/${itemHash(name)}" data-catalog-link>看更多</a><button type="button" class="price-row-action booking">進行預約</button>`;
+      actions.innerHTML=isAddon
+        ? `<a class="price-row-action more" href="${B}/services/${slug}/${itemHash(name)}" data-catalog-link>看更多</a><span class="price-row-action addon-reminder">預約時請記得選加購項目</span>`
+        : `<a class="price-row-action more" href="${B}/services/${slug}/${itemHash(name)}" data-catalog-link>看更多</a><button type="button" class="price-row-action booking">進行預約</button>`;
       row.appendChild(actions);
       actions.querySelector('.more')?.addEventListener('click',()=>{
         delete document.documentElement.dataset.serviceItemFocus;
