@@ -12,8 +12,8 @@ export default function HomePage() {
             <h1>{brand.slogan}</h1>
             <p>怕痛、害羞、不知道第一次要準備什麼，都不用先變成專家。這裡把服務、流程與預約拆開說清楚，讓妳在決定以前就先感到安心。</p>
             <div className="hero-actions">
-              <Link className="button primary" href="/booking">24H 送出預約需求</Link>
-              <Link className="button secondary" href="/services">先看看適合的服務</Link>
+              <Link className="button primary" href="/booking">預約時段讓自己更好</Link>
+              <Link className="button secondary" href="/services">77waxing提供的服務</Link>
             </div>
           </div>
           <div className="hero-art" aria-label="日式暖木質品牌視覺示意"><div className="hero-orb" /></div>
