@@ -8,12 +8,14 @@
  let cursor=nav.querySelector('.nav-cursor');
  if(!cursor){cursor=document.createElement('span');cursor.className='nav-cursor';cursor.setAttribute('aria-hidden','true');nav.prepend(cursor)}
  const topLinks=()=>[...nav.children].filter(el=>el.matches?.('a'));
- const current=()=>topLinks().find(a=>a.classList.contains('on'))||null;
+ const cursorLinks=()=>topLinks().filter(a=>!a.classList.contains('book'));
+ const current=()=>cursorLinks().find(a=>a.classList.contains('on'))||null;
+ const hideCursor=()=>{if(cursor)cursor.style.opacity='0'};
  const moveCursor=(target,instant=false)=>{
-   if(!target||!cursor){if(cursor)cursor.style.opacity='0';return}
+   if(!target||!cursor){hideCursor();return}
    const nr=nav.getBoundingClientRect();
    const r=target.getBoundingClientRect();
-   if(!r.width||!r.height){cursor.style.opacity='0';return}
+   if(!r.width||!r.height){hideCursor();return}
    if(instant)cursor.style.transition='none';
    cursor.style.width=`${r.width}px`;
    cursor.style.height=`${r.height}px`;
@@ -23,13 +25,19 @@
  };
  const syncCursor=(instant=false)=>{
    const open=nav.classList.contains('open');
-   if(innerWidth<=850&&!open){cursor.style.opacity='0';return}
+   if(innerWidth<=850&&!open){hideCursor();return}
    moveCursor(current(),instant);
  };
  const bindCursorLinks=()=>{
    topLinks().forEach(a=>{
      if(a.dataset.navMotionBound)return;
      a.dataset.navMotionBound='1';
+     if(a.classList.contains('book')){
+       a.addEventListener('mouseenter',hideCursor);
+       a.addEventListener('focus',hideCursor);
+       a.addEventListener('click',()=>requestAnimationFrame(()=>hideCursor()));
+       return;
+     }
      a.addEventListener('mouseenter',()=>moveCursor(a));
      a.addEventListener('focus',()=>moveCursor(a));
      a.addEventListener('click',()=>requestAnimationFrame(()=>syncCursor()));
