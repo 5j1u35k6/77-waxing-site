@@ -23,6 +23,8 @@
     const top=host.querySelector('.admin-topline');
     const metrics=host.querySelector('.metrics');
     const dashboard=host.querySelector('[data-dashboard-v3]');
+    const workspace=host.querySelector('.admin-v2-workspace');
+    const basePanel=[...host.querySelectorAll('.panel')].find(panel=>panel!==workspace&&!panel.closest('[data-dashboard-v3]'));
     const heading=ensureConceptHeading(host);
     const isDashboard=view()==='dashboard';
 
@@ -39,6 +41,10 @@
     else if(dashboard&&!metrics&&heading.nextElementSibling!==dashboard)heading.insertAdjacentElement('afterend',dashboard);
 
     heading.hidden=!isDashboard;
+    if(metrics)metrics.hidden=!isDashboard;
+    if(dashboard)dashboard.hidden=!isDashboard;
+    if(basePanel&&isDashboard)basePanel.hidden=true;
+
     if(top)top.classList.add('admin-topline-primary');
     if(metrics)metrics.classList.add('admin-concept-metrics');
   }
