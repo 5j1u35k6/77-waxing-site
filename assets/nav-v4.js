@@ -5,10 +5,10 @@
  if(!header||!nav||!hamb)return;
  const B=location.hostname.endsWith('github.io')?'/77-waxing-site':'';
  const SERVICE_ITEMS=[
-   ['女性熱蠟','women-waxing'],
-   ['男士熱蠟','men-waxing'],
-   ['肌膚管理','skin-care'],
-   ['美胸保養','bust-care']
+   ['女性熱蠟','women-waxing','WOMEN HOT WAXING'],
+   ['男士熱蠟','men-waxing','MEN HOT WAXING'],
+   ['肌膚管理','skin-care','SKIN CARE'],
+   ['美胸保養','bust-care','BUST CARE']
  ];
  const isDesktop=()=>innerWidth>850;
  let backdrop=document.querySelector('.static-nav-backdrop');
@@ -25,7 +25,7 @@
    serviceMenu=document.createElement('div');
    serviceMenu.className='service-flyout';
    serviceMenu.setAttribute('aria-label','施作服務選單');
-   serviceMenu.innerHTML=SERVICE_ITEMS.map(([name,slug])=>`<a href="${B}/services/${slug}/" data-catalog-link><span>${name}</span><small>查看施作項目</small></a>`).join('');
+   serviceMenu.innerHTML=SERVICE_ITEMS.map(([name,slug,en])=>`<a href="${B}/services/${slug}/" data-catalog-link><span>${name}</span><small>${en}</small></a>`).join('');
    serviceLink.after(serviceMenu);
  }
  if(serviceLink){
@@ -65,7 +65,7 @@
    const nr=nav.getBoundingClientRect();
    const r=serviceLink.getBoundingClientRect();
    serviceMenu.style.left=`${r.left-nr.left+r.width/2}px`;
-   serviceMenu.style.top=`${r.bottom-nr.top+10}px`;
+   serviceMenu.style.top=`${r.bottom-nr.top+16}px`;
  };
  const showServiceMenu=()=>{
    if(!serviceLink||!serviceMenu)return;
