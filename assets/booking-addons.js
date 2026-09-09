@@ -1,14 +1,20 @@
 (()=>{
-  const ADDONS={
-    women:{label:'女性熱蠟',items:[['小鬍子 / 小腹線 / 腋下','$199'],['腋下美白軟膜','$199'],['私密處美白軟膜','$199']]},
-    men:{label:'男士熱蠟',items:[['小鬍子 / 小腹線 / 腋下','$350'],['腋下美白軟膜','$299'],['私密處美白軟膜','$299']]},
-    skin:{label:'肌膚管理',items:[['頸部緊緻保養','$699'],['臉部拋光','$499'],['頭刮肩頸加強','$399'],['耳穴放鬆','$599'],['臉部熱蠟','視範圍']]},
-    bust:{label:'美胸保養',items:[]}
-  };
-
   const booking=()=>document.querySelector('#booking');
-  const currentCategoryKey=()=>booking()?.querySelector('[data-booking-category].on')?.dataset.bookingCategory||'women';
+  const currentCategoryKey=()=>booking()?.querySelector('[data-booking-category].on')?.dataset.bookingCategory||'';
   let lastBookingView='';
+
+  function currentConfig(){
+    const key=currentCategoryKey();
+    const catalog=Array.isArray(window.__77_SERVICE_CATALOG__)?window.__77_SERVICE_CATALOG__:[];
+    const category=catalog.find(entry=>entry.key===key);
+    if(!category)return {key,label:'服務',items:[]};
+    const items=(category.groups||[])
+      .filter(group=>group.kind==='addon')
+      .flatMap(group=>group.items||[])
+      .filter(item=>item.enabled!==false)
+      .map(item=>({name:item.name,price:item.priceLabel||'',id:item.id}));
+    return {key,label:category.name,items};
+  }
 
   function currentBookingView(){
     const root=booking();
@@ -22,16 +28,14 @@
   function syncStepScroll(){
     const view=currentBookingView();
     if(!view)return;
-    if(lastBookingView&&view!==lastBookingView){
-      requestAnimationFrame(()=>window.scrollTo({top:0,left:0,behavior:'auto'}));
-    }
+    if(lastBookingView&&view!==lastBookingView)requestAnimationFrame(()=>window.scrollTo({top:0,left:0,behavior:'auto'}));
     lastBookingView=view;
   }
 
   function stripStepOneAddons(){
-    booking()?.querySelectorAll('[data-step="1"] .booking-item-group').forEach((group)=>{
+    booking()?.querySelectorAll('[data-step="1"] .booking-item-group').forEach(group=>{
       const title=group.querySelector('h3')?.textContent?.trim()||'';
-      if(/加購/.test(title))group.remove();
+      if(/加購/.test(title)||group.dataset.bookingKind==='addon')group.remove();
     });
   }
 
@@ -39,29 +43,30 @@
     const root=booking();
     const step=root?.querySelector('[data-step="3"]');
     if(!step)return;
-    const key=currentCategoryKey();
-    const config=ADDONS[key]||ADDONS.women;
+    const config=currentConfig();
     let panel=step.querySelector('[data-booking-addons]');
     if(!panel){
       panel=document.createElement('section');
       panel.className='booking-addon-panel';
       panel.dataset.bookingAddons='1';
       const note=step.querySelector('label.full');
-      if(note)step.insertBefore(panel,note);
-      else step.querySelector('.actions')?.before(panel);
+      if(note)step.insertBefore(panel,note);else step.querySelector('.actions')?.before(panel);
     }
-    if(panel.dataset.category===key)return;
-    panel.dataset.category=key;
+    const signature=`${config.key}|${config.items.map(item=>`${item.id}:${item.price}`).join(',')}`;
+    if(panel.dataset.signature===signature)return;
+    const previouslySelected=new Set([...panel.querySelectorAll('[data-booking-addon-option]:checked')].map(input=>input.value));
+    panel.dataset.signature=signature;
+    panel.dataset.category=config.key;
     if(!config.items.length){
       panel.innerHTML=`<div class="booking-addon-head"><h3>加購項目</h3><p>${config.label}目前沒有加購項目。</p></div>`;
       return;
     }
-    panel.innerHTML=`<div class="booking-addon-head"><h3>加購項目</h3><p>依照你選擇的${config.label}顯示，可複選。</p></div><div class="booking-addon-options">${config.items.map(([name,price])=>`<label class="booking-addon-option"><input type="checkbox" data-booking-addon-option value="${name}"><span><b>${name}</b><small>${price}</small></span></label>`).join('')}</div>`;
+    panel.innerHTML=`<div class="booking-addon-head"><h3>加購項目</h3><p>依照你選擇的${config.label}顯示，可複選。</p></div><div class="booking-addon-options">${config.items.map(item=>`<label class="booking-addon-option"><input type="checkbox" data-booking-addon-option value="${String(item.name).replace(/"/g,'&quot;')}" ${previouslySelected.has(item.name)?'checked':''}><span><b>${item.name}</b><small>${item.price}</small></span></label>`).join('')}</div>`;
   }
 
   function selectedAddons(){
     const root=booking();
-    return [...(root?.querySelectorAll('[data-booking-addon-option]:checked')||[])].map((input)=>input.value);
+    return [...(root?.querySelectorAll('[data-booking-addon-option]:checked')||[])].map(input=>input.value);
   }
 
   function syncSummary(){
@@ -74,7 +79,7 @@
     const row=document.createElement('div');
     row.dataset.addonSummary='1';
     row.innerHTML=`<small>加購項目</small><b>${addons.join('、')}</b>`;
-    const serviceRow=[...summary.children].find((node)=>node.querySelector('small')?.textContent.trim()==='服務項目');
+    const serviceRow=[...summary.children].find(node=>node.querySelector('small')?.textContent.trim()==='服務項目');
     if(serviceRow)serviceRow.after(row);else summary.prepend(row);
   }
 
@@ -82,7 +87,7 @@
     const root=booking();
     const note=root?.querySelector('[name="note"]');
     if(!note)return;
-    const clean=(note.value||'').split('\n').filter((line)=>!line.trim().startsWith('[加購項目]')).join('\n').trim();
+    const clean=(note.value||'').split('\n').filter(line=>!line.trim().startsWith('[加購項目]')).join('\n').trim();
     const addons=selectedAddons();
     note.value=addons.length?`${clean}${clean?'\n':''}[加購項目] ${addons.join('、')}`:clean;
   }
@@ -94,28 +99,21 @@
     syncStepScroll();
   }
 
-  document.addEventListener('click',(event)=>{
-    if(event.target.closest('#booking [data-submit]'))syncNoteBeforeSubmit();
-  },true);
-
-  document.addEventListener('click',(event)=>{
+  document.addEventListener('click',event=>{if(event.target.closest('#booking [data-submit]'))syncNoteBeforeSubmit()},true);
+  document.addEventListener('click',event=>{
     if(!event.target.closest('#booking [data-next],#booking [data-prev],#booking [data-submit],#booking [data-booking-category]'))return;
     setTimeout(syncAll,0);
   });
-
-  document.addEventListener('change',(event)=>{
-    if(event.target.matches?.('#booking [data-booking-addon-option]'))setTimeout(syncSummary,0);
-  });
+  document.addEventListener('change',event=>{if(event.target.matches?.('#booking [data-booking-addon-option]'))setTimeout(syncSummary,0)});
+  addEventListener('77waxing:catalog-ready',()=>setTimeout(syncAll,0));
+  addEventListener('77waxing:booking-category',()=>setTimeout(syncAll,0));
 
   const root=booking()||document.querySelector('#app')||document.body;
   let scheduled=false;
   const schedule=()=>{
     if(scheduled)return;
     scheduled=true;
-    requestAnimationFrame(()=>{
-      scheduled=false;
-      syncAll();
-    });
+    requestAnimationFrame(()=>{scheduled=false;syncAll()});
   };
   new MutationObserver(schedule).observe(root,{childList:true,subtree:true});
   syncAll();
