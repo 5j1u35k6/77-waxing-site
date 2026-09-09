@@ -1,7 +1,7 @@
 (()=>{
   const B='/77-waxing-site';
   const PREFILL_KEY='77waxing-booking-prefill';
-  const BOOKING_CACHE='20260909-1635';
+  const BOOKING_CACHE='20260909-1641';
   const SERVICE_SLUGS={
     women:'women-waxing',
     men:'men-waxing',
@@ -48,7 +48,7 @@
       const actions=document.createElement('div');
       actions.className='price-row-actions';
       const href=bookingHref(category,name);
-      actions.innerHTML=`<a class="price-row-action more" href="${B}/services/${slug}/${itemHash(name)}" data-catalog-link>看更多</a><a class="price-row-action booking" href="${href}">進行預約</a>`;
+      actions.innerHTML=`<a class="price-row-action more" href="${B}/services/${slug}/${itemHash(name)}" data-catalog-link>看更多</a><button type="button" class="price-row-action booking">進行預約</button>`;
       row.appendChild(actions);
       actions.querySelector('.more')?.addEventListener('click',()=>{
         delete document.documentElement.dataset.serviceItemFocus;
