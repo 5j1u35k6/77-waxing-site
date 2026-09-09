@@ -19,10 +19,16 @@ jobs:
       - name: Check GitHub Pages JavaScript
         run: |
           node --check assets/pages.js
-          node --check assets/experience-v3.js
+          node --check assets/nav-v4.js
+          node --check assets/catalog-v1.js
+          node --check assets/catalog-scroll-fix.js
           node --check assets/firebase-bootstrap.js
           cp assets/firebase-pages.js /tmp/firebase-pages.mjs
           node --check /tmp/firebase-pages.mjs
+          cp assets/booking-v2.js /tmp/booking-v2.mjs
+          node --check /tmp/booking-v2.mjs
+          cp assets/email-dispatch.js /tmp/email-dispatch.mjs
+          node --check /tmp/email-dispatch.mjs
       - name: Install dependencies
         run: npm install --no-audit --no-fund
       - name: Build Next.js
