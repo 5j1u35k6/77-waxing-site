@@ -118,7 +118,14 @@
  const close=()=>{nav.classList.remove('open');hideServiceMenu();sync()};
  hamb.setAttribute('aria-controls','static-primary-navigation');
  nav.id='static-primary-navigation';
- hamb.addEventListener('click',()=>requestAnimationFrame(sync));
+ hamb.addEventListener('click',event=>{
+   if(innerWidth>850)return;
+   event.preventDefault();
+   const opening=!nav.classList.contains('open');
+   nav.classList.toggle('open',opening);
+   if(!opening)hideServiceMenu();
+   sync();
+ });
  nav.addEventListener('click',event=>{
    if(innerWidth>850)return;
    const link=event.target.closest?.('a[href]');
