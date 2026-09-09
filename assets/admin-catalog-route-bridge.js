@@ -1,5 +1,5 @@
 (()=>{
-  const VERSION='20260909-2012';
+  const VERSION='20260909-2020';
   const TIMEOUT_MS=10000;
   const wantedViews=new Set(['services','pricing']);
   let timer=0;
