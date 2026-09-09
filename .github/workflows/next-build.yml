@@ -30,6 +30,7 @@ jobs:
           node --check /tmp/booking-v3.mjs
           node --check assets/booking-prefill-direct.js
           node --check assets/booking-display-fix.js
+          node --check assets/booking-addons.js
           cp assets/email-dispatch.js /tmp/email-dispatch.mjs
           node --check /tmp/email-dispatch.mjs
       - name: Install dependencies
