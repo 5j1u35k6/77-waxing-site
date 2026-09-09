@@ -1,7 +1,7 @@
 const PROJECT_ID = 'waxing-86909';
 const FIRESTORE_BASE = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
 const STORE_EMAIL = '77waxing.mail@gmail.com';
-const SCRIPT_VERSION = '2026-09-09-email-v7';
+const SCRIPT_VERSION = '2026-09-09-email-v8';
 const WEBSITE_URL = 'https://5j1u35k6.github.io/77-waxing-site/';
 const EMAIL_FOOTER_IMAGE = 'https://5j1u35k6.github.io/77-waxing-site/assets/email-footer-77waxing.jpg';
 const EMAIL_FOOTER_FETCH_URL = 'https://raw.githubusercontent.com/5j1u35k6/77-waxing-site/main/assets/email-footer-77waxing.jpg';
@@ -58,6 +58,32 @@ function testSelfEmail() {
     shell_('Email 系統測試成功', '<p>如果你收到這封信，代表 Google Apps Script 已使用 77waxing 店家信箱寄信。</p>')
   );
   return `sent:${STORE_EMAIL}`;
+}
+
+function testFooterInline() {
+  send_(
+    STORE_EMAIL,
+    '77waxing｜Footer 圖片測試',
+    shell_('Footer 圖片測試', '<p>如果信件最下方正常顯示深色山海橫幅，代表內嵌圖片已正常。</p>')
+  );
+  return `footer-inline-sent:${STORE_EMAIL}`;
+}
+
+function debugFooterAsset() {
+  const response = UrlFetchApp.fetch(EMAIL_FOOTER_FETCH_URL, {
+    muteHttpExceptions: true,
+    followRedirects: true,
+  });
+  const bytes = response.getContent();
+  const blob = Utilities.newBlob(bytes, 'image/jpeg', '77waxing-email-footer.jpg');
+  const result = {
+    code: response.getResponseCode(),
+    bytes: bytes.length,
+    contentType: blob.getContentType(),
+    version: SCRIPT_VERSION,
+  };
+  console.log(JSON.stringify(result));
+  return result;
 }
 
 function doPost(e) {
@@ -188,25 +214,45 @@ function decodeValue_(v) {
   return null;
 }
 
+function footerFallbackHtml_() {
+  return `<span style="display:block;background:#2f2a28;color:#f9f6f0;padding:22px 24px;border-radius:14px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang TC',sans-serif;line-height:1.8">
+    <strong style="font-family:Georgia,serif;font-size:22px;color:#ffffff"><span style="color:#c5a070">77</span>waxing</strong><br>
+    <span style="font-size:13px;color:#e6dfd8">基隆・預約制美學服務</span><br>
+    <span style="font-size:13px;color:#e6dfd8">基隆市中正區義一路56號2樓</span><br>
+    <span style="font-size:13px;color:#d8b98c">把第一次的緊張，交給 77 的細心與溫柔。</span><br>
+    <span style="font-size:12px;color:#f3e1c5">前往官方網站 →</span>
+  </span>`;
+}
+
 function send_(to, subject, html) {
   const options = senderOptions_();
   options.htmlBody = html;
 
   try {
-    const response = UrlFetchApp.fetch(EMAIL_FOOTER_FETCH_URL, { muteHttpExceptions:true });
-    if (response.getResponseCode() === 200) {
-      options.inlineImages = {
-        emailFooter: response.getBlob().setName('77waxing-email-footer.jpg'),
-      };
-    } else {
-      options.htmlBody = html.replace('cid:emailFooter', EMAIL_FOOTER_IMAGE);
-    }
+    const response = UrlFetchApp.fetch(EMAIL_FOOTER_FETCH_URL, {
+      muteHttpExceptions: true,
+      followRedirects: true,
+    });
+    const code = response.getResponseCode();
+    if (code !== 200) throw new Error(`HTTP_${code}`);
+
+    const bytes = response.getContent();
+    if (!bytes || !bytes.length) throw new Error('EMPTY_IMAGE');
+
+    const blob = Utilities.newBlob(bytes, 'image/jpeg', '77waxing-email-footer.jpg');
+    options.inlineImages = { emailFooter: blob };
+    console.log(JSON.stringify({
+      event: 'email_footer_inline_ready',
+      bytes: bytes.length,
+      contentType: blob.getContentType(),
+      version: SCRIPT_VERSION,
+    }));
   } catch (err) {
     console.warn(`email_footer_inline_failed:${String(err && err.message || err)}`);
-    options.htmlBody = html.replace('cid:emailFooter', EMAIL_FOOTER_IMAGE);
+    options.htmlBody = html.replace(/<img src="cid:emailFooter"[^>]*>/, footerFallbackHtml_());
   }
 
-  GmailApp.sendEmail(to, subject, htmlToText_(html), options);
+  GmailApp.sendEmail(to, subject, htmlToText_(options.htmlBody), options);
 }
 
 function serviceRange_(b) {
