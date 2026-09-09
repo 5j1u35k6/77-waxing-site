@@ -3,6 +3,7 @@
   const onGithubPages=location.hostname.endsWith('github.io');
   const bookingUrl=onGithubPages?`${REPO_BASE}/booking/`:'/booking/';
   const siteUrl=onGithubPages?`${REPO_BASE}/`:'/';
+  const PREFILL_KEY='77waxing-booking-prefill';
   const DURATION_MINUTES=90;
 
   function setText(node,value){
@@ -14,6 +15,20 @@
     if(!Number.isFinite(hours)||!Number.isFinite(minutes))return '';
     const total=hours*60+minutes+amount;
     return `${String(Math.floor(total/60)%24).padStart(2,'0')}:${String(total%60).padStart(2,'0')}`;
+  }
+
+  function preserveBookingPrefill(url){
+    const hashParams=new URLSearchParams(String(url.hash||'').replace(/^#/,''));
+    const category=(url.searchParams.get('category')||hashParams.get('category')||'').trim();
+    const item=(url.searchParams.get('item')||hashParams.get('item')||'').trim();
+    if(category&&item){
+      url.searchParams.set('category',category);
+      url.searchParams.set('item',item);
+      const payload=JSON.stringify({category,item,ts:Date.now()});
+      try{sessionStorage.setItem(PREFILL_KEY,payload)}catch{}
+      try{localStorage.setItem(PREFILL_KEY,payload)}catch{}
+    }
+    return `${url.pathname}${url.search}${url.hash}`;
   }
 
   function updateBookingSummary(){
@@ -188,7 +203,7 @@
     if(onGithubPages&&url.origin===location.origin&&url.pathname===bookingUrl&&location.pathname!==bookingUrl){
       event.preventDefault();
       event.stopImmediatePropagation();
-      window.location.assign(bookingUrl);
+      window.location.assign(preserveBookingPrefill(url));
     }
   },true);
 
