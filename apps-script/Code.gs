@@ -1,9 +1,10 @@
 const PROJECT_ID = 'waxing-86909';
 const FIRESTORE_BASE = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
 const STORE_EMAIL = '77waxing.mail@gmail.com';
-const SCRIPT_VERSION = '2026-09-09-email-v6';
+const SCRIPT_VERSION = '2026-09-09-email-v7';
 const WEBSITE_URL = 'https://5j1u35k6.github.io/77-waxing-site/';
 const EMAIL_FOOTER_IMAGE = 'https://5j1u35k6.github.io/77-waxing-site/assets/email-footer-77waxing.jpg';
+const EMAIL_FOOTER_FETCH_URL = 'https://raw.githubusercontent.com/5j1u35k6/77-waxing-site/main/assets/email-footer-77waxing.jpg';
 
 function senderStatus_() {
   const effectiveEmail = String(Session.getEffectiveUser().getEmail() || '').trim().toLowerCase();
@@ -190,6 +191,21 @@ function decodeValue_(v) {
 function send_(to, subject, html) {
   const options = senderOptions_();
   options.htmlBody = html;
+
+  try {
+    const response = UrlFetchApp.fetch(EMAIL_FOOTER_FETCH_URL, { muteHttpExceptions:true });
+    if (response.getResponseCode() === 200) {
+      options.inlineImages = {
+        emailFooter: response.getBlob().setName('77waxing-email-footer.jpg'),
+      };
+    } else {
+      options.htmlBody = html.replace('cid:emailFooter', EMAIL_FOOTER_IMAGE);
+    }
+  } catch (err) {
+    console.warn(`email_footer_inline_failed:${String(err && err.message || err)}`);
+    options.htmlBody = html.replace('cid:emailFooter', EMAIL_FOOTER_IMAGE);
+  }
+
   GmailApp.sendEmail(to, subject, htmlToText_(html), options);
 }
 
@@ -248,7 +264,7 @@ function shell_(title, body) {
     ${body}
     <div style="margin-top:34px">
       <a href="${WEBSITE_URL}" target="_blank" style="display:block;text-decoration:none;border:0">
-        <img src="${EMAIL_FOOTER_IMAGE}" alt="77waxing｜基隆・預約制美學服務｜基隆市中正區義一路56號2樓｜前往官方網站" width="620" style="display:block;width:100%;max-width:620px;height:auto;border:0;border-radius:14px">
+        <img src="cid:emailFooter" alt="77waxing｜基隆・預約制美學服務｜基隆市中正區義一路56號2樓｜前往官方網站" width="620" style="display:block;width:100%;max-width:620px;height:auto;border:0;border-radius:14px">
       </a>
     </div>
   </div>`;
