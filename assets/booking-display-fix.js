@@ -1,4 +1,6 @@
 (()=>{
+  const PREFILL_KEY='77waxing-booking-prefill';
+
   function apply(){
     document.querySelectorAll('#booking [data-booking-block-note]').forEach(el=>{
       const section=el.closest('.notice');
@@ -27,13 +29,34 @@
     });
   }
 
+  function readStoredPrefill(){
+    try{
+      const raw=sessionStorage.getItem(PREFILL_KEY);
+      if(!raw)return {category:'',item:''};
+      const parsed=JSON.parse(raw);
+      const age=Date.now()-Number(parsed?.ts||0);
+      if(!parsed?.category||!parsed?.item||!Number.isFinite(age)||age>10*60*1000){
+        sessionStorage.removeItem(PREFILL_KEY);
+        return {category:'',item:''};
+      }
+      return {category:String(parsed.category).trim(),item:String(parsed.item).trim()};
+    }catch{
+      return {category:'',item:''};
+    }
+  }
+
   function readPrefill(){
     const search=new URLSearchParams(location.search);
     const hash=new URLSearchParams(location.hash.replace(/^#/,''));
+    const stored=readStoredPrefill();
     return {
-      category:(search.get('category')||hash.get('category')||'').trim(),
-      item:(search.get('item')||hash.get('item')||'').trim()
+      category:(search.get('category')||hash.get('category')||stored.category||'').trim(),
+      item:(search.get('item')||hash.get('item')||stored.item||'').trim()
     };
+  }
+
+  function clearStoredPrefill(){
+    try{sessionStorage.removeItem(PREFILL_KEY)}catch{}
   }
 
   let prefillDone=false;
@@ -96,6 +119,7 @@
       note.hidden=false;
       note.textContent=`已從價目表帶入：${categoryName}｜${wanted.item}`;
     }
+    clearStoredPrefill();
     prefillDone=true;
   }
 
