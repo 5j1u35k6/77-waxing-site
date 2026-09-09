@@ -3,7 +3,7 @@ import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/1
 import { collection, doc, getDoc, getDocs, getFirestore, onSnapshot, serverTimestamp, setDoc } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
 import { firebaseConfig, firebaseConfigured } from "./firebase-config.js";
 
-export const CATALOG_DOC_ID = "__catalog__";
+export const CATALOG_DOC_ID = "catalog-main";
 
 const clone = (value) => JSON.parse(JSON.stringify(value));
 const safeId = (value) => String(value || "").trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
