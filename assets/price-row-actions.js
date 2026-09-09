@@ -1,7 +1,7 @@
 (()=>{
   const B='/77-waxing-site';
   const PREFILL_KEY='77waxing-booking-prefill';
-  const BOOKING_CACHE='20260909-1615';
+  const BOOKING_CACHE='20260909-1635';
   const SERVICE_SLUGS={
     women:'women-waxing',
     men:'men-waxing',
@@ -12,12 +12,12 @@
   const itemHash=(name)=>`#item=${encodeURIComponent(name)}`;
   const bookingHref=(category,item)=>{
     const payload=`category=${encodeURIComponent(category)}&item=${encodeURIComponent(item)}`;
-    return `${B}/booking/?v=${BOOKING_CACHE}&${payload}#${payload}`;
+    return `${B}/booking/?v=${BOOKING_CACHE}#${payload}`;
   };
   const rememberPrefill=(category,item)=>{
-    try{
-      sessionStorage.setItem(PREFILL_KEY,JSON.stringify({category,item,ts:Date.now()}));
-    }catch{}
+    const payload=JSON.stringify({category,item,ts:Date.now()});
+    try{sessionStorage.setItem(PREFILL_KEY,payload)}catch{}
+    try{localStorage.setItem(PREFILL_KEY,payload)}catch{}
   };
 
   function closeRows(except=null){
@@ -47,13 +47,17 @@
 
       const actions=document.createElement('div');
       actions.className='price-row-actions';
-      actions.innerHTML=`<a class="price-row-action more" href="${B}/services/${slug}/${itemHash(name)}" data-catalog-link>看更多</a><a class="price-row-action booking" href="${bookingHref(category,name)}">進行預約</a>`;
+      const href=bookingHref(category,name);
+      actions.innerHTML=`<a class="price-row-action more" href="${B}/services/${slug}/${itemHash(name)}" data-catalog-link>看更多</a><a class="price-row-action booking" href="${href}">進行預約</a>`;
       row.appendChild(actions);
       actions.querySelector('.more')?.addEventListener('click',()=>{
         delete document.documentElement.dataset.serviceItemFocus;
       });
-      actions.querySelector('.booking')?.addEventListener('click',()=>{
+      actions.querySelector('.booking')?.addEventListener('click',(event)=>{
+        event.preventDefault();
+        event.stopPropagation();
         rememberPrefill(category,name);
+        location.assign(href);
       });
 
       const toggle=()=>{
