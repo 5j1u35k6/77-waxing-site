@@ -29,6 +29,7 @@ jobs:
           node --check assets/booking-display-fix.js
           node --check assets/booking-addons.js
           node --check assets/booking-choice-ui.js
+          node --check assets/admin-catalog-route-bridge.js
           cp assets/firebase-pages.js /tmp/firebase-pages.mjs
           node --check /tmp/firebase-pages.mjs
           cp assets/service-catalog-store.js /tmp/service-catalog-store.mjs
