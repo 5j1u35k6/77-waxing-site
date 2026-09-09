@@ -8,6 +8,7 @@ const addDays=(date,amount)=>{const d=new Date(date);d.setDate(d.getDate()+amoun
 const addMinutes=(time,amount)=>{const [h,m]=String(time||'').split(':').map(Number);if(!Number.isFinite(h)||!Number.isFinite(m))return '';const total=h*60+m+amount;return `${pad(Math.floor(total/60)%24)}:${pad(total%60)}`};
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
 const statusLabel=status=>({pending_confirmation:'待確認',pending_payment:'待付款',confirmed:'已確認',completed:'已完成',cancelled:'已取消',no_show:'未到店'}[status]||status||'—');
+const SERVICE_CATEGORIES=['女性熱蠟','男士熱蠟','肌膚管理','美胸保養'];
 let rows=[];
 let lastSignature='';
 
@@ -19,7 +20,13 @@ function monthPrefix(date=new Date()){return `${date.getFullYear()}-${pad(date.g
 function dayLabel(date){return `週${'日一二三四五六'[date.getDay()]}`}
 function activeRows(){return rows.filter(r=>!['cancelled','no_show'].includes(r.status))}
 function sidebarLink(label){return [...document.querySelectorAll('.sidebar a')].find(a=>(a.textContent||'').trim()===label)}
-function goto(label){sidebarLink(label)?.click()}
+function customerKey(row){const phone=String(row.customerPhone||'').replace(/[^0-9+]/g,'');return phone||`${String(row.customerName||'').trim()}|${String(row.customerEmail||'').trim()}`}
+function goto(label){
+  const link=sidebarLink(label);
+  if(!link)return;
+  link.click();
+  setTimeout(syncAfterNavigation,0);
+}
 
 function render(force=false){
   const host=root();const panel=ensure();if(!host||!panel)return;
@@ -34,9 +41,19 @@ function render(force=false){
   const month=monthPrefix();
   const monthRows=active.filter(r=>String(r.preferredDate||'').startsWith(month));
   const confirmedMonth=monthRows.filter(r=>['confirmed','completed'].includes(r.status)).length;
-  const newMonth=monthRows.filter(r=>r.isFirstVisit===true).length;
-  const returningMonth=Math.max(0,monthRows.length-newMonth);
-  const newRate=monthRows.length?Math.round(newMonth/monthRows.length*100):0;
+
+  const customerMap=new Map();
+  monthRows.forEach(r=>{
+    const key=customerKey(r);if(!key)return;
+    const current=customerMap.get(key)||{isFirstVisit:false};
+    current.isFirstVisit=current.isFirstVisit||r.isFirstVisit===true;
+    customerMap.set(key,current);
+  });
+  const monthCustomers=[...customerMap.values()];
+  const newMonth=monthCustomers.filter(c=>c.isFirstVisit).length;
+  const returningMonth=Math.max(0,monthCustomers.length-newMonth);
+  const newRate=monthCustomers.length?Math.round(newMonth/monthCustomers.length*100):0;
+
   const pending=active.filter(r=>r.status==='pending_confirmation');
   const unpaid=active.filter(r=>r.status==='pending_payment');
   const upcoming=active.filter(r=>!['completed'].includes(r.status)&&`${r.preferredDate||''} ${r.preferredTime||''}`>=`${now} 00:00`).sort((a,b)=>`${a.preferredDate||''} ${a.preferredTime||''}`.localeCompare(`${b.preferredDate||''} ${b.preferredTime||''}`));
@@ -47,17 +64,22 @@ function render(force=false){
   const weekTotal=weekCounts.reduce((sum,n)=>sum+n,0);
   const weekMax=Math.max(1,...weekCounts);
 
-  const serviceMap=new Map();
-  monthRows.forEach(r=>{const name=String(r.serviceName||'未分類').split('｜')[0].trim()||'未分類';serviceMap.set(name,(serviceMap.get(name)||0)+1)});
-  const services=[...serviceMap.entries()].sort((a,b)=>b[1]-a[1]).slice(0,5);
+  const serviceMap=new Map(SERVICE_CATEGORIES.map(name=>[name,0]));
+  monthRows.forEach(r=>{
+    const raw=String(r.serviceName||'').split('｜')[0].trim();
+    const name=SERVICE_CATEGORIES.includes(raw)?raw:null;
+    if(name)serviceMap.set(name,(serviceMap.get(name)||0)+1);
+  });
+  const services=SERVICE_CATEGORIES.map(name=>[name,serviceMap.get(name)||0]);
   const serviceMax=Math.max(1,...services.map(([,count])=>count));
+  const hasMonthData=monthRows.length>0;
 
-  const signature=JSON.stringify({now,todayRows:todayRows.map(r=>[r.id,r.status,r.preferredTime,r.durationMinutes]),monthRows:monthRows.map(r=>[r.id,r.status,r.serviceName,r.isFirstVisit]),pending:pending.map(r=>r.id),unpaid:unpaid.map(r=>r.id),next:next?.id||'',weekCounts});
+  const signature=JSON.stringify({now,todayRows:todayRows.map(r=>[r.id,r.status,r.preferredTime,r.durationMinutes]),monthRows:monthRows.map(r=>[r.id,r.status,r.serviceName,r.isFirstVisit,r.customerPhone]),pending:pending.map(r=>r.id),unpaid:unpaid.map(r=>r.id),next:next?.id||'',weekCounts});
   if(!force&&signature===lastSignature)return;lastSignature=signature;
 
   panel.innerHTML=`
     <div class="admin-view-head dashboard-overview-head">
-      <div><span class="tag">BUSINESS PULSE</span><h3>營運總覽</h3><p class="muted">這一頁看趨勢、顧客結構與待辦；逐筆預約改到「預約管理」處理。</p></div>
+      <div><span class="tag">BUSINESS PULSE</span><h3>營運總覽</h3><p class="muted">總覽版型固定存在；有資料時填入趨勢，尚無資料時保留同一個位置顯示 0 與空白狀態。</p></div>
       <div class="dashboard-overview-actions"><button type="button" data-overview-calendar>看行事曆</button><button type="button" data-overview-customers>看顧客</button></div>
     </div>
 
@@ -71,7 +93,7 @@ function render(force=false){
     <div class="dashboard-overview-grid">
       <section class="dashboard-next-card">
         <div class="dashboard-v3-title"><div><small>NEXT</small><h4>下一位顧客</h4></div></div>
-        ${next?`<div class="dashboard-next-main"><time>${esc(next.preferredDate||'')}<strong>${esc(range(next))}</strong></time><div><b>${esc(next.customerName||'未命名')}</b><span>${esc(next.serviceName||'—')}</span><small>${statusLabel(next.status)}</small></div></div>`:`<p class="muted">目前沒有接下來的預約。</p>`}
+        ${next?`<div class="dashboard-next-main"><time>${esc(next.preferredDate||'')}<strong>${esc(range(next))}</strong></time><div><b>${esc(next.customerName||'未命名')}</b><span>${esc(next.serviceName||'—')}</span><small>${statusLabel(next.status)}</small></div></div>`:`<div class="dashboard-panel-empty"><b>目前沒有下一筆預約</b><span>之後有預約時，這裡會直接顯示下一位顧客。</span></div>`}
       </section>
 
       <section class="dashboard-attention-summary">
@@ -80,19 +102,21 @@ function render(force=false){
         <p class="muted">只有需要人工處理的數量，不在總覽重複列出整張預約表。</p>
       </section>
 
-      <section class="dashboard-week-panel">
+      <section class="dashboard-week-panel ${weekTotal===0?'is-empty':''}">
         <div class="dashboard-v3-title"><div><small>7 DAYS</small><h4>未來 7 天預約量</h4></div><b>${weekTotal} 筆</b></div>
-        <div class="dashboard-week-bars">${weekDays.map((d,i)=>`<div><span>${dayLabel(d)}</span><i><em style="height:${Math.max(6,Math.round(weekCounts[i]/weekMax*100))}%"></em></i><b>${weekCounts[i]}</b><small>${d.getMonth()+1}/${d.getDate()}</small></div>`).join('')}</div>
+        <div class="dashboard-week-bars">${weekDays.map((d,i)=>`<div><span>${dayLabel(d)}</span><i><em style="height:${weekCounts[i]===0?0:Math.max(8,Math.round(weekCounts[i]/weekMax*100))}%"></em></i><b>${weekCounts[i]}</b><small>${d.getMonth()+1}/${d.getDate()}</small></div>`).join('')}</div>
+        ${weekTotal===0?`<p class="dashboard-inline-empty">未來 7 天目前沒有預約，圖表會保留在原位。</p>`:''}
       </section>
 
-      <section class="dashboard-service-panel">
+      <section class="dashboard-service-panel ${!hasMonthData?'is-empty':''}">
         <div class="dashboard-v3-title"><div><small>MIX</small><h4>本月服務分布</h4></div></div>
-        <div class="dashboard-service-bars">${services.length?services.map(([name,count])=>`<div><span><b>${esc(name)}</b><small>${count} 筆</small></span><i><em style="width:${Math.max(4,Math.round(count/serviceMax*100))}%"></em></i></div>`).join(''):`<p class="muted">本月尚無預約資料。</p>`}</div>
+        <div class="dashboard-service-bars">${services.map(([name,count])=>`<div><span><b>${esc(name)}</b><small>${count} 筆</small></span><i><em style="width:${count===0?0:Math.max(4,Math.round(count/serviceMax*100))}%"></em></i></div>`).join('')}</div>
+        ${!hasMonthData?`<p class="dashboard-inline-empty">本月尚無預約資料，服務分類仍固定顯示。</p>`:''}
       </section>
 
-      <section class="dashboard-customer-panel">
+      <section class="dashboard-customer-panel ${monthCustomers.length===0?'is-empty':''}">
         <div class="dashboard-v3-title"><div><small>CUSTOMERS</small><h4>本月顧客結構</h4></div></div>
-        <div class="dashboard-customer-ratio"><div><span style="width:${newRate}%"></span></div><p><b>${newRate}%</b> 新客</p></div>
+        <div class="dashboard-customer-ratio"><div><span style="width:${newRate}%"></span></div><p><b>${newRate}%</b> 新客</p>${monthCustomers.length===0?`<small class="dashboard-inline-empty">尚無顧客資料，之後會在同一位置顯示比例。</small>`:''}</div>
         <div class="dashboard-customer-counts"><span><b>${newMonth}</b><small>新客</small></span><span><b>${returningMonth}</b><small>回訪</small></span></div>
       </section>
     </div>`;
@@ -103,5 +127,13 @@ function render(force=false){
 }
 
 function syncAfterNavigation(){lastSignature='';requestAnimationFrame(()=>render(true));}
-function start(){if(!getApps().length)return setTimeout(start,80);const db=getFirestore(getApp());onSnapshot(collection(db,'bookings'),snap=>{rows=snap.docs.map(d=>({id:d.id,...d.data()}));render();});document.addEventListener('click',event=>{if(event.target.closest?.('.sidebar a'))setTimeout(syncAfterNavigation,0);});addEventListener('hashchange',syncAfterNavigation);addEventListener('popstate',syncAfterNavigation);syncAfterNavigation();}
+function start(){
+  if(!getApps().length)return setTimeout(start,80);
+  const db=getFirestore(getApp());
+  onSnapshot(collection(db,'bookings'),snap=>{rows=snap.docs.map(d=>({id:d.id,...d.data()}));render();});
+  document.addEventListener('click',event=>{if(event.target.closest?.('.sidebar a'))setTimeout(syncAfterNavigation,0);},true);
+  addEventListener('hashchange',syncAfterNavigation);
+  addEventListener('popstate',syncAfterNavigation);
+  syncAfterNavigation();
+}
 start();
