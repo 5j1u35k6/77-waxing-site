@@ -65,15 +65,28 @@ async function deleteCustomer(phone,name){
   await commitDeletes(refs);
 }
 
+function bookingIdForCell(cell){
+  const source=cell.querySelector('[data-id]');
+  if(source?.dataset.id)return source.dataset.id;
+  const tr=cell.closest('tr');
+  const cells=tr?.querySelectorAll('td');
+  if(!cells||cells.length<5)return '';
+  const date=cells[0]?.textContent.trim()||'';
+  const start=(cells[1]?.dataset.originalStart||cells[1]?.textContent.match(/\d{2}:\d{2}/)?.[0]||'').slice(0,5);
+  const name=cells[2]?.textContent.trim()||'';
+  const phone=normalizePhone(cells[3]?.textContent||'');
+  return bookings.find(row=>row.preferredDate===date&&String(row.preferredTime||'').slice(0,5)===start&&String(row.customerName||'').trim()===name&&normalizePhone(row.customerPhone)===phone)?.id||'';
+}
+
 function enhanceBookingRows(){
   document.querySelectorAll('.adminacts').forEach(cell=>{
     if(cell.querySelector('[data-admin-delete-booking]'))return;
-    const source=cell.querySelector('[data-id]');
-    if(!source)return;
+    const id=bookingIdForCell(cell);
+    if(!id)return;
     const button=document.createElement('button');
     button.type='button';
     button.className='admin-delete-record';
-    button.dataset.adminDeleteBooking=source.dataset.id;
+    button.dataset.adminDeleteBooking=id;
     button.textContent='刪除';
     button.addEventListener('click',async()=>{
       button.disabled=true;
