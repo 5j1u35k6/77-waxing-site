@@ -8,6 +8,25 @@
 
   const booking=()=>document.querySelector('#booking');
   const currentCategoryKey=()=>booking()?.querySelector('[data-booking-category].on')?.dataset.bookingCategory||'women';
+  let lastBookingView='';
+
+  function currentBookingView(){
+    const root=booking();
+    if(!root)return '';
+    const activeStep=root.querySelector('.step.on[data-step]');
+    if(activeStep)return `step-${activeStep.dataset.step}`;
+    if(root.querySelector('.success.on'))return 'success';
+    return '';
+  }
+
+  function syncStepScroll(){
+    const view=currentBookingView();
+    if(!view)return;
+    if(lastBookingView&&view!==lastBookingView){
+      requestAnimationFrame(()=>window.scrollTo({top:0,left:0,behavior:'auto'}));
+    }
+    lastBookingView=view;
+  }
 
   function stripStepOneAddons(){
     booking()?.querySelectorAll('[data-step="1"] .booking-item-group').forEach((group)=>{
@@ -72,6 +91,7 @@
     stripStepOneAddons();
     ensureAddonPanel();
     if(booking()?.querySelector('[data-step="4"].on'))syncSummary();
+    syncStepScroll();
   }
 
   document.addEventListener('click',(event)=>{
@@ -79,7 +99,7 @@
   },true);
 
   document.addEventListener('click',(event)=>{
-    if(!event.target.closest('#booking [data-next],#booking [data-prev],#booking [data-booking-category]'))return;
+    if(!event.target.closest('#booking [data-next],#booking [data-prev],#booking [data-submit],#booking [data-booking-category]'))return;
     setTimeout(syncAll,0);
   });
 
