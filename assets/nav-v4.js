@@ -83,6 +83,7 @@
    serviceLink.setAttribute('aria-expanded','false');
  };
  const scheduleServiceHide=()=>{
+   if(!isDesktop())return;
    clearTimeout(serviceCloseTimer);
    serviceCloseTimer=setTimeout(hideServiceMenu,130);
  };
@@ -120,10 +121,10 @@
    if(link&&link!==hoverTarget)activateDesktopLink(link);
  });
  if(serviceMenu){
-   serviceMenu.addEventListener('mouseenter',()=>{clearTimeout(serviceCloseTimer);if(serviceLink)setCursor(serviceLink)});
+   serviceMenu.addEventListener('mouseenter',()=>{if(!isDesktop())return;clearTimeout(serviceCloseTimer);if(serviceLink)setCursor(serviceLink)});
    serviceMenu.addEventListener('mouseleave',scheduleServiceHide);
-   serviceMenu.addEventListener('focusin',()=>{clearTimeout(serviceCloseTimer);if(serviceLink)setCursor(serviceLink)});
-   serviceMenu.addEventListener('focusout',event=>{if(!serviceMenu.contains(event.relatedTarget))scheduleServiceHide()});
+   serviceMenu.addEventListener('focusin',()=>{if(!isDesktop())return;clearTimeout(serviceCloseTimer);if(serviceLink)setCursor(serviceLink)});
+   serviceMenu.addEventListener('focusout',event=>{if(isDesktop()&&!serviceMenu.contains(event.relatedTarget))scheduleServiceHide()});
    serviceMenu.addEventListener('click',()=>{hideServiceMenu();hoverTarget=null;if(!isDesktop())requestAnimationFrame(()=>close())});
  }
  if(serviceLink){
@@ -144,17 +145,17 @@
      if(a.dataset.navMotionBound)return;
      a.dataset.navMotionBound='1';
      if(a.classList.contains('book')){
-       a.addEventListener('mouseenter',()=>{hoverTarget=null;hideServiceMenu();hideCursor()});
-       a.addEventListener('focus',()=>{hoverTarget=null;hideServiceMenu();hideCursor()});
+       a.addEventListener('mouseenter',()=>{if(!isDesktop())return;hoverTarget=null;hideServiceMenu();hideCursor()});
+       a.addEventListener('focus',()=>{if(!isDesktop())return;hoverTarget=null;hideServiceMenu();hideCursor()});
        a.addEventListener('click',()=>requestAnimationFrame(()=>hideCursor()));
        return;
      }
      if(a===serviceLink){
-       a.addEventListener('mouseenter',()=>{setCursor(a);showServiceMenu()});
-       a.addEventListener('focus',()=>{setCursor(a);showServiceMenu()});
+       a.addEventListener('mouseenter',()=>{if(!isDesktop())return;setCursor(a);showServiceMenu()});
+       a.addEventListener('focus',()=>{if(!isDesktop())return;setCursor(a);showServiceMenu()});
      }else{
-       a.addEventListener('mouseenter',()=>{hideServiceMenu();setCursor(a)});
-       a.addEventListener('focus',()=>{hideServiceMenu();setCursor(a)});
+       a.addEventListener('mouseenter',()=>{if(!isDesktop())return;hideServiceMenu();setCursor(a)});
+       a.addEventListener('focus',()=>{if(!isDesktop())return;hideServiceMenu();setCursor(a)});
      }
      a.addEventListener('click',()=>requestAnimationFrame(()=>{hoverTarget=null;syncCursor()}));
    });
@@ -188,8 +189,8 @@
    if(!link||!nav.contains(link)||link===serviceLink)return;
    requestAnimationFrame(close);
  });
- nav.addEventListener('mouseleave',()=>{hoverTarget=null;scheduleServiceHide();syncCursor()});
- nav.addEventListener('focusout',e=>{if(!nav.contains(e.relatedTarget)){hoverTarget=null;scheduleServiceHide();syncCursor()}});
+ nav.addEventListener('mouseleave',()=>{if(!isDesktop())return;hoverTarget=null;scheduleServiceHide();syncCursor()});
+ nav.addEventListener('focusout',e=>{if(isDesktop()&&!nav.contains(e.relatedTarget)){hoverTarget=null;scheduleServiceHide();syncCursor()}});
  backdrop.addEventListener('click',close);
  document.addEventListener('keydown',e=>{if(e.key==='Escape'){hideServiceMenu();close()}});
  addEventListener('resize',()=>{hideServiceMenu();hoverTarget=null;if(isDesktop())close();else sync();requestAnimationFrame(()=>syncCursor(true))});
