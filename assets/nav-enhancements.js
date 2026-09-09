@@ -10,7 +10,7 @@
   })||null;
   const aboutLink=findTop('/about');
   const serviceLink=findTop('/services');
-  const serviceMenu=()=>[...nav.querySelectorAll('.service-flyout')].find(el=>!el.classList.contains('about-flyout'))||null;
+  const serviceMenu=()=>nav.querySelector('.service-flyout');
 
   function ensureBustCare(){
     const menu=serviceMenu();
@@ -31,7 +31,7 @@
   let aboutMenu=nav.querySelector('.about-flyout');
   if(!aboutMenu){
     aboutMenu=document.createElement('div');
-    aboutMenu.className='service-flyout about-flyout';
+    aboutMenu.className='about-flyout';
     aboutMenu.setAttribute('aria-label','關於 77 選單');
     aboutMenu.innerHTML=ABOUT_ITEMS.map(([name,anchor,en])=>`<a href="${B}/about/#${anchor}"><span>${name}</span><small>${en}</small></a>`).join('');
     aboutLink.after(aboutMenu);
