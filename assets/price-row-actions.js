@@ -39,6 +39,9 @@
       actions.className='price-row-actions';
       actions.innerHTML=`<a class="price-row-action more" href="${B}/services/${slug}/${itemHash(name)}" data-catalog-link>看更多</a><a class="price-row-action booking" href="${bookingHref(category,name)}">進行預約</a>`;
       row.appendChild(actions);
+      actions.querySelector('.more')?.addEventListener('click',()=>{
+        delete document.documentElement.dataset.serviceItemFocus;
+      });
 
       const toggle=()=>{
         const willOpen=!row.classList.contains('open');
@@ -90,7 +93,10 @@
     delete document.documentElement.dataset.serviceItemFocus;
     setTimeout(apply,0);
   });
-  addEventListener('popstate',()=>setTimeout(apply,0));
+  addEventListener('popstate',()=>{
+    delete document.documentElement.dataset.serviceItemFocus;
+    setTimeout(apply,0);
+  });
 
   const root=document.querySelector('#app')||document.body;
   new MutationObserver(()=>requestAnimationFrame(apply)).observe(root,{childList:true,subtree:true});
