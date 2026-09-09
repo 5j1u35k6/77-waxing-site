@@ -1,4 +1,4 @@
-import { loadCatalog, publicCatalog, watchCatalog } from "./service-catalog-store.js";
+import { loadCatalog, publicCatalog, watchCatalog } from "./service-catalog-store.js?v=20260909-2035";
 
 const B = "/77-waxing-site";
 let catalog = [];
