@@ -17,6 +17,8 @@
     if(!select||mounted.has(select))return;
     mounted.add(select);
     select.classList.add('booking-native-select');
+    select.tabIndex=-1;
+    select.setAttribute('aria-hidden','true');
 
     const control=document.createElement('div');
     control.className='booking-choice-control';
@@ -108,17 +110,9 @@
     sync();
   }
 
-  function apply(){
-    document.querySelectorAll(SELECTORS).forEach(mountSelect);
-  }
-
-  document.addEventListener('click',(event)=>{
-    if(openControl&&!event.target.closest('.booking-choice-control'))closeControl(openControl);
-  });
-  document.addEventListener('keydown',(event)=>{
-    if(event.key==='Escape')closeControl(openControl);
-  });
-
+  function apply(){document.querySelectorAll(SELECTORS).forEach(mountSelect);}
+  document.addEventListener('click',(event)=>{if(openControl&&!event.target.closest('.booking-choice-control'))closeControl(openControl);});
+  document.addEventListener('keydown',(event)=>{if(event.key==='Escape')closeControl(openControl);});
   const root=document.querySelector('#app')||document.body;
   new MutationObserver(()=>queueMicrotask(apply)).observe(root,{childList:true,subtree:true});
   apply();
