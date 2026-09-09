@@ -8,7 +8,10 @@
   };
 
   const itemHash=(name)=>`#item=${encodeURIComponent(name)}`;
-  const bookingHref=(category,item)=>`${B}/booking/?category=${encodeURIComponent(category)}&item=${encodeURIComponent(item)}`;
+  const bookingHref=(category,item)=>{
+    const query=`category=${encodeURIComponent(category)}&item=${encodeURIComponent(item)}`;
+    return `${B}/booking/?${query}#${query}`;
+  };
 
   function closeRows(except=null){
     document.querySelectorAll('.price-row.price-row-actionable.open').forEach((row)=>{
