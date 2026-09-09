@@ -10,12 +10,11 @@
     clearTimeout(timer);
     timer=setTimeout(()=>{
       if(!wantedViews.has(currentView()))return;
-      // admin-service-catalog.js already owns the actual renderer.  Dispatching
-      // hashchange gives it a deterministic hand-off even when admin-v2 stops
-      // click propagation or redraws the legacy service/pricing workspace.
       window.dispatchEvent(new HashChangeEvent('hashchange'));
     },delay);
   }
+
+  window.addEventListener('77waxing:admin-catalog-route',()=>requestCatalogRender(0));
 
   document.addEventListener('click',(event)=>{
     const link=event.target.closest?.('#admin-preview .sidebar a');
@@ -31,9 +30,7 @@
       const node=workspace();
       if(!node)return requestCatalogRender(20);
       const view=currentView();
-      if(node.dataset.catalogOwned!==view||!node.querySelector(`[data-dynamic-catalog-view="${view}"]`)){
-        requestCatalogRender(10);
-      }
+      if(node.dataset.catalogOwned!==view||!node.querySelector(`[data-dynamic-catalog-view="${view}"]`))requestCatalogRender(10);
     },20);
   }).observe(document.querySelector('#app')||document.body,{childList:true,subtree:true});
 
