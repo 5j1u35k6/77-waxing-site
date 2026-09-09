@@ -1,5 +1,5 @@
 (()=>{
-  const SELECTORS='select[name="gender"],select[name="first"]';
+  const SELECTORS='#booking select[name="gender"],#booking select[name="first"]';
   const mounted=new WeakSet();
   let openControl=null;
 
@@ -109,7 +109,7 @@
   }
 
   function apply(){
-    document.querySelectorAll(`#booking ${SELECTORS}`).forEach(mountSelect);
+    document.querySelectorAll(SELECTORS).forEach(mountSelect);
   }
 
   document.addEventListener('click',(event)=>{
