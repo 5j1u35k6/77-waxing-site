@@ -2,18 +2,6 @@ import { getApp, getApps } from "https://www.gstatic.com/firebasejs/12.18.0/fire
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
 import { collection, doc, getDoc, getFirestore, onSnapshot, orderBy, query, serverTimestamp, setDoc } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
 
-const SERVICE_CATALOG = [
-  {key:"women",name:"女性熱蠟",items:[
-    ["全腿 / 半腿",90,"$1599 / 899"],["全手 / 半手",90,"$1399 / 799"],["全背 / 半背",90,"$1299 / 699"],["私密處全除",90,"$1399"],["小鬍子 / 小腹線",90,"$399"],["腋下",90,"$399"]]},
-  {key:"men",name:"男士熱蠟",items:[
-    ["全腿 / 半腿",90,"$1899 / 1099"],["全手 / 半手",90,"$1599 / 899"],["全背 / 半背",90,"$1599 / 899"],["私密處全除",90,"$2299"],["小腹線 / 鬍子",90,"$499 / 視範圍"],["腋下",90,"$499"]]},
-  {key:"skin",name:"肌膚管理",items:[
-    ["修修臉粉刺毛孔大掃除",90,"$1399"],["針管式客制化安瓶",90,"$1599"],["CICA 深層修復",90,"$1899"],["裸肌水光駐顏",90,"$1899"],["肌活再生外泌課程",90,"$1999"],["濃縮原液客制化",90,"$1999"],["黑溜溜矽晶煥膚",90,"$2199"],["全方位臉部撥筋",70,"$1399"],["臉部撥筋 + 基礎手工清粉刺",150,"$2499"],["果酸 / 矽晶美背護理",90,"$1699 / 2999"],["水潤 / 肌泌緊緻肩頸胸",90,"$699 / 1099"],["果酸 / 矽晶粉嫩屁屁",90,"$1499 / 2199"]]},
-  {key:"bust",name:"美胸保養",items:[
-    ["基礎美胸",60,"$1299"],["舒緩美胸",75,"$1499"],["全方位美胸",90,"$1699"]]},
-];
-
-const serviceId = (category,name) => `${category}-${encodeURIComponent(name).replace(/%/g,"")}`;
 const pad = (n)=>String(n).padStart(2,"0");
 const dateKey = (d)=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
 const addDays = (date,amount)=>{const d=new Date(date);d.setDate(d.getDate()+amount);return d;};
@@ -23,12 +11,12 @@ const monthTitle = (date)=>`${date.getFullYear()} 年 ${date.getMonth()+1} 月`;
 const dayTitle = (date)=>`${date.getFullYear()} 年 ${date.getMonth()+1} 月 ${date.getDate()} 日`;
 const statusText=(status)=>({pending_confirmation:"待確認",pending_payment:"待付款",confirmed:"已確認",cancelled:"已取消",completed:"已完成",no_show:"未到店"}[status]||status||"—");
 
-let db=null,auth=null,bookings=[],serviceOverrides=new Map(),settings={};
+let db=null,auth=null,bookings=[],settings={};
 let currentView="dashboard";
 let calendarMode="week";
 let calendarDate=new Date();
 let initialized=false;
-let unsubBookings=null,unsubServices=null;
+let unsubBookings=null;
 
 function activeAdminRoot(){return document.querySelector("body.admin-page #admin-preview");}
 function dash(){return activeAdminRoot()?.querySelector(".dash");}
@@ -83,23 +71,6 @@ function renderCustomers(){
   w.querySelector("[data-paper-import]").onclick=()=>{const note=w.querySelector("[data-paper-note]");note.hidden=false;note.scrollIntoView({behavior:"smooth",block:"nearest"});};
 }
 
-function currentServiceValue(category,name,duration,price){return serviceOverrides.get(serviceId(category,name))||{category,name,durationMinutes:duration,priceLabel:price,enabled:true};}
-async function saveService(category,name,duration,price,patch){
-  const id=serviceId(category,name);const current=currentServiceValue(category,name,duration,price);
-  const next={...current,...patch,category,name,durationMinutes:duration,updatedAt:serverTimestamp()};
-  await setDoc(doc(db,"services",id),next,{merge:true});
-}
-function renderServices(){
-  const w=ensureWorkspace();if(!w)return;setBaseVisibility(false);
-  w.innerHTML=`<div class="admin-view-head"><div><span class="tag">SERVICES</span><h3>服務管理</h3></div></div><p class="muted">這裡只控制服務是否開放線上預約；關閉後顧客端不再顯示該細項。</p><div class="service-admin-list">${SERVICE_CATALOG.map(cat=>`<section><h4>${cat.name}</h4>${cat.items.map(([name,duration,price])=>{const value=currentServiceValue(cat.key,name,duration,price);return `<label class="service-toggle-row"><span><b>${escapeHtml(name)}</b><small>${duration} 分鐘</small></span><input type="checkbox" data-service-toggle data-category="${cat.key}" data-name="${escapeHtml(name)}" data-duration="${duration}" data-price="${escapeHtml(price)}" ${value.enabled!==false?"checked":""}><i></i></label>`;}).join("")}</section>`).join("")}</div>`;
-  w.querySelectorAll("[data-service-toggle]").forEach(input=>input.onchange=async()=>{input.disabled=true;try{await saveService(input.dataset.category,input.dataset.name,Number(input.dataset.duration),input.dataset.price,{enabled:input.checked});}finally{input.disabled=false;}});
-}
-function renderPricing(){
-  const w=ensureWorkspace();if(!w)return;setBaseVisibility(false);
-  w.innerHTML=`<div class="admin-view-head"><div><span class="tag">PRICING</span><h3>價格管理</h3></div></div><p class="muted">修改後會同步提供給價目頁與預約選項使用。可保留「$1599 / 899」這類雙價格格式。</p><div class="pricing-admin-list">${SERVICE_CATALOG.map(cat=>`<section><h4>${cat.name}</h4>${cat.items.map(([name,duration,price])=>{const value=currentServiceValue(cat.key,name,duration,price);return `<div class="pricing-row"><span><b>${escapeHtml(name)}</b><small>${duration} 分鐘</small></span><input type="text" value="${escapeHtml(value.priceLabel||price)}" data-price-input data-category="${cat.key}" data-name="${escapeHtml(name)}" data-duration="${duration}" data-default-price="${escapeHtml(price)}"><button type="button" data-price-save>儲存</button></div>`;}).join("")}</section>`).join("")}</div>`;
-  w.querySelectorAll(".pricing-row").forEach(row=>{row.querySelector("[data-price-save]").onclick=async()=>{const input=row.querySelector("[data-price-input]");const button=row.querySelector("[data-price-save]");button.disabled=true;button.textContent="儲存中";try{await saveService(input.dataset.category,input.dataset.name,Number(input.dataset.duration),input.dataset.defaultPrice,{priceLabel:input.value.trim()});button.textContent="已儲存";setTimeout(()=>button.textContent="儲存",900);}catch{button.textContent="失敗";}finally{button.disabled=false;}};});
-}
-
 async function renderSettings(){
   const w=ensureWorkspace();if(!w)return;setBaseVisibility(false);
   let live=settings;
@@ -110,7 +81,30 @@ async function renderSettings(){
   w.querySelector("[data-save-settings]").onclick=async()=>{const button=w.querySelector("[data-save-settings]");const msg=w.querySelector("[data-settings-message]");const a=w.querySelector('[name="bookingStartTime"]').value,b=w.querySelector('[name="bookingEndTime"]').value;if(a>b){msg.textContent="最晚開始時間不可早於最早時間。";return;}button.disabled=true;msg.textContent="儲存中…";try{settings={bookingEnabled:w.querySelector('[name="bookingEnabled"]').checked,bookingStartTime:a,bookingEndTime:b,maxAdvanceDays:Number(w.querySelector('[name="maxAdvanceDays"]').value||60),bookingNotice:w.querySelector('[name="bookingNotice"]').value.trim()};await setDoc(doc(db,"settings","general"),{...settings,updatedAt:serverTimestamp()},{merge:true});msg.textContent="已儲存，前台會套用最新設定。";}catch(e){console.error(e);msg.textContent="儲存失敗，請稍後再試。";}finally{button.disabled=false;}};
 }
 
-function renderView(view){currentView=view;if(view==="dashboard"){setBaseVisibility(true);return;}if(view==="calendar")return renderCalendar();if(view==="customers")return renderCustomers();if(view==="services")return renderServices();if(view==="pricing")return renderPricing();if(view==="settings")return renderSettings();if(view==="bookings"){setBaseVisibility(true);const p=originalPanel();if(p){metrics().hidden=true;p.hidden=false;p.querySelector("h3").textContent="預約管理";p.scrollIntoView({behavior:"smooth",block:"start"});}return;}}
+function delegateCatalog(view){
+  setBaseVisibility(false);
+  const w=ensureWorkspace();
+  if(w){
+    w.hidden=false;
+    w.dataset.catalogOwned="pending";
+    w.innerHTML=`<div class="admin-view-head"><div><span class="tag">${view==="services"?"SERVICES":"PRICING"}</span><h3>${view==="services"?"服務管理":"價格管理"}</h3></div></div><p class="muted">正在載入管理工具…</p>`;
+  }
+  window.dispatchEvent(new CustomEvent("77waxing:admin-catalog-route",{detail:{view}}));
+}
+
+function renderView(view){
+  currentView=view;
+  if(view==="dashboard"){setBaseVisibility(true);return;}
+  if(view==="calendar")return renderCalendar();
+  if(view==="customers")return renderCustomers();
+  if(view==="services"||view==="pricing")return delegateCatalog(view);
+  if(view==="settings")return renderSettings();
+  if(view==="bookings"){
+    setBaseVisibility(true);
+    const p=originalPanel();
+    if(p){metrics().hidden=true;p.hidden=false;p.querySelector("h3").textContent="預約管理";p.scrollIntoView({behavior:"smooth",block:"start"});}
+  }
+}
 
 function bindSidebar(){
   const root=activeAdminRoot();if(!root)return false;const sidebar=root.querySelector(".sidebar");if(!sidebar)return false;
@@ -122,7 +116,6 @@ function bindSidebar(){
 function startData(){
   if(unsubBookings)return;
   unsubBookings=onSnapshot(query(collection(db,"bookings"),orderBy("preferredDate","asc")),snap=>{bookings=snap.docs.map(d=>({id:d.id,...d.data()}));if(currentView==="calendar")renderCalendar();if(currentView==="customers")renderCustomers();});
-  unsubServices=onSnapshot(collection(db,"services"),snap=>{serviceOverrides=new Map(snap.docs.map(d=>[d.id,d.data()]));if(currentView==="services")renderServices();if(currentView==="pricing")renderPricing();});
   onSnapshot(doc(db,"settings","general"),snap=>{settings=snap.exists()?snap.data():{};});
 }
 
