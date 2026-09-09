@@ -137,7 +137,7 @@
        return;
      }
      if(serviceMenu?.classList.contains('on'))hideServiceMenu();else showServiceMenu();
-   });
+   },true);
  }
  const bindCursorLinks=()=>{
    topLinks().forEach(a=>{
