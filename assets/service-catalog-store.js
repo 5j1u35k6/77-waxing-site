@@ -49,7 +49,7 @@ export const DEFAULT_CATALOG = [
         title: "加購保養",
         priceTitle: "加購項目 ADD ON",
         kind: "addon",
-        desc: "可搭配主服務加購。",
+        desc: "",
         items: [
           serviceItem("women-addon-detail", "小鬍子 / 小腹線 / 腋下", "加購除毛項目", 90, "約 90 分鐘", "$199"),
           serviceItem("women-addon-underarm-mask", "腋下美白軟膜", "Underarm whitening mask", 90, "約 90 分鐘", "$199"),
@@ -86,7 +86,7 @@ export const DEFAULT_CATALOG = [
         title: "加購保養",
         priceTitle: "加購項目 ADD ON",
         kind: "addon",
-        desc: "可搭配主服務加購。",
+        desc: "",
         items: [
           serviceItem("men-addon-detail", "小鬍子 / 小腹線 / 腋下", "加購除毛項目", 90, "約 90 分鐘", "$350"),
           serviceItem("men-addon-underarm-mask", "腋下美白軟膜", "Underarm whitening mask", 90, "約 90 分鐘", "$299"),
@@ -133,7 +133,7 @@ export const DEFAULT_CATALOG = [
         id: "skin-body",
         title: "身體項目",
         kind: "main",
-        desc: "肌膚管理中的身體保養項目。",
+        desc: "",
         items: [
           serviceItem("skin-back", "果酸 / 矽晶美背護理", "背部肌膚管理", 90, "約 90 分鐘", "$1699 / 2999"),
           serviceItem("skin-neck", "水潤 / 肌泌緊緻肩頸胸", "肩頸胸肌膚保養", 90, "約 90 分鐘", "$699 / 1099"),
@@ -144,7 +144,7 @@ export const DEFAULT_CATALOG = [
         id: "skin-addon",
         title: "加購項目",
         kind: "addon",
-        desc: "可依主要服務需求加購。",
+        desc: "",
         items: [
           serviceItem("skin-addon-neck", "頸部緊緻保養", "頸部加強保養", 90, "約 90 分鐘", "$699"),
           serviceItem("skin-addon-polish", "臉部拋光", "臉部除毛項目", 90, "約 90 分鐘", "$499"),
@@ -196,12 +196,18 @@ function normalizeItem(item, index) {
 
 function normalizeGroup(group, index) {
   const title = String(group?.title || `服務項目 ${index + 1}`).trim();
+  const rawDesc = String(group?.desc || "").trim();
+  const hiddenLegacyCopy = new Set([
+    "可搭配主服務加購。",
+    "可依主要服務需求加購。",
+    "肌膚管理中的身體保養項目。",
+  ]);
   return {
     id: String(group?.id || makeCatalogId(`group${index}`)),
     title,
     priceTitle: String(group?.priceTitle || title).trim(),
     kind: group?.kind === "addon" || /加購/.test(title) ? "addon" : "main",
-    desc: String(group?.desc || "").trim(),
+    desc: hiddenLegacyCopy.has(rawDesc) ? "" : rawDesc,
     items: Array.isArray(group?.items) ? group.items.map(normalizeItem) : [],
   };
 }
