@@ -2,19 +2,20 @@ import { getApp, getApps } from "https://www.gstatic.com/firebasejs/12.18.0/fire
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
 import { DEFAULT_CATALOG, loadCatalog, makeCatalogId, makeSlug, saveCatalog, watchCatalog } from "./service-catalog-store.js";
 
-let catalog = [];
-let ready = false;
+const VERSION = "20260909-2025";
+let catalog = JSON.parse(JSON.stringify(DEFAULT_CATALOG));
 let hydrated = false;
 let hydrating = false;
-let catalogWritable = false;
 let unsubCatalog = null;
-let scheduled = false;
+let actionBusy = false;
 
+const clone = (value) => JSON.parse(JSON.stringify(value));
 const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
 const route = () => ((location.hash || "#dashboard").slice(1) || "dashboard");
-const root = () => document.querySelector("body.admin-page #admin-preview");
-const workspace = () => root()?.querySelector(".admin-v2-workspace");
-const clone = (value) => JSON.parse(JSON.stringify(value));
+const workspace = () => document.querySelector("body.admin-page #admin-preview .admin-v2-workspace");
+const categoryAt = (key, source = catalog) => source.find((category) => category.key === key);
+const groupAt = (category, id) => category?.groups?.find((group) => group.id === id);
+const itemAt = (group, id) => group?.items?.find((item) => item.id === id);
 
 function ensureBusy() {
   let node = document.querySelector("[data-catalog-admin-busy]");
@@ -55,294 +56,227 @@ function openForm({ title, fields, submitText = "儲存" }) {
       const cls = field.full ? "full" : "";
       const value = esc(field.value ?? "");
       if (field.type === "textarea") return `<label class="${cls}">${esc(field.label)}<textarea name="${esc(field.name)}" rows="3" ${field.required ? "required" : ""}>${value}</textarea></label>`;
-      if (field.type === "select") return `<label class="${cls}">${esc(field.label)}<select name="${esc(field.name)}">${field.options.map(([v,l])=>`<option value="${esc(v)}" ${String(field.value)===String(v)?"selected":""}>${esc(l)}</option>`).join("")}</select></label>`;
+      if (field.type === "select") return `<label class="${cls}">${esc(field.label)}<select name="${esc(field.name)}">${field.options.map(([v,l]) => `<option value="${esc(v)}" ${String(field.value)===String(v)?"selected":""}>${esc(l)}</option>`).join("")}</select></label>`;
       return `<label class="${cls}">${esc(field.label)}<input name="${esc(field.name)}" type="${field.type || "text"}" value="${value}" ${field.min != null ? `min="${field.min}"` : ""} ${field.max != null ? `max="${field.max}"` : ""} ${field.required ? "required" : ""}></label>`;
     }).join("")}</form><div class="catalog-admin-modal-actions"><button type="button" class="catalog-mini-btn" data-modal-cancel>取消</button><button type="button" class="catalog-mini-btn primary" data-modal-submit>${esc(submitText)}</button></div></div>`;
     const form = modal.querySelector("form");
     const close = (value) => { modal.hidden = true; modal.innerHTML = ""; resolve(value); };
     modal.querySelector("[data-modal-cancel]").onclick = () => close(null);
-    modal.addEventListener("click", (event) => { if (event.target === modal) close(null); }, { once: true });
     modal.querySelector("[data-modal-submit]").onclick = () => {
       if (!form.reportValidity()) return;
-      const data = Object.fromEntries(new FormData(form).entries());
-      close(data);
+      close(Object.fromEntries(new FormData(form).entries()));
     };
+    modal.onclick = (event) => { if (event.target === modal) close(null); };
   });
-}
-
-async function persist(nextCatalog, title = "正在更新服務資料…") {
-  if (!catalogWritable) {
-    alert("服務資料仍在與 Firestore 同步，請稍候幾秒後再操作。");
-    return;
-  }
-  setBusy(true, title);
-  try {
-    catalog = await saveCatalog(nextCatalog);
-    renderCurrent(true);
-  } catch (error) {
-    console.error(error);
-    alert("更新失敗，請稍後再試。資料尚未套用。");
-  } finally {
-    setBusy(false);
-  }
-}
-
-function categoryAt(key, source = catalog) { return source.find((category) => category.key === key); }
-function groupAt(category, id) { return category?.groups.find((group) => group.id === id); }
-function itemAt(group, id) { return group?.items.find((item) => item.id === id); }
-
-async function addCategory() {
-  const values = await openForm({
-    title: "新增服務分類",
-    fields: [
-      { name: "name", label: "分類名稱，例如：身體保養", required: true },
-      { name: "en", label: "英文標題", value: "SERVICE" },
-      { name: "slug", label: "網址代碼（英文，例如 body-care）", required: true },
-      { name: "intro", label: "服務頁小標語／簡介", type: "textarea", full: true },
-    ],
-    submitText: "新增分類",
-  });
-  if (!values) return;
-  const slug = makeSlug(values.slug);
-  if (catalog.some((category) => category.slug === slug)) return alert("這個網址代碼已經存在，請換一個。");
-  const next = clone(catalog);
-  next.push({
-    key: makeCatalogId("cat"),
-    slug,
-    name: values.name.trim(),
-    en: values.en.trim() || "SERVICE",
-    intro: values.intro.trim(),
-    enabled: true,
-    groups: [
-      { id: makeCatalogId("group"), title: "服務項目", priceTitle: "服務項目", kind: "main", desc: "", items: [] },
-      { id: makeCatalogId("addon"), title: "加購項目", priceTitle: "加購項目", kind: "addon", desc: "", items: [] },
-    ],
-    notes: [],
-  });
-  await persist(next, "正在新增服務分類…");
-}
-
-async function editCategory(key) {
-  const current = categoryAt(key); if (!current) return;
-  const values = await openForm({
-    title: `編輯 ${current.name}`,
-    fields: [
-      { name: "name", label: "分類名稱", value: current.name, required: true },
-      { name: "en", label: "英文標題", value: current.en },
-      { name: "slug", label: "網址代碼", value: current.slug, required: true },
-      { name: "intro", label: "服務頁小標語／簡介", type: "textarea", value: current.intro, full: true },
-    ],
-  });
-  if (!values) return;
-  const slug = makeSlug(values.slug);
-  if (catalog.some((category) => category.key !== key && category.slug === slug)) return alert("這個網址代碼已經存在，請換一個。");
-  const next = clone(catalog); const target = categoryAt(key, next);
-  Object.assign(target, { name: values.name.trim(), en: values.en.trim() || "SERVICE", slug, intro: values.intro.trim() });
-  await persist(next, "正在更新服務分類…");
-}
-
-async function deleteCategory(key) {
-  const current = categoryAt(key); if (!current) return;
-  if (!confirm(`確定刪除「${current.name}」？\n\n前台服務選單、價目表與預約分類都會同步移除；既有預約紀錄不會被刪除。`)) return;
-  await persist(catalog.filter((category) => category.key !== key), "正在刪除服務分類…");
-}
-
-async function addGroup(key) {
-  const current = categoryAt(key); if (!current) return;
-  const values = await openForm({
-    title: `在 ${current.name} 新增區塊`,
-    fields: [
-      { name: "title", label: "區塊名稱", required: true },
-      { name: "priceTitle", label: "價目表區塊名稱（可相同）" },
-      { name: "kind", label: "區塊類型", type: "select", value: "main", options: [["main","一般服務"],["addon","加購項目"]] },
-      { name: "desc", label: "區塊說明", type: "textarea", full: true },
-    ],
-    submitText: "新增區塊",
-  });
-  if (!values) return;
-  const next = clone(catalog); const target = categoryAt(key, next);
-  target.groups.push({ id: makeCatalogId("group"), title: values.title.trim(), priceTitle: values.priceTitle.trim() || values.title.trim(), kind: values.kind, desc: values.desc.trim(), items: [] });
-  await persist(next, "正在新增服務區塊…");
-}
-
-async function deleteGroup(key, groupId) {
-  const current = categoryAt(key); const group = groupAt(current, groupId); if (!group) return;
-  if (!confirm(`確定刪除「${group.title}」以及裡面的 ${group.items.length} 個項目？`)) return;
-  const next = clone(catalog); const target = categoryAt(key, next); target.groups = target.groups.filter((entry) => entry.id !== groupId);
-  await persist(next, "正在刪除服務區塊…");
-}
-
-async function editItem(key, groupId, itemId = "") {
-  const current = categoryAt(key); const group = groupAt(current, groupId); if (!group) return;
-  const currentItem = itemId ? itemAt(group, itemId) : null;
-  const values = await openForm({
-    title: currentItem ? `編輯 ${currentItem.name}` : `新增${group.kind === "addon" ? "加購" : "服務"}項目`,
-    fields: [
-      { name: "name", label: "項目名稱", value: currentItem?.name || "", required: true },
-      { name: "description", label: "服務頁說明", value: currentItem?.description || "", full: true },
-      { name: "durationMinutes", label: "施作時間（分鐘）", type: "number", value: currentItem?.durationMinutes || 90, min: 1, max: 180, required: true },
-      { name: "durationLabel", label: "顯示時間文字", value: currentItem?.durationLabel || "約 90 分鐘" },
-      { name: "priceLabel", label: "價格，例如 $1399 或 視範圍", value: currentItem?.priceLabel || "", full: true },
-    ],
-    submitText: currentItem ? "儲存修改" : "新增項目",
-  });
-  if (!values) return;
-  const next = clone(catalog); const targetGroup = groupAt(categoryAt(key, next), groupId);
-  const payload = {
-    id: currentItem?.id || makeCatalogId(group.kind === "addon" ? "addon" : "item"),
-    name: values.name.trim(),
-    description: values.description.trim(),
-    durationMinutes: Number(values.durationMinutes || 90),
-    durationLabel: values.durationLabel.trim() || `約 ${Number(values.durationMinutes || 90)} 分鐘`,
-    priceLabel: values.priceLabel.trim(),
-    enabled: currentItem?.enabled !== false,
-  };
-  if (currentItem) Object.assign(itemAt(targetGroup, itemId), payload); else targetGroup.items.push(payload);
-  await persist(next, currentItem ? "正在更新服務項目…" : "正在新增服務項目…");
-}
-
-async function deleteItem(key, groupId, itemId) {
-  const current = categoryAt(key); const group = groupAt(current, groupId); const item = itemAt(group, itemId); if (!item) return;
-  if (!confirm(`確定刪除「${item.name}」？\n\n前台服務、價目與預約選項會同步移除。`)) return;
-  const next = clone(catalog); const targetGroup = groupAt(categoryAt(key, next), groupId); targetGroup.items = targetGroup.items.filter((entry) => entry.id !== itemId);
-  await persist(next, "正在刪除服務項目…");
-}
-
-async function toggleCategory(key, enabled) {
-  const next = clone(catalog); categoryAt(key, next).enabled = enabled; await persist(next, "正在更新服務開放狀態…");
-}
-async function toggleItem(key, groupId, itemId, enabled) {
-  const next = clone(catalog); itemAt(groupAt(categoryAt(key, next), groupId), itemId).enabled = enabled; await persist(next, "正在更新項目開放狀態…");
-}
-async function savePrice(key, groupId, itemId, value) {
-  const next = clone(catalog); itemAt(groupAt(categoryAt(key, next), groupId), itemId).priceLabel = value.trim(); await persist(next, "正在同步價格…");
-}
-
-function statusMarkup() {
-  if (catalogWritable) return "";
-  return `<div class="firebase-state info" data-catalog-sync-state><b>服務資料同步中</b><p>管理畫面已先載入；完成 Firestore 同步後即可新增、編輯或刪除。</p></div>`;
 }
 
 function servicesMarkup() {
-  return `<div class="catalog-admin-shell" data-dynamic-catalog-view="services">${statusMarkup()}<div class="catalog-admin-head"><div><span class="tag">SERVICES</span><h3>服務管理</h3><p class="catalog-admin-note">新增或刪除後，前台服務選單、服務頁、價目表與預約項目會讀取同一份資料。</p></div><div class="catalog-category-actions"><button class="catalog-mini-btn primary" type="button" data-add-category ${catalogWritable ? "" : "disabled"}>＋ 新增服務分類</button></div></div>${catalog.map((category) => `<section class="catalog-category-card" data-category="${esc(category.key)}"><div class="catalog-category-head"><div><h4>${esc(category.name)}</h4><small>${esc(category.en)} · /services/${esc(category.slug)}/</small></div><div class="catalog-category-actions"><label class="catalog-toggle"><input type="checkbox" data-category-toggle ${category.enabled !== false ? "checked" : ""} ${catalogWritable ? "" : "disabled"}> 開放前台</label><button class="catalog-mini-btn" data-edit-category ${catalogWritable ? "" : "disabled"}>編輯</button><button class="catalog-mini-btn" data-add-group ${catalogWritable ? "" : "disabled"}>＋ 新增區塊</button><button class="catalog-mini-btn danger" data-delete-category ${catalogWritable ? "" : "disabled"}>刪除分類</button></div></div>${category.groups.map((group) => `<div class="catalog-group-card" data-group="${esc(group.id)}"><div class="catalog-group-head"><div><h5>${esc(group.title)}</h5><span class="catalog-kind">${group.kind === "addon" ? "ADD-ON 加購" : "SERVICE 一般服務"}</span></div><div class="catalog-group-actions"><button class="catalog-mini-btn" data-add-item ${catalogWritable ? "" : "disabled"}>＋ ${group.kind === "addon" ? "新增加購項目" : "新增服務項目"}</button><button class="catalog-mini-btn danger" data-delete-group ${catalogWritable ? "" : "disabled"}>刪除區塊</button></div></div><div class="catalog-item-list">${group.items.length ? group.items.map((item) => `<div class="catalog-item-row" data-item="${esc(item.id)}"><div><b>${esc(item.name)}</b><small>${esc(item.description || "尚未填寫服務說明")}</small></div><div><b>${esc(item.durationLabel)}</b><small>${esc(item.durationMinutes)} 分鐘</small></div><div class="price">${esc(item.priceLabel || "尚未設定價格")}</div><div class="catalog-item-actions"><label class="catalog-toggle"><input type="checkbox" data-item-toggle ${item.enabled !== false ? "checked" : ""} ${catalogWritable ? "" : "disabled"}> 開放</label><button class="catalog-mini-btn" data-edit-item ${catalogWritable ? "" : "disabled"}>編輯</button><button class="catalog-mini-btn danger" data-delete-item ${catalogWritable ? "" : "disabled"}>刪除</button></div></div>`).join("") : `<div class="catalog-admin-empty">這個區塊目前沒有項目。</div>`}</div></div>`).join("")}</section>`).join("")}</div>`;
+  return `<div class="catalog-admin-shell" data-dynamic-catalog-view="services" data-catalog-version="${VERSION}"><div class="catalog-admin-head"><div><span class="tag">SERVICES</span><h3>服務管理</h3><p class="catalog-admin-note">新增或刪除後，前台服務選單、服務頁、價目表與預約項目會讀取同一份資料。</p></div><div class="catalog-category-actions"><button class="catalog-mini-btn primary" type="button" data-add-category>＋ 新增服務分類</button></div></div>${catalog.map((category) => `<section class="catalog-category-card" data-category="${esc(category.key)}"><div class="catalog-category-head"><div><h4>${esc(category.name)}</h4><small>${esc(category.en)} · /services/${esc(category.slug)}/</small></div><div class="catalog-category-actions"><label class="catalog-toggle"><input type="checkbox" data-category-toggle ${category.enabled !== false ? "checked" : ""}> 開放前台</label><button class="catalog-mini-btn" type="button" data-edit-category>編輯</button><button class="catalog-mini-btn" type="button" data-add-group>＋ 新增區塊</button><button class="catalog-mini-btn danger" type="button" data-delete-category>刪除分類</button></div></div>${category.groups.map((group) => `<div class="catalog-group-card" data-group="${esc(group.id)}"><div class="catalog-group-head"><div><h5>${esc(group.title)}</h5><span class="catalog-kind">${group.kind === "addon" ? "ADD-ON 加購" : "SERVICE 一般服務"}</span></div><div class="catalog-group-actions"><button class="catalog-mini-btn" type="button" data-add-item>＋ ${group.kind === "addon" ? "新增加購項目" : "新增服務項目"}</button><button class="catalog-mini-btn danger" type="button" data-delete-group>刪除區塊</button></div></div><div class="catalog-item-list">${group.items.length ? group.items.map((item) => `<div class="catalog-item-row" data-item="${esc(item.id)}"><div><b>${esc(item.name)}</b><small>${esc(item.description || "尚未填寫服務說明")}</small></div><div><b>${esc(item.durationLabel)}</b><small>${esc(item.durationMinutes)} 分鐘</small></div><div class="price">${esc(item.priceLabel || "尚未設定價格")}</div><div class="catalog-item-actions"><label class="catalog-toggle"><input type="checkbox" data-item-toggle ${item.enabled !== false ? "checked" : ""}> 開放</label><button class="catalog-mini-btn" type="button" data-edit-item>編輯</button><button class="catalog-mini-btn danger" type="button" data-delete-item>刪除</button></div></div>`).join("") : `<div class="catalog-admin-empty">這個區塊目前沒有項目。</div>`}</div></div>`).join("")}</section>`).join("")}</div>`;
 }
 
 function pricingMarkup() {
-  return `<div class="catalog-admin-shell" data-dynamic-catalog-view="pricing">${statusMarkup()}<div class="catalog-admin-head"><div><span class="tag">PRICING</span><h3>價格管理</h3><p class="catalog-admin-note">修改後會同步提供給價目頁與預約選項使用。</p></div></div><div class="catalog-pricing-list">${catalog.map((category) => `<section class="catalog-category-card" data-category="${esc(category.key)}"><div class="catalog-category-head"><div><h4>${esc(category.name)}</h4><small>${category.enabled === false ? "目前分類未開放前台" : esc(category.en)}</small></div></div>${category.groups.map((group) => `<div class="catalog-group-card" data-group="${esc(group.id)}"><div class="catalog-group-head"><h5>${esc(group.priceTitle || group.title)}</h5><span class="catalog-kind">${group.kind === "addon" ? "ADD-ON" : "SERVICE"}</span></div>${group.items.length ? group.items.map((item) => `<div class="catalog-price-row" data-item="${esc(item.id)}"><div><b>${esc(item.name)}</b><small>${item.enabled === false ? "目前未開放" : esc(item.durationLabel)}</small></div><input type="text" value="${esc(item.priceLabel || "")}" data-price-value ${catalogWritable ? "" : "disabled"}><button class="catalog-mini-btn primary" type="button" data-save-price ${catalogWritable ? "" : "disabled"}>儲存</button></div>`).join("") : `<div class="catalog-admin-empty">這個區塊目前沒有項目。</div>`}</div>`).join("")}</section>`).join("")}</div></div>`;
+  return `<div class="catalog-admin-shell" data-dynamic-catalog-view="pricing" data-catalog-version="${VERSION}"><div class="catalog-admin-head"><div><span class="tag">PRICING</span><h3>價格管理</h3><p class="catalog-admin-note">修改後會同步提供給價目頁與預約選項使用。</p></div></div><div class="catalog-pricing-list">${catalog.map((category) => `<section class="catalog-category-card" data-category="${esc(category.key)}"><div class="catalog-category-head"><div><h4>${esc(category.name)}</h4><small>${category.enabled === false ? "目前分類未開放前台" : esc(category.en)}</small></div></div>${category.groups.map((group) => `<div class="catalog-group-card" data-group="${esc(group.id)}"><div class="catalog-group-head"><h5>${esc(group.priceTitle || group.title)}</h5><span class="catalog-kind">${group.kind === "addon" ? "ADD-ON" : "SERVICE"}</span></div>${group.items.length ? group.items.map((item) => `<div class="catalog-price-row" data-item="${esc(item.id)}"><div><b>${esc(item.name)}</b><small>${item.enabled === false ? "目前未開放" : esc(item.durationLabel)}</small></div><input type="text" value="${esc(item.priceLabel || "")}" data-price-value><button class="catalog-mini-btn primary" type="button" data-save-price>儲存</button></div>`).join("") : `<div class="catalog-admin-empty">這個區塊目前沒有項目。</div>`}</div>`).join("")}</section>`).join("")}</div></div>`;
 }
 
-function bindServices(node) {
-  node.querySelector("[data-add-category]")?.addEventListener("click", addCategory);
-  node.querySelectorAll("[data-category]").forEach((categoryNode) => {
-    const key = categoryNode.dataset.category;
-    categoryNode.querySelector("[data-edit-category]")?.addEventListener("click", () => editCategory(key));
-    categoryNode.querySelector("[data-delete-category]")?.addEventListener("click", () => deleteCategory(key));
-    categoryNode.querySelector("[data-add-group]")?.addEventListener("click", () => addGroup(key));
-    categoryNode.querySelector("[data-category-toggle]")?.addEventListener("change", (event) => toggleCategory(key, event.target.checked));
-    categoryNode.querySelectorAll("[data-group]").forEach((groupNode) => {
-      const groupId = groupNode.dataset.group;
-      groupNode.querySelector("[data-add-item]")?.addEventListener("click", () => editItem(key, groupId));
-      groupNode.querySelector("[data-delete-group]")?.addEventListener("click", () => deleteGroup(key, groupId));
-      groupNode.querySelectorAll("[data-item]").forEach((itemNode) => {
-        const itemId = itemNode.dataset.item;
-        itemNode.querySelector("[data-edit-item]")?.addEventListener("click", () => editItem(key, groupId, itemId));
-        itemNode.querySelector("[data-delete-item]")?.addEventListener("click", () => deleteItem(key, groupId, itemId));
-        itemNode.querySelector("[data-item-toggle]")?.addEventListener("change", (event) => toggleItem(key, groupId, itemId, event.target.checked));
-      });
-    });
-  });
-}
-
-function bindPricing(node) {
-  node.querySelectorAll("[data-category]").forEach((categoryNode) => {
-    const key = categoryNode.dataset.category;
-    categoryNode.querySelectorAll("[data-group]").forEach((groupNode) => {
-      const groupId = groupNode.dataset.group;
-      groupNode.querySelectorAll("[data-item]").forEach((itemNode) => {
-        const itemId = itemNode.dataset.item;
-        itemNode.querySelector("[data-save-price]")?.addEventListener("click", () => savePrice(key, groupId, itemId, itemNode.querySelector("[data-price-value]").value));
-      });
-    });
-  });
-}
-
-function renderCurrent(force = false) {
-  if (!ready) return;
+function render() {
   const view = route();
   if (view !== "services" && view !== "pricing") return;
   const node = workspace();
-  if (!node) return scheduleTakeover();
-  if (!force && node.dataset.catalogOwned === view && node.querySelector(`[data-dynamic-catalog-view="${view}"]`)) return;
+  if (!node) return setTimeout(render, 50);
   node.hidden = false;
   node.dataset.catalogOwned = view;
-  node.dataset.catalogHydrated = hydrated ? "1" : "0";
   node.innerHTML = view === "services" ? servicesMarkup() : pricingMarkup();
-  if (view === "services") bindServices(node); else bindPricing(node);
-  window.dispatchEvent(new CustomEvent("77waxing:admin-catalog-rendered", { detail: { view, hydrated, writable: catalogWritable } }));
 }
 
-function scheduleTakeover() {
-  if (scheduled) return;
-  scheduled = true;
-  requestAnimationFrame(() => { scheduled = false; renderCurrent(); });
-}
-
-function renderFallbackImmediately() {
-  if (ready) return;
-  catalog = clone(DEFAULT_CATALOG);
-  ready = true;
-  renderCurrent(true);
-}
-
-async function hydrateCatalog() {
-  if (hydrating || hydrated) return;
+async function refreshFromFirestore() {
+  if (hydrating) return;
   hydrating = true;
   try {
     catalog = await loadCatalog();
     hydrated = true;
-    catalogWritable = true;
-    renderCurrent(true);
+    render();
     if (unsubCatalog) unsubCatalog();
     unsubCatalog = await watchCatalog((next) => {
       catalog = next;
       hydrated = true;
-      catalogWritable = true;
-      renderCurrent(true);
+      render();
     });
   } catch (error) {
-    console.error("77waxing catalog hydration failed", error);
-    catalogWritable = false;
-    renderCurrent(true);
+    console.error("77waxing catalog load failed", error);
     window.dispatchEvent(new CustomEvent("77waxing:admin-catalog-error", { detail: { code: error?.code || error?.name || "CATALOG_READ_ERROR" } }));
   } finally {
     hydrating = false;
   }
 }
 
-function waitForAdmin() {
-  renderFallbackImmediately();
-  const timer = setInterval(() => {
-    if (!getApps().length) return;
-    clearInterval(timer);
-    const auth = getAuth(getApp());
-    const tryHydrate = (user) => {
-      if (user && !user.isAnonymous) hydrateCatalog();
-    };
-    tryHydrate(auth.currentUser);
-    onAuthStateChanged(auth, tryHydrate);
-  }, 100);
-  setTimeout(() => clearInterval(timer), 20000);
+async function commitChange(mutator, title) {
+  if (actionBusy) return;
+  actionBusy = true;
+  setBusy(true, title);
+  try {
+    const latest = hydrated ? catalog : await loadCatalog();
+    const next = clone(latest);
+    const result = mutator(next);
+    if (result === false) return;
+    catalog = await saveCatalog(next);
+    hydrated = true;
+    render();
+  } catch (error) {
+    console.error("77waxing catalog write failed", error);
+    alert(`更新失敗：${error?.code || error?.name || "WRITE_ERROR"}`);
+  } finally {
+    actionBusy = false;
+    setBusy(false);
+  }
 }
 
-addEventListener("hashchange", () => setTimeout(() => renderCurrent(true), 0));
-document.addEventListener("click", (event) => {
-  if (event.target.closest?.("#admin-preview .sidebar a")) setTimeout(() => renderCurrent(true), 20);
-});
+async function handleClick(event) {
+  const button = event.target.closest?.(".catalog-admin-shell button");
+  if (!button) return;
+  event.preventDefault();
+  event.stopPropagation();
+
+  const categoryNode = button.closest("[data-category]");
+  const groupNode = button.closest("[data-group]");
+  const itemNode = button.closest("[data-item]");
+  const key = categoryNode?.dataset.category || "";
+  const groupId = groupNode?.dataset.group || "";
+  const itemId = itemNode?.dataset.item || "";
+
+  if (button.matches("[data-add-category]")) {
+    const values = await openForm({ title: "新增服務分類", fields: [
+      { name: "name", label: "分類名稱，例如：身體保養", required: true },
+      { name: "en", label: "英文標題", value: "SERVICE" },
+      { name: "slug", label: "網址代碼（英文，例如 body-care）", required: true },
+      { name: "intro", label: "服務頁小標語／簡介", type: "textarea", full: true },
+    ], submitText: "新增分類" });
+    if (!values) return;
+    return commitChange((next) => {
+      const slug = makeSlug(values.slug);
+      if (next.some((category) => category.slug === slug)) { alert("這個網址代碼已經存在，請換一個。"); return false; }
+      next.push({ key: makeCatalogId("cat"), slug, name: values.name.trim(), en: values.en.trim() || "SERVICE", intro: values.intro.trim(), enabled: true, groups: [
+        { id: makeCatalogId("group"), title: "服務項目", priceTitle: "服務項目", kind: "main", desc: "", items: [] },
+        { id: makeCatalogId("addon"), title: "加購項目", priceTitle: "加購項目", kind: "addon", desc: "", items: [] },
+      ], notes: [] });
+    }, "正在新增服務分類…");
+  }
+
+  if (!key) return;
+  const currentCategory = categoryAt(key);
+  if (!currentCategory) return;
+
+  if (button.matches("[data-edit-category]")) {
+    const values = await openForm({ title: `編輯 ${currentCategory.name}`, fields: [
+      { name: "name", label: "分類名稱", value: currentCategory.name, required: true },
+      { name: "en", label: "英文標題", value: currentCategory.en },
+      { name: "slug", label: "網址代碼", value: currentCategory.slug, required: true },
+      { name: "intro", label: "服務頁小標語／簡介", type: "textarea", value: currentCategory.intro, full: true },
+    ] });
+    if (!values) return;
+    return commitChange((next) => {
+      const target = categoryAt(key, next);
+      const slug = makeSlug(values.slug);
+      if (next.some((category) => category.key !== key && category.slug === slug)) { alert("這個網址代碼已經存在，請換一個。"); return false; }
+      Object.assign(target, { name: values.name.trim(), en: values.en.trim() || "SERVICE", slug, intro: values.intro.trim() });
+    }, "正在更新服務分類…");
+  }
+
+  if (button.matches("[data-delete-category]")) {
+    if (!confirm(`確定刪除「${currentCategory.name}」？\n\n前台服務選單、價目表與預約分類都會同步移除；既有預約紀錄不會被刪除。`)) return;
+    return commitChange((next) => { const index = next.findIndex((category) => category.key === key); if (index >= 0) next.splice(index, 1); }, "正在刪除服務分類…");
+  }
+
+  if (button.matches("[data-add-group]")) {
+    const values = await openForm({ title: `在 ${currentCategory.name} 新增區塊`, fields: [
+      { name: "title", label: "區塊名稱", required: true },
+      { name: "priceTitle", label: "價目表區塊名稱（可相同）" },
+      { name: "kind", label: "區塊類型", type: "select", value: "main", options: [["main","一般服務"],["addon","加購項目"]] },
+      { name: "desc", label: "區塊說明", type: "textarea", full: true },
+    ], submitText: "新增區塊" });
+    if (!values) return;
+    return commitChange((next) => {
+      categoryAt(key, next).groups.push({ id: makeCatalogId("group"), title: values.title.trim(), priceTitle: values.priceTitle.trim() || values.title.trim(), kind: values.kind, desc: values.desc.trim(), items: [] });
+    }, "正在新增服務區塊…");
+  }
+
+  if (!groupId) return;
+  const currentGroup = groupAt(currentCategory, groupId);
+  if (!currentGroup) return;
+
+  if (button.matches("[data-delete-group]")) {
+    if (!confirm(`確定刪除「${currentGroup.title}」以及裡面的 ${currentGroup.items.length} 個項目？`)) return;
+    return commitChange((next) => { const target = categoryAt(key, next); target.groups = target.groups.filter((group) => group.id !== groupId); }, "正在刪除服務區塊…");
+  }
+
+  if (button.matches("[data-add-item],[data-edit-item]")) {
+    const currentItem = itemId ? itemAt(currentGroup, itemId) : null;
+    const values = await openForm({ title: currentItem ? `編輯 ${currentItem.name}` : `新增${currentGroup.kind === "addon" ? "加購" : "服務"}項目`, fields: [
+      { name: "name", label: "項目名稱", value: currentItem?.name || "", required: true },
+      { name: "description", label: "服務頁說明", value: currentItem?.description || "", full: true },
+      { name: "durationMinutes", label: "施作時間（分鐘）", type: "number", value: currentItem?.durationMinutes || 90, min: 1, max: 180, required: true },
+      { name: "durationLabel", label: "顯示時間文字", value: currentItem?.durationLabel || "約 90 分鐘" },
+      { name: "priceLabel", label: "價格，例如 $1399 或 視範圍", value: currentItem?.priceLabel || "", full: true },
+    ], submitText: currentItem ? "儲存修改" : "新增項目" });
+    if (!values) return;
+    return commitChange((next) => {
+      const targetGroup = groupAt(categoryAt(key, next), groupId);
+      const payload = { id: currentItem?.id || makeCatalogId(currentGroup.kind === "addon" ? "addon" : "item"), name: values.name.trim(), description: values.description.trim(), durationMinutes: Number(values.durationMinutes || 90), durationLabel: values.durationLabel.trim() || `約 ${Number(values.durationMinutes || 90)} 分鐘`, priceLabel: values.priceLabel.trim(), enabled: currentItem?.enabled !== false };
+      if (currentItem) Object.assign(itemAt(targetGroup, itemId), payload); else targetGroup.items.push(payload);
+    }, currentItem ? "正在更新服務項目…" : "正在新增服務項目…");
+  }
+
+  if (button.matches("[data-delete-item]")) {
+    const currentItem = itemAt(currentGroup, itemId);
+    if (!currentItem || !confirm(`確定刪除「${currentItem.name}」？\n\n前台服務、價目與預約選項會同步移除。`)) return;
+    return commitChange((next) => { const targetGroup = groupAt(categoryAt(key, next), groupId); targetGroup.items = targetGroup.items.filter((item) => item.id !== itemId); }, "正在刪除服務項目…");
+  }
+
+  if (button.matches("[data-save-price]")) {
+    const value = itemNode?.querySelector("[data-price-value]")?.value ?? "";
+    return commitChange((next) => { itemAt(groupAt(categoryAt(key, next), groupId), itemId).priceLabel = value.trim(); }, "正在同步價格…");
+  }
+}
+
+async function handleChange(event) {
+  const input = event.target;
+  if (!input.closest?.(".catalog-admin-shell")) return;
+  const categoryNode = input.closest("[data-category]");
+  const groupNode = input.closest("[data-group]");
+  const itemNode = input.closest("[data-item]");
+  const key = categoryNode?.dataset.category || "";
+  const groupId = groupNode?.dataset.group || "";
+  const itemId = itemNode?.dataset.item || "";
+
+  if (input.matches("[data-category-toggle]")) {
+    return commitChange((next) => { categoryAt(key, next).enabled = input.checked; }, "正在更新服務開放狀態…");
+  }
+  if (input.matches("[data-item-toggle]")) {
+    return commitChange((next) => { itemAt(groupAt(categoryAt(key, next), groupId), itemId).enabled = input.checked; }, "正在更新項目開放狀態…");
+  }
+}
+
+document.addEventListener("click", handleClick, true);
+document.addEventListener("change", handleChange, true);
+addEventListener("hashchange", () => setTimeout(render, 0));
+addEventListener("popstate", () => setTimeout(render, 0));
 new MutationObserver(() => {
   const view = route();
   if (view !== "services" && view !== "pricing") return;
   const node = workspace();
-  if (!node || node.dataset.catalogOwned !== view || !node.querySelector(`[data-dynamic-catalog-view="${view}"]`)) scheduleTakeover();
+  if (!node || !node.querySelector(`[data-dynamic-catalog-view="${view}"][data-catalog-version="${VERSION}"]`)) render();
 }).observe(document.querySelector("#app") || document.body, { childList: true, subtree: true });
 
-waitForAdmin();
+function boot() {
+  render();
+  const timer = setInterval(() => {
+    if (!getApps().length) return;
+    clearInterval(timer);
+    const auth = getAuth(getApp());
+    const tryStart = (user) => { if (user && !user.isAnonymous) refreshFromFirestore(); };
+    tryStart(auth.currentUser);
+    onAuthStateChanged(auth, tryStart);
+  }, 100);
+  setTimeout(() => clearInterval(timer), 20000);
+}
+
+boot();
