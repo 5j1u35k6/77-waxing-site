@@ -1,7 +1,7 @@
 const PROJECT_ID = 'waxing-86909';
 const FIRESTORE_BASE = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
 const STORE_EMAIL = '77waxing.mail@gmail.com';
-const SCRIPT_VERSION = '2026-09-10-email-v17';
+const SCRIPT_VERSION = '2026-09-10-email-v18';
 const WEBSITE_URL = 'https://5j1u35k6.github.io/77-waxing-site/';
 const EMAIL_FOOTER_IMAGE = 'https://5j1u35k6.github.io/77-waxing-site/assets/email-footer-77waxing.jpg?v=20260910-1555';
 
@@ -62,15 +62,15 @@ function testSelfEmail() {
 function testFooterInline() {
   send_(
     STORE_EMAIL,
-    '77waxing｜Footer 原圖＋前景文字測試',
-    shell_('Footer 原圖＋前景文字測試', '<p>這版維持原本山海與手寫字構圖，只把 Logo、工作室文字、服務文字與地址放到前景並放大；手寫字本身維持原圖不變。</p>')
+    '77waxing｜Footer v18 原圖前景文字測試',
+    shell_('Footer v18 原圖前景文字測試', '<p>這版保留原本整張山海橫幅與手寫標語，只把非手寫文字獨立到前景放大，並移除上下白邊與重複文字。</p>')
   );
-  return `footer-original-art-foreground-text-v17-sent:${STORE_EMAIL}`;
+  return `footer-original-art-foreground-text-v18-sent:${STORE_EMAIL}`;
 }
 
 function debugFooterAsset() {
   const result = {
-    mode: 'original-artwork-foreground-html-text',
+    mode: 'original-artwork-foreground-text-v18',
     hasInlineImage: false,
     imageUrl: EMAIL_FOOTER_IMAGE,
     version: SCRIPT_VERSION,
@@ -210,7 +210,7 @@ function decodeValue_(v) {
 function footerHtml_() {
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="email-footer-frame" style="width:100%;height:132px;border-collapse:separate;border-spacing:0;margin:0;padding:0;background:#2f2a28;border-radius:14px;overflow:hidden">
     <tr>
-      <td class="email-footer-bg" width="100%" height="132" background="${EMAIL_FOOTER_IMAGE}" valign="middle" style="width:100%;height:132px;padding:0;margin:0;border:0;border-radius:14px;overflow:hidden;background-color:#2f2a28;background-image:url('${EMAIL_FOOTER_IMAGE}');background-repeat:no-repeat;background-position:center center;background-size:112% auto;vertical-align:middle">
+      <td class="email-footer-bg" width="100%" height="132" background="${EMAIL_FOOTER_IMAGE}" valign="middle" style="width:100%;height:132px;padding:0;margin:0;border:0;border-radius:14px;overflow:hidden;background-color:#2f2a28;background-image:url('${EMAIL_FOOTER_IMAGE}');background-repeat:no-repeat;background-position:center center;background-size:126% auto;vertical-align:middle">
         <table role="presentation" width="100%" height="132" cellpadding="0" cellspacing="0" border="0" class="email-footer-inner" style="width:100%;height:132px;border-collapse:collapse;border-spacing:0;margin:0;padding:0">
           <tr>
             <td class="email-footer-copy" width="30%" valign="middle" style="width:30%;height:132px;padding:12px 10px 10px 18px;margin:0;border:0;border-right:1px solid #6b6055;background:#2f2a28;color:#f7f0e6;vertical-align:middle">
@@ -220,10 +220,13 @@ function footerHtml_() {
                 <div class="email-footer-desc" style="font-size:8.5px;line-height:1.25;color:#e8dfd4">基隆・預約制美學服務</div>
               </a>
             </td>
-            <td class="email-footer-address-cell" width="38%" valign="bottom" style="width:38%;height:132px;padding:0 5px 10px 12px;margin:0;border:0;background:transparent;vertical-align:bottom">
-              <a href="${WEBSITE_URL}" target="_blank" aria-label="前往 77waxing 官方網站" style="display:block;width:100%;color:#e8dfd4;text-decoration:none;border:0">
-                <span class="email-footer-address" style="display:block;width:100%;box-sizing:border-box;background:#2f2a28;color:#e8dfd4;font-size:10px;line-height:1.2;padding:6px 5px 5px;border-radius:4px;white-space:nowrap">● 基隆市中正區義一路56號2樓</span>
-              </a>
+            <td class="email-footer-address-cell" width="38%" style="width:38%;height:132px;padding:0;margin:0;border:0;background:transparent">
+              <table role="presentation" width="100%" height="132" cellpadding="0" cellspacing="0" border="0" style="width:100%;height:132px;border-collapse:collapse;border-spacing:0;margin:0;padding:0">
+                <tr><td class="email-footer-address-spacer" height="98" style="height:98px;padding:0;margin:0;border:0;background:transparent;font-size:0;line-height:0">&nbsp;</td></tr>
+                <tr><td class="email-footer-address-strip" height="34" valign="middle" style="height:34px;padding:0 5px;margin:0;border:0;background:#2f2a28;color:#e8dfd4;font-size:10px;line-height:1.2;white-space:nowrap;vertical-align:middle">
+                  <a href="${WEBSITE_URL}" target="_blank" aria-label="前往 77waxing 官方網站" style="display:block;color:#e8dfd4;text-decoration:none;border:0">● 基隆市中正區義一路56號2樓</a>
+                </td></tr>
+              </table>
             </td>
             <td width="32%" style="width:32%;height:132px;padding:0;margin:0;border:0;background:transparent;font-size:0;line-height:0">
               <a href="${WEBSITE_URL}" target="_blank" aria-label="前往 77waxing 官方網站" style="display:block;width:100%;height:132px;text-decoration:none;border:0;font-size:0;line-height:132px">&nbsp;</a>
@@ -296,7 +299,7 @@ function shell_(title, body) {
       .email-footer-bg,
       .email-footer-inner { height:76px !important; }
       .email-footer-bg {
-        background-size:112% auto !important;
+        background-size:126% auto !important;
         background-position:center center !important;
       }
       .email-footer-copy {
@@ -307,15 +310,13 @@ function shell_(title, body) {
       .email-footer-logo { font-size:26px !important; margin-bottom:2px !important; }
       .email-footer-studio { font-size:7.5px !important; margin-bottom:2px !important; }
       .email-footer-desc { font-size:7.5px !important; line-height:1.2 !important; }
-      .email-footer-address-cell {
-        width:38% !important;
-        height:76px !important;
-        padding:0 4px 6px 8px !important;
-      }
-      .email-footer-address {
+      .email-footer-address-cell { width:38% !important; height:76px !important; }
+      .email-footer-address-spacer { height:56px !important; }
+      .email-footer-address-strip {
+        height:20px !important;
+        padding:0 4px !important;
         font-size:8.5px !important;
-        line-height:1.2 !important;
-        padding:6px 4px 5px !important;
+        line-height:1.15 !important;
       }
     }
   </style>
