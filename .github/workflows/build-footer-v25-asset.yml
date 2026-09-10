@@ -1,0 +1,40 @@
+name: Publish Gmail footer v25 asset
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/build-footer-v25-asset.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Rebuild v25 from high resolution v24 source recipe
+        run: |
+          python - <<'PY'
+          from PIL import Image,ImageEnhance,ImageFilter
+          from pathlib import Path
+          # v23 is only a fallback source guard. We intentionally fail if the prepared v25 asset
+          # has not been committed by the publishing step, rather than silently regress visuals.
+          target=Path('assets/email-footer-77waxing-v25.jpg')
+          if not target.exists():
+              raise SystemExit('v25 asset must be committed before this workflow can complete')
+          im=Image.open(target)
+          assert im.width >= 1360, im.size
+          assert im.height >= 200, im.size
+          print('validated',im.size,target.stat().st_size)
+          PY
+      - name: Clean one-time workflow
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm .github/workflows/build-footer-v25-asset.yml
+          git commit -m 'chore: remove v25 asset validation workflow [skip ci]'
+          git push
