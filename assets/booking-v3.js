@@ -49,9 +49,14 @@ if (firebaseConfigured) {
 
 async function ensureSignedIn() {
   if (!auth) throw new Error("FIREBASE_NOT_READY");
+  if (typeof auth.authStateReady === "function") await auth.authStateReady();
   if (auth.currentUser) return auth.currentUser;
-  const credential = await signInAnonymously(auth);
-  return credential.user;
+  if (!window.__77_ANON_AUTH_PROMISE__) {
+    window.__77_ANON_AUTH_PROMISE__ = signInAnonymously(auth)
+      .then((credential) => credential.user)
+      .finally(() => { window.__77_ANON_AUTH_PROMISE__ = null; });
+  }
+  return window.__77_ANON_AUTH_PROMISE__;
 }
 
 async function dynamicCatalog() {
@@ -106,7 +111,7 @@ function bookingMarkup(catalog) {
   if (!catalog.length) return `<div class="notice"><b>目前沒有開放中的服務</b><p>請稍後再回來查看，或直接聯絡 77waxing。</p></div>`;
   return `<div class="steps"><span class="on">1 服務</span><span>2 日期時段</span><span>3 資料</span><span>4 確認</span></div>
     <section class="step on" data-step="1"><h2>選擇服務項目</h2><p class="muted booking-prefill-note" data-booking-prefill-note hidden></p><div class="booking-service-picker"><aside class="booking-service-categories" aria-label="服務分類">${catalog.map((category, index) => `<button type="button" data-booking-category="${esc(category.key)}" class="${index === 0 ? "on" : ""}">${esc(category.name)}</button>`).join("")}</aside><div class="booking-service-items" data-booking-items></div></div><div class="booking-service-note muted" data-booking-service-note></div><div class="actions"><button class="btn dark" type="button" data-next disabled>下一步</button></div></section>
-    <section class="step" data-step="2"><h2>先從月曆選基準日期，再比較固定 7 天</h2><p class="muted">月曆選定後，下面 7 天會鎖定。要更換這組日期，請回月曆重新選基準日期。</p><div class="flight-calendar"><div class="calbar"><button type="button" data-month-prev>←</button><b data-month-label></b><button type="button" data-month-next>→</button></div><div class="calweek">${"日一二三四五六".split("").map((weekday) => `<span>${weekday}</span>`).join("")}</div><div class="calgrid" data-calgrid></div></div><div class="slotlegend"><span><i class="free"></i>可選</span><span><i class="hold"></i>其他顧客預約中</span><span><i class="pick"></i>你的選擇</span></div><div class="booking-sync" data-booking-sync>正在確認可預約時段…</div><div class="dayrail" data-dayrail></div><div class="notice"><b>時段保留方式</b><p data-booking-block-note></p></div><div class="actions"><button class="btn" type="button" data-prev>上一步</button><button class="btn dark" type="button" data-next>下一步</button></div></section>
+    <section class="step" data-step="2"><h2>選擇日期與時段</h2><p class="muted">先從月曆選日期，再從下方 7 天中選擇實際預約日與時段。</p><div class="flight-calendar"><div class="calbar"><button type="button" data-month-prev>←</button><b data-month-label></b><button type="button" data-month-next>→</button></div><div class="calweek">${"日一二三四五六".split("").map((weekday) => `<span>${weekday}</span>`).join("")}</div><div class="calgrid" data-calgrid></div></div><div class="slotlegend"><span><i class="free"></i>可選</span><span><i class="hold"></i>其他顧客預約中</span><span><i class="pick"></i>你的選擇</span></div><div class="booking-sync" data-booking-sync>正在確認可預約時段…</div><div class="dayrail" data-dayrail></div><div class="actions"><button class="btn" type="button" data-prev>上一步</button><button class="btn dark" type="button" data-next>下一步</button></div></section>
     <section class="step" data-step="3"><h2>留下聯絡方式</h2><p class="muted">不用建立會員帳號，填寫資料後即可送出預約需求。</p><div class="fields"><label>姓名<input name="name" autocomplete="name"></label><label>手機<input name="phone" inputmode="tel" autocomplete="tel"></label><label>Email<input name="email" type="email" autocomplete="email" placeholder="用於接收預約確認信"></label><label>LINE ID<input name="line"></label><label>第一次來店？<select name="first"><option value="yes">是</option><option value="no">曾經來過</option></select></label></div><label class="full">備註<textarea name="note" rows="3"></textarea></label><p><label><input style="width:auto" type="checkbox" name="ok"> 同意 77美學工作室為處理本次預約使用我填寫的聯絡資料。</label></p><div class="actions"><button class="btn" type="button" data-prev>上一步</button><button class="btn dark" type="button" data-next>確認內容</button></div></section>
     <section class="step" data-step="4"><h2>確認預約需求</h2><div class="summary"></div><div class="notice"><b>送出後先保留</b><p>成功送出後，對應時段會先變成「保留中」，等待 77 後台確認。</p></div><div class="actions"><button class="btn" type="button" data-prev>上一步</button><button class="btn dark" type="button" data-submit>送出預約需求</button></div></section>
     <section class="success"><h2>預約需求已建立</h2><p>預約需求已送出，該時段已暫時保留，等待 77 確認。</p><div class="btns" style="justify-content:center"><a class="btn" href="${B}/booking/">回到預約頁面</a></div></section>`;
@@ -168,7 +173,7 @@ async function mount(root) {
   const drawItems = () => {
     const target = root.querySelector("[data-booking-items]");
     const groups = selectedCategory.groups.filter((group) => group.kind !== "addon" && group.items.length);
-    target.innerHTML = groups.length ? groups.map((group) => `<section class="booking-item-group" data-booking-group="${esc(group.id)}"><h3>${esc(group.title)}</h3><div>${group.items.map((serviceItem) => `<button type="button" class="booking-item ${selectedItem?.id === serviceItem.id ? "on" : ""}" data-booking-item="${esc(serviceItem.id)}"><span><b>${esc(serviceItem.name)}</b><small>施作時間｜${esc(serviceItem.durationLabel)}</small>${serviceItem.priceLabel ? `<strong class="booking-live-price">${esc(serviceItem.priceLabel)}</strong>` : ""}</span><em>時段保留 ${serviceItem.blockMinutes} 分鐘</em></button>`).join("")}</div></section>`).join("") : `<div class="notice"><b>目前沒有可預約項目</b><p>請選擇其他服務分類。</p></div>`;
+    target.innerHTML = groups.length ? groups.map((group) => `<section class="booking-item-group" data-booking-group="${esc(group.id)}"><h3>${esc(group.title)}</h3><div>${group.items.map((serviceItem) => `<button type="button" class="booking-item ${selectedItem?.id === serviceItem.id ? "on" : ""}" data-booking-item="${esc(serviceItem.id)}"><span><b>${esc(serviceItem.name)}</b><small>施作時間｜${esc(serviceItem.durationLabel)}</small>${serviceItem.priceLabel ? `<strong class="booking-live-price">${esc(serviceItem.priceLabel)}</strong>` : ""}</span></button>`).join("")}</div></section>`).join("") : `<div class="notice"><b>目前沒有可預約項目</b><p>請選擇其他服務分類。</p></div>`;
     root.querySelector("[data-booking-service-note]").textContent = "";
     target.querySelectorAll("[data-booking-item]").forEach((button) => {
       button.onclick = () => {
@@ -198,11 +203,7 @@ async function mount(root) {
     step = nextStep;
     root.querySelectorAll(".step").forEach((element) => element.classList.toggle("on", Number(element.dataset.step) === nextStep));
     root.querySelectorAll(".steps span").forEach((element, index) => element.classList.toggle("on", index === nextStep - 1));
-    if (nextStep === 2 && selectedItem) {
-      const cleanup = selectedItem.blockMinutes - selectedItem.durationMinutes;
-      root.querySelector("[data-booking-block-note]").textContent = `${selectedItem.durationLabel}施作結束後，結束邊界的半小時時段也會保留給環境整理與顧客善後。本項目共保留 ${selectedItem.blockMinutes} 分鐘${cleanup > 0 ? `（比施作時間多保留約 ${cleanup} 分鐘）` : ""}。`;
-      refreshAvailability();
-    }
+    if (nextStep === 2 && selectedItem) refreshAvailability();
   };
 
   const drawCalendar = () => {
@@ -223,7 +224,7 @@ async function mount(root) {
     rail.innerHTML = availability.windowDates.map((date) => {
       const label = shortDate(date);
       const slots = TIMES.map((time) => ({ time, state: slotState(availability.locksByDate, date, time, selectedItem.blockMinutes) })).filter((slot) => slot.state !== "hidden");
-      return `<article class="daycol ${date === selectedDate ? "on" : ""}"><button type="button" class="dayhead" data-visible-date="${date}"><small>${label.weekday}</small><b>${label.label}</b>${date === anchorDate ? "<em>基準日</em>" : ""}</button><div class="times">${slots.map((slot) => `<button type="button" class="slot ${slot.state === "held" ? "held" : ""} ${selectedDate === date && selectedTime === slot.time ? "pick" : ""}" data-slot-date="${date}" data-slot-time="${slot.time}" ${slot.state === "held" ? "disabled" : ""}><b>${slot.time}</b>${slot.state === "held" ? "<small>保留中</small>" : ""}</button>`).join("")}</div></article>`;
+      return `<article class="daycol ${date === selectedDate ? "on" : ""}"><button type="button" class="dayhead" data-visible-date="${date}"><small>${label.weekday}</small><b>${label.label}</b></button><div class="times">${slots.map((slot) => `<button type="button" class="slot ${slot.state === "held" ? "held" : ""} ${selectedDate === date && selectedTime === slot.time ? "pick" : ""}" data-slot-date="${date}" data-slot-time="${slot.time}" ${slot.state === "held" ? "disabled" : ""}><b>${slot.time}</b>${slot.state === "held" ? "<small>保留中</small>" : ""}</button>`).join("")}</div></article>`;
     }).join("");
     rail.querySelectorAll("[data-visible-date]").forEach((button) => button.onclick = () => { selectedDate = button.dataset.visibleDate; selectedTime = ""; drawRail(); });
     rail.querySelectorAll("[data-slot-time]").forEach((button) => button.onclick = () => { selectedDate = button.dataset.slotDate; selectedTime = button.dataset.slotTime; drawRail(); });
