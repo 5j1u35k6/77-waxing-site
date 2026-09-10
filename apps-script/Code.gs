@@ -1,9 +1,9 @@
 const PROJECT_ID = 'waxing-86909';
 const FIRESTORE_BASE = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
 const STORE_EMAIL = '77waxing.mail@gmail.com';
-const SCRIPT_VERSION = '2026-09-10-email-v22';
+const SCRIPT_VERSION = '2026-09-10-email-v23';
 const WEBSITE_URL = 'https://5j1u35k6.github.io/77-waxing-site/';
-const EMAIL_FOOTER_IMAGE = 'https://5j1u35k6.github.io/77-waxing-site/assets/email-footer-77waxing-v22.jpg';
+const EMAIL_FOOTER_IMAGE = 'https://5j1u35k6.github.io/77-waxing-site/assets/email-footer-77waxing-v23.jpg';
 
 function senderStatus_() {
   const effectiveEmail = String(Session.getEffectiveUser().getEmail() || '').trim().toLowerCase();
@@ -62,15 +62,15 @@ function testSelfEmail() {
 function testFooterInline() {
   send_(
     STORE_EMAIL,
-    '77waxing｜Footer v22 高清圖片＋官方網站文字測試',
-    shell_('Footer v22 高清圖片測試', '<p>這版沿用 v21 已成功的 baseline JPEG＋獨立檔名方式，改用 2× 顯示密度圖片並放大右上角「77waxing 官方網站」文字。</p>')
+    '77waxing｜Footer v23 完整元素恢復測試',
+    shell_('Footer v23 完整元素恢復測試', '<p>這版恢復 v21 已驗證成功的完整 footer 元素，改用 3× 顯示密度圖片，並保留放大的右上角「77waxing 官方網站」文字。</p>')
   );
-  return `footer-hires-v22-sent:${STORE_EMAIL}`;
+  return `footer-complete-v23-sent:${STORE_EMAIL}`;
 }
 
 function debugFooterAsset() {
   const result = {
-    mode: 'baseline-jpeg-hires-v22',
+    mode: 'baseline-jpeg-complete-hidpi-v23',
     hasInlineImage: false,
     imageUrl: EMAIL_FOOTER_IMAGE,
     version: SCRIPT_VERSION,
