@@ -1,9 +1,9 @@
 const PROJECT_ID = 'waxing-86909';
 const FIRESTORE_BASE = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
 const STORE_EMAIL = '77waxing.mail@gmail.com';
-const SCRIPT_VERSION = '2026-09-10-email-v18';
+const SCRIPT_VERSION = '2026-09-10-email-v19';
 const WEBSITE_URL = 'https://5j1u35k6.github.io/77-waxing-site/';
-const EMAIL_FOOTER_IMAGE = 'https://5j1u35k6.github.io/77-waxing-site/assets/email-footer-77waxing.jpg?v=20260910-1555';
+const EMAIL_FOOTER_IMAGE = 'https://5j1u35k6.github.io/77-waxing-site/assets/email-footer-77waxing-v19.jpg?v=20260910-1916';
 
 function senderStatus_() {
   const effectiveEmail = String(Session.getEffectiveUser().getEmail() || '').trim().toLowerCase();
@@ -62,15 +62,15 @@ function testSelfEmail() {
 function testFooterInline() {
   send_(
     STORE_EMAIL,
-    '77waxing｜Footer v18 原圖前景文字測試',
-    shell_('Footer v18 原圖前景文字測試', '<p>這版保留原本整張山海橫幅與手寫標語，只把非手寫文字獨立到前景放大，並移除上下白邊與重複文字。</p>')
+    '77waxing｜Footer v19 合成圖層測試',
+    shell_('Footer v19 合成圖層測試', '<p>這版已依照原始 Footer 分離背景與文字後重新合成為單一圖片：保留原山海構圖與手寫字，其他文字放大，並移除圖片上下白邊。</p>')
   );
-  return `footer-original-art-foreground-text-v18-sent:${STORE_EMAIL}`;
+  return `footer-flattened-composite-v19-sent:${STORE_EMAIL}`;
 }
 
 function debugFooterAsset() {
   const result = {
-    mode: 'original-artwork-foreground-text-v18',
+    mode: 'flattened-composite-image-v19',
     hasInlineImage: false,
     imageUrl: EMAIL_FOOTER_IMAGE,
     version: SCRIPT_VERSION,
@@ -208,31 +208,12 @@ function decodeValue_(v) {
 }
 
 function footerHtml_() {
-  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="email-footer-frame" style="width:100%;height:132px;border-collapse:separate;border-spacing:0;margin:0;padding:0;background:#2f2a28;border-radius:14px;overflow:hidden">
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;border-spacing:0;margin:0;padding:0">
     <tr>
-      <td class="email-footer-bg" width="100%" height="132" background="${EMAIL_FOOTER_IMAGE}" valign="middle" style="width:100%;height:132px;padding:0;margin:0;border:0;border-radius:14px;overflow:hidden;background-color:#2f2a28;background-image:url('${EMAIL_FOOTER_IMAGE}');background-repeat:no-repeat;background-position:center center;background-size:126% auto;vertical-align:middle">
-        <table role="presentation" width="100%" height="132" cellpadding="0" cellspacing="0" border="0" class="email-footer-inner" style="width:100%;height:132px;border-collapse:collapse;border-spacing:0;margin:0;padding:0">
-          <tr>
-            <td class="email-footer-copy" width="30%" valign="middle" style="width:30%;height:132px;padding:12px 10px 10px 18px;margin:0;border:0;border-right:1px solid #6b6055;background:#2f2a28;color:#f7f0e6;vertical-align:middle">
-              <a href="${WEBSITE_URL}" target="_blank" aria-label="前往 77waxing 官方網站" style="display:block;color:#f7f0e6;text-decoration:none;border:0">
-                <div class="email-footer-logo" style="font-family:Georgia,'Times New Roman',serif;font-size:28px;line-height:1;white-space:nowrap;margin:0 0 4px"><span style="color:#c5a070">77</span><span style="color:#f7f0e6">waxing</span></div>
-                <div class="email-footer-studio" style="font-size:8px;line-height:1.2;letter-spacing:.13em;color:#d8cbbb;margin:0 0 4px">77美學工作室</div>
-                <div class="email-footer-desc" style="font-size:8.5px;line-height:1.25;color:#e8dfd4">基隆・預約制美學服務</div>
-              </a>
-            </td>
-            <td class="email-footer-address-cell" width="38%" style="width:38%;height:132px;padding:0;margin:0;border:0;background:transparent">
-              <table role="presentation" width="100%" height="132" cellpadding="0" cellspacing="0" border="0" style="width:100%;height:132px;border-collapse:collapse;border-spacing:0;margin:0;padding:0">
-                <tr><td class="email-footer-address-spacer" height="98" style="height:98px;padding:0;margin:0;border:0;background:transparent;font-size:0;line-height:0">&nbsp;</td></tr>
-                <tr><td class="email-footer-address-strip" height="34" valign="middle" style="height:34px;padding:0 5px;margin:0;border:0;background:#2f2a28;color:#e8dfd4;font-size:10px;line-height:1.2;white-space:nowrap;vertical-align:middle">
-                  <a href="${WEBSITE_URL}" target="_blank" aria-label="前往 77waxing 官方網站" style="display:block;color:#e8dfd4;text-decoration:none;border:0">● 基隆市中正區義一路56號2樓</a>
-                </td></tr>
-              </table>
-            </td>
-            <td width="32%" style="width:32%;height:132px;padding:0;margin:0;border:0;background:transparent;font-size:0;line-height:0">
-              <a href="${WEBSITE_URL}" target="_blank" aria-label="前往 77waxing 官方網站" style="display:block;width:100%;height:132px;text-decoration:none;border:0;font-size:0;line-height:132px">&nbsp;</a>
-            </td>
-          </tr>
-        </table>
+      <td width="100%" style="width:100%;padding:0;margin:0;border:0;line-height:0;font-size:0">
+        <a href="${WEBSITE_URL}" target="_blank" aria-label="前往 77waxing 官方網站" style="display:block;width:100%;padding:0;margin:0;border:0;text-decoration:none;line-height:0;font-size:0">
+          <img src="${EMAIL_FOOTER_IMAGE}" width="680" alt="77waxing｜把第一次的緊張，交給77的細心與溫柔。" style="display:block;width:100%;max-width:680px;height:auto;margin:0;padding:0;border:0;border-radius:14px;line-height:0;font-size:0">
+        </a>
       </td>
     </tr>
   </table>`;
@@ -293,34 +274,7 @@ function line_(label, value) {
 }
 
 function shell_(title, body) {
-  return `<style type="text/css">
-    @media screen and (max-width:480px) {
-      .email-footer-frame,
-      .email-footer-bg,
-      .email-footer-inner { height:76px !important; }
-      .email-footer-bg {
-        background-size:126% auto !important;
-        background-position:center center !important;
-      }
-      .email-footer-copy {
-        width:30% !important;
-        height:76px !important;
-        padding:7px 6px 6px 9px !important;
-      }
-      .email-footer-logo { font-size:26px !important; margin-bottom:2px !important; }
-      .email-footer-studio { font-size:7.5px !important; margin-bottom:2px !important; }
-      .email-footer-desc { font-size:7.5px !important; line-height:1.2 !important; }
-      .email-footer-address-cell { width:38% !important; height:76px !important; }
-      .email-footer-address-spacer { height:56px !important; }
-      .email-footer-address-strip {
-        height:20px !important;
-        padding:0 4px !important;
-        font-size:8.5px !important;
-        line-height:1.15 !important;
-      }
-    }
-  </style>
-  <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang TC',sans-serif;color:#3a3836;max-width:680px;margin:auto;line-height:1.75">
+  return `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang TC',sans-serif;color:#3a3836;max-width:680px;margin:auto;line-height:1.75">
     <div style="padding:30px 24px 0">
       <div style="font-family:Georgia,serif;font-size:28px;margin-bottom:22px"><b style="color:#c5a070">77</b>waxing</div>
       <h2 style="font-size:20px;line-height:1.5;margin:0 0 18px">${esc_(title)}</h2>
