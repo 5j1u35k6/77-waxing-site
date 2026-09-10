@@ -1,10 +1,8 @@
 const PROJECT_ID = 'waxing-86909';
 const FIRESTORE_BASE = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
 const STORE_EMAIL = '77waxing.mail@gmail.com';
-const SCRIPT_VERSION = '2026-09-09-email-v8';
+const SCRIPT_VERSION = '2026-09-10-email-v9';
 const WEBSITE_URL = 'https://5j1u35k6.github.io/77-waxing-site/';
-const EMAIL_FOOTER_IMAGE = 'https://5j1u35k6.github.io/77-waxing-site/assets/email-footer-77waxing.jpg';
-const EMAIL_FOOTER_FETCH_URL = 'https://raw.githubusercontent.com/5j1u35k6/77-waxing-site/main/assets/email-footer-77waxing.jpg';
 
 function senderStatus_() {
   const effectiveEmail = String(Session.getEffectiveUser().getEmail() || '').trim().toLowerCase();
@@ -63,23 +61,17 @@ function testSelfEmail() {
 function testFooterInline() {
   send_(
     STORE_EMAIL,
-    '77waxing｜Footer 圖片測試',
-    shell_('Footer 圖片測試', '<p>如果信件最下方正常顯示深色山海橫幅，代表內嵌圖片已正常。</p>')
+    '77waxing｜Footer HTML 測試',
+    shell_('Footer HTML 測試', '<p>如果信件最下方正常顯示滿版深色品牌區塊，代表純 HTML Footer 已正常啟用，信件不會再附帶 Footer 圖片。</p>')
   );
-  return `footer-inline-sent:${STORE_EMAIL}`;
+  return `footer-html-sent:${STORE_EMAIL}`;
 }
 
 function debugFooterAsset() {
-  const response = UrlFetchApp.fetch(EMAIL_FOOTER_FETCH_URL, {
-    muteHttpExceptions: true,
-    followRedirects: true,
-  });
-  const bytes = response.getContent();
-  const blob = Utilities.newBlob(bytes, 'image/jpeg', '77waxing-email-footer.jpg');
   const result = {
-    code: response.getResponseCode(),
-    bytes: bytes.length,
-    contentType: blob.getContentType(),
+    deprecated: true,
+    mode: 'html-footer',
+    hasInlineImage: false,
     version: SCRIPT_VERSION,
   };
   console.log(JSON.stringify(result));
@@ -214,45 +206,26 @@ function decodeValue_(v) {
   return null;
 }
 
-function footerFallbackHtml_() {
-  return `<span style="display:block;background:#2f2a28;color:#f9f6f0;padding:22px 24px;border-radius:14px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang TC',sans-serif;line-height:1.8">
-    <strong style="font-family:Georgia,serif;font-size:22px;color:#ffffff"><span style="color:#c5a070">77</span>waxing</strong><br>
-    <span style="font-size:13px;color:#e6dfd8">基隆・預約制美學服務</span><br>
-    <span style="font-size:13px;color:#e6dfd8">基隆市中正區義一路56號2樓</span><br>
-    <span style="font-size:13px;color:#d8b98c">把第一次的緊張，交給 77 的細心與溫柔。</span><br>
-    <span style="font-size:12px;color:#f3e1c5">前往官方網站 →</span>
-  </span>`;
+function footerHtml_() {
+  return `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="width:100%;border-collapse:separate;background:#2f2a28;border-radius:14px;overflow:hidden">
+    <tr>
+      <td style="padding:26px 24px;text-align:left;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang TC',sans-serif;line-height:1.8">
+        <a href="${WEBSITE_URL}" target="_blank" style="display:block;color:#f9f6f0;text-decoration:none;border:0">
+          <span style="display:block;font-family:Georgia,serif;font-size:24px;line-height:1.2;color:#ffffff;margin-bottom:10px"><span style="color:#c5a070;font-weight:700">77</span>waxing</span>
+          <span style="display:block;font-size:13px;color:#e6dfd8">基隆・預約制美學服務</span>
+          <span style="display:block;font-size:13px;color:#e6dfd8">基隆市中正區義一路56號2樓</span>
+          <span style="display:block;font-size:13px;color:#d8b98c;margin-top:8px">把第一次的緊張，交給 77 的細心與溫柔。</span>
+          <span style="display:block;font-size:12px;color:#f3e1c5;margin-top:8px">前往官方網站 →</span>
+        </a>
+      </td>
+    </tr>
+  </table>`;
 }
 
 function send_(to, subject, html) {
   const options = senderOptions_();
   options.htmlBody = html;
-
-  try {
-    const response = UrlFetchApp.fetch(EMAIL_FOOTER_FETCH_URL, {
-      muteHttpExceptions: true,
-      followRedirects: true,
-    });
-    const code = response.getResponseCode();
-    if (code !== 200) throw new Error(`HTTP_${code}`);
-
-    const bytes = response.getContent();
-    if (!bytes || !bytes.length) throw new Error('EMPTY_IMAGE');
-
-    const blob = Utilities.newBlob(bytes, 'image/jpeg', '77waxing-email-footer.jpg');
-    options.inlineImages = { emailFooter: blob };
-    console.log(JSON.stringify({
-      event: 'email_footer_inline_ready',
-      bytes: bytes.length,
-      contentType: blob.getContentType(),
-      version: SCRIPT_VERSION,
-    }));
-  } catch (err) {
-    console.warn(`email_footer_inline_failed:${String(err && err.message || err)}`);
-    options.htmlBody = html.replace(/<img src="cid:emailFooter"[^>]*>/, footerFallbackHtml_());
-  }
-
-  GmailApp.sendEmail(to, subject, htmlToText_(options.htmlBody), options);
+  GmailApp.sendEmail(to, subject, htmlToText_(html), options);
 }
 
 function serviceRange_(b) {
@@ -304,15 +277,13 @@ function line_(label, value) {
 }
 
 function shell_(title, body) {
-  return `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang TC',sans-serif;color:#3a3836;max-width:620px;margin:auto;padding:30px 24px;line-height:1.75">
-    <div style="font-family:Georgia,serif;font-size:28px;margin-bottom:22px"><b style="color:#c5a070">77</b>waxing</div>
-    <h2 style="font-size:20px;line-height:1.5;margin:0 0 18px">${esc_(title)}</h2>
-    ${body}
-    <div style="margin-top:34px">
-      <a href="${WEBSITE_URL}" target="_blank" style="display:block;text-decoration:none;border:0">
-        <img src="cid:emailFooter" alt="77waxing｜基隆・預約制美學服務｜基隆市中正區義一路56號2樓｜前往官方網站" width="620" style="display:block;width:100%;max-width:620px;height:auto;border:0;border-radius:14px">
-      </a>
+  return `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang TC',sans-serif;color:#3a3836;max-width:620px;margin:auto;line-height:1.75">
+    <div style="padding:30px 24px 0">
+      <div style="font-family:Georgia,serif;font-size:28px;margin-bottom:22px"><b style="color:#c5a070">77</b>waxing</div>
+      <h2 style="font-size:20px;line-height:1.5;margin:0 0 18px">${esc_(title)}</h2>
+      ${body}
     </div>
+    <div style="margin-top:34px">${footerHtml_()}</div>
   </div>`;
 }
 
