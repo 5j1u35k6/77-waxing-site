@@ -1,10 +1,9 @@
 const PROJECT_ID = 'waxing-86909';
 const FIRESTORE_BASE = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
 const STORE_EMAIL = '77waxing.mail@gmail.com';
-const SCRIPT_VERSION = '2026-09-10-email-v24';
+const SCRIPT_VERSION = '2026-09-11-email-v25';
 const WEBSITE_URL = 'https://5j1u35k6.github.io/77-waxing-site/';
-const EMAIL_FOOTER_DRIVE_FILE_ID = '1-_2y_ObqyN3C_TAzst5CodZR8aFjlQRa';
-const EMAIL_FOOTER_CID = 'emailFooterV24';
+const EMAIL_FOOTER_IMAGE = 'https://5j1u35k6.github.io/77-waxing-site/assets/email-footer-77waxing-v25.jpg?v=20260911-0035';
 
 function senderStatus_() {
   const effectiveEmail = String(Session.getEffectiveUser().getEmail() || '').trim().toLowerCase();
@@ -63,17 +62,17 @@ function testSelfEmail() {
 function testFooterInline() {
   send_(
     STORE_EMAIL,
-    '77waxing｜Footer v24 高解析新圖測試',
-    shell_('Footer v24 高解析新圖測試', '<p>這版直接使用最新 2172×400 高解析橫幅，右上角官方網站文字已再放大，並改成 CID 內嵌圖片避免 Gmail 外部圖片代理造成模糊。</p>')
+    '77waxing｜Footer v25 手機 Gmail 正文圖片測試',
+    shell_('Footer v25 手機 Gmail 正文圖片測試', '<p>這版改回公開 HTTPS 圖片，維持高解析來源，不使用 CID/附件 MIME，避免手機 Gmail 顯示附件卡片。</p>')
   );
-  return `footer-inline-hidpi-v24-sent:${STORE_EMAIL}`;
+  return `footer-body-image-v25-sent:${STORE_EMAIL}`;
 }
 
 function debugFooterAsset() {
   const result = {
-    mode: 'drive-inline-png-hidpi-v24',
-    hasInlineImage: true,
-    driveFileId: EMAIL_FOOTER_DRIVE_FILE_ID,
+    mode: 'public-https-body-image-v25',
+    hasInlineImage: false,
+    imageUrl: EMAIL_FOOTER_IMAGE,
     version: SCRIPT_VERSION,
   };
   console.log(JSON.stringify(result));
@@ -213,7 +212,7 @@ function footerHtml_() {
     <tr>
       <td width="100%" style="width:100%;padding:0;margin:0;border:0;line-height:0;font-size:0">
         <a href="${WEBSITE_URL}" target="_blank" aria-label="前往 77waxing 官方網站" style="display:block;width:100%;padding:0;margin:0;border:0;text-decoration:none;line-height:0;font-size:0">
-          <img src="cid:${EMAIL_FOOTER_CID}" width="680" alt="77waxing｜把第一次的緊張，交給77的細心與溫柔。" style="display:block;width:100%;max-width:680px;height:auto;margin:0;padding:0;border:0;border-radius:14px;line-height:0;font-size:0">
+          <img src="${EMAIL_FOOTER_IMAGE}" width="680" alt="77waxing｜把第一次的緊張，交給77的細心與溫柔。" style="display:block;width:100%;max-width:680px;height:auto;margin:0;padding:0;border:0;border-radius:14px;line-height:0;font-size:0">
         </a>
       </td>
     </tr>
@@ -223,8 +222,6 @@ function footerHtml_() {
 function send_(to, subject, html) {
   const options = senderOptions_();
   options.htmlBody = html;
-  options.inlineImages = {};
-  options.inlineImages[EMAIL_FOOTER_CID] = DriveApp.getFileById(EMAIL_FOOTER_DRIVE_FILE_ID).getBlob().setName('email-footer-77waxing-v24.png');
   GmailApp.sendEmail(to, subject, htmlToText_(html), options);
 }
 
