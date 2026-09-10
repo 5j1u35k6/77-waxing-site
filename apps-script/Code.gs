@@ -1,7 +1,7 @@
 const PROJECT_ID = 'waxing-86909';
 const FIRESTORE_BASE = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
 const STORE_EMAIL = '77waxing.mail@gmail.com';
-const SCRIPT_VERSION = '2026-09-10-email-v13';
+const SCRIPT_VERSION = '2026-09-10-email-v14';
 const WEBSITE_URL = 'https://5j1u35k6.github.io/77-waxing-site/';
 const EMAIL_FOOTER_IMAGE = 'https://5j1u35k6.github.io/77-waxing-site/assets/email-footer-77waxing.jpg?v=20260910-1555';
 
@@ -62,15 +62,15 @@ function testSelfEmail() {
 function testFooterInline() {
   send_(
     STORE_EMAIL,
-    '77waxing｜Footer 手機版放大測試',
-    shell_('Footer 手機版放大測試', '<p>請優先用手機 Gmail 檢視最下方橫幅；手機版會放大山海圖與其中的文字，同時維持無附件、無上下白邊。</p>')
+    '77waxing｜Footer 手機文字放大測試',
+    shell_('Footer 手機文字放大測試', '<p>請用手機 Gmail 檢視最下方：山海畫面保留，但 Logo、品牌標語與地址已改成獨立 HTML 文字，因此手機可單獨放大而不需要把整張圖片一起放大。</p>')
   );
-  return `footer-mobile-zoom-sent:${STORE_EMAIL}`;
+  return `footer-mobile-html-copy-sent:${STORE_EMAIL}`;
 }
 
 function debugFooterAsset() {
   const result = {
-    mode: 'external-mobile-zoom-footer',
+    mode: 'external-artwork-html-copy-footer',
     hasInlineImage: false,
     imageUrl: EMAIL_FOOTER_IMAGE,
     version: SCRIPT_VERSION,
@@ -208,11 +208,19 @@ function decodeValue_(v) {
 }
 
 function footerHtml_() {
-  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="email-footer-frame" style="width:100%;height:128px;border-collapse:collapse;border-spacing:0;margin:0;padding:0;background:#2f2a28;border-radius:14px;overflow:hidden">
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="email-footer-frame" style="width:100%;height:146px;border-collapse:separate;border-spacing:0;margin:0;padding:0;background:#2f2a28;border-radius:14px;overflow:hidden">
     <tr>
-      <td width="100%" height="128" valign="middle" style="width:100%;height:128px;padding:0!important;margin:0!important;border:0;line-height:0!important;font-size:0!important;background:#2f2a28;border-radius:14px;overflow:hidden">
-        <a href="${WEBSITE_URL}" target="_blank" aria-label="前往 77waxing 官方網站" style="display:block;width:100%;height:128px;padding:0;margin:0;text-decoration:none;border:0;line-height:0;font-size:0;background:#2f2a28;overflow:hidden">
-          <img class="email-footer-image" src="${EMAIL_FOOTER_IMAGE}" width="680" height="128" alt="77waxing" style="display:block;width:100%;max-width:680px;height:128px;object-fit:cover;object-position:center center;border:0;margin:0;padding:0;line-height:0;font-size:0;background:#2f2a28">
+      <td class="email-footer-copy" width="58%" valign="middle" style="width:58%;height:146px;padding:16px 12px 14px 20px;margin:0;border:0;background:#2f2a28;color:#f7f0e6;vertical-align:middle">
+        <a href="${WEBSITE_URL}" target="_blank" aria-label="前往 77waxing 官方網站" style="display:block;color:#f7f0e6;text-decoration:none;border:0">
+          <div class="email-footer-logo" style="font-family:Georgia,'Times New Roman',serif;font-size:26px;line-height:1.05;white-space:nowrap;margin:0 0 8px"><span style="color:#c5a070">77</span><span style="color:#f7f0e6">waxing</span></div>
+          <div class="email-footer-studio" style="font-size:9px;line-height:1.35;letter-spacing:.18em;color:#d8cbbb;margin:0 0 9px">77美學工作室</div>
+          <div class="email-footer-tagline" style="font-family:Georgia,'Noto Serif TC','PingFang TC',serif;font-size:15px;line-height:1.45;color:#dfc6a5;margin:0 0 9px">把第一次的緊張，<br>交給77的細心與溫柔。</div>
+          <div class="email-footer-address" style="font-size:10px;line-height:1.45;color:#e8dfd4">● 基隆市中正區義一路56號2樓</div>
+        </a>
+      </td>
+      <td class="email-footer-art" width="42%" height="146" valign="middle" style="width:42%;height:146px;padding:0;margin:0;border:0;line-height:0;font-size:0;background:#2f2a28;overflow:hidden;vertical-align:middle">
+        <a href="${WEBSITE_URL}" target="_blank" aria-label="前往 77waxing 官方網站" style="display:block;width:100%;height:146px;padding:0;margin:0;text-decoration:none;border:0;line-height:0;font-size:0;overflow:hidden;background:#2f2a28">
+          <img class="email-footer-art-image" src="${EMAIL_FOOTER_IMAGE}" width="286" height="146" alt="" style="display:block;width:100%;height:146px;object-fit:cover;object-position:82% center;border:0;margin:0;padding:0;line-height:0;font-size:0;background:#2f2a28">
         </a>
       </td>
     </tr>
@@ -276,17 +284,18 @@ function line_(label, value) {
 function shell_(title, body) {
   return `<style type="text/css">
     @media screen and (max-width:480px) {
-      .email-footer-frame { height:150px !important; }
-      .email-footer-frame td,
-      .email-footer-frame a { height:150px !important; }
-      .email-footer-image {
-        width:124% !important;
-        max-width:none !important;
-        height:150px !important;
-        margin-left:-12% !important;
-        object-fit:cover !important;
-        object-position:center center !important;
-      }
+      .email-footer-frame,
+      .email-footer-copy,
+      .email-footer-art,
+      .email-footer-art a,
+      .email-footer-art-image { height:168px !important; }
+      .email-footer-copy { width:61% !important; padding:16px 8px 14px 16px !important; }
+      .email-footer-art { width:39% !important; }
+      .email-footer-logo { font-size:30px !important; margin-bottom:9px !important; }
+      .email-footer-studio { font-size:10px !important; margin-bottom:10px !important; }
+      .email-footer-tagline { font-size:17px !important; line-height:1.42 !important; margin-bottom:10px !important; }
+      .email-footer-address { font-size:11px !important; line-height:1.4 !important; }
+      .email-footer-art-image { object-position:82% center !important; }
     }
   </style>
   <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang TC',sans-serif;color:#3a3836;max-width:680px;margin:auto;line-height:1.75">
@@ -316,7 +325,7 @@ function htmlToText_(html) {
 }
 
 function esc_(value) {
-  return String(value == null ? '' : value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  return String(value == null ? '' : value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]));
 }
 
 function json_(obj) {
