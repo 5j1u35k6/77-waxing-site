@@ -1,7 +1,7 @@
 const PROJECT_ID = 'waxing-86909';
 const FIRESTORE_BASE = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
 const STORE_EMAIL = '77waxing.mail@gmail.com';
-const SCRIPT_VERSION = '2026-09-10-email-v12';
+const SCRIPT_VERSION = '2026-09-10-email-v13';
 const WEBSITE_URL = 'https://5j1u35k6.github.io/77-waxing-site/';
 const EMAIL_FOOTER_IMAGE = 'https://5j1u35k6.github.io/77-waxing-site/assets/email-footer-77waxing.jpg?v=20260910-1555';
 
@@ -62,15 +62,15 @@ function testSelfEmail() {
 function testFooterInline() {
   send_(
     STORE_EMAIL,
-    '77waxing｜Footer 圖片風格測試',
-    shell_('Footer 圖片風格測試', '<p>信件最下方保留 77waxing 山海圖，改用固定橫幅比例裁切，並貼齊信件寬度。</p>')
+    '77waxing｜Footer 手機版放大測試',
+    shell_('Footer 手機版放大測試', '<p>請優先用手機 Gmail 檢視最下方橫幅；手機版會放大山海圖與其中的文字，同時維持無附件、無上下白邊。</p>')
   );
-  return `footer-cropped-image-sent:${STORE_EMAIL}`;
+  return `footer-mobile-zoom-sent:${STORE_EMAIL}`;
 }
 
 function debugFooterAsset() {
   const result = {
-    mode: 'external-cropped-image-footer',
+    mode: 'external-mobile-zoom-footer',
     hasInlineImage: false,
     imageUrl: EMAIL_FOOTER_IMAGE,
     version: SCRIPT_VERSION,
@@ -208,11 +208,11 @@ function decodeValue_(v) {
 }
 
 function footerHtml_() {
-  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;border-spacing:0;margin:0;padding:0;background:#2f2a28;border-radius:14px;overflow:hidden">
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="email-footer-frame" style="width:100%;height:128px;border-collapse:collapse;border-spacing:0;margin:0;padding:0;background:#2f2a28;border-radius:14px;overflow:hidden">
     <tr>
-      <td width="100%" valign="middle" style="width:100%;padding:0!important;margin:0!important;border:0;line-height:0!important;font-size:0!important;background:#2f2a28;border-radius:14px;overflow:hidden">
-        <a href="${WEBSITE_URL}" target="_blank" aria-label="前往 77waxing 官方網站" style="display:block;width:100%;padding:0;margin:0;text-decoration:none;border:0;line-height:0;font-size:0;background:#2f2a28">
-          <img src="${EMAIL_FOOTER_IMAGE}" width="680" height="118" alt="77waxing" style="display:block!important;width:100%!important;max-width:680px!important;height:118px!important;object-fit:cover!important;object-position:center center!important;border:0!important;margin:0!important;padding:0!important;line-height:0!important;font-size:0!important;background:#2f2a28">
+      <td width="100%" height="128" valign="middle" style="width:100%;height:128px;padding:0!important;margin:0!important;border:0;line-height:0!important;font-size:0!important;background:#2f2a28;border-radius:14px;overflow:hidden">
+        <a href="${WEBSITE_URL}" target="_blank" aria-label="前往 77waxing 官方網站" style="display:block;width:100%;height:128px;padding:0;margin:0;text-decoration:none;border:0;line-height:0;font-size:0;background:#2f2a28;overflow:hidden">
+          <img class="email-footer-image" src="${EMAIL_FOOTER_IMAGE}" width="680" height="128" alt="77waxing" style="display:block;width:100%;max-width:680px;height:128px;object-fit:cover;object-position:center center;border:0;margin:0;padding:0;line-height:0;font-size:0;background:#2f2a28">
         </a>
       </td>
     </tr>
@@ -274,7 +274,22 @@ function line_(label, value) {
 }
 
 function shell_(title, body) {
-  return `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang TC',sans-serif;color:#3a3836;max-width:680px;margin:auto;line-height:1.75">
+  return `<style type="text/css">
+    @media screen and (max-width:480px) {
+      .email-footer-frame { height:150px !important; }
+      .email-footer-frame td,
+      .email-footer-frame a { height:150px !important; }
+      .email-footer-image {
+        width:124% !important;
+        max-width:none !important;
+        height:150px !important;
+        margin-left:-12% !important;
+        object-fit:cover !important;
+        object-position:center center !important;
+      }
+    }
+  </style>
+  <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang TC',sans-serif;color:#3a3836;max-width:680px;margin:auto;line-height:1.75">
     <div style="padding:30px 24px 0">
       <div style="font-family:Georgia,serif;font-size:28px;margin-bottom:22px"><b style="color:#c5a070">77</b>waxing</div>
       <h2 style="font-size:20px;line-height:1.5;margin:0 0 18px">${esc_(title)}</h2>
