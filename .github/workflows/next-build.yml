@@ -50,6 +50,8 @@ jobs:
           node --check /tmp/admin-dashboard-v3.mjs
           cp assets/admin-record-actions.js /tmp/admin-record-actions.mjs
           node --check /tmp/admin-record-actions.mjs
+          cp assets/admin-cancel-reason.js /tmp/admin-cancel-reason.mjs
+          node --check /tmp/admin-cancel-reason.mjs
           cp assets/email-dispatch.js /tmp/email-dispatch.mjs
           node --check /tmp/email-dispatch.mjs
       - name: Install dependencies

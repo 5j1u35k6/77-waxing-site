@@ -4,10 +4,14 @@ import { collection, doc, getDoc, getDocs, getFirestore, onSnapshot, query, wher
 
 const DEFAULT_APPS_SCRIPT_EMAIL_URL='https://script.google.com/macros/s/AKfycbx6iC26KXbHWYte5XhLGNRMmG16Yydx2vPHDxYpmp4rmWn3plk__6Qwwr7Y09hLptTW/exec';
 const LEGACY_APPS_SCRIPT_EMAIL_URL='https://script.google.com/macros/s/AKfycby1y-oojBtmNsT8T1UPMydCTPkaZIjRss7QvxXkWi2duOs4mKI8p3tbIzvhi2xwd_Zb/exec';
+const DISPATCH_VERSION='20260910-1518';
 let started=false;
 let adminUnsub=null;
 let statusMap=new Map();
 let publicObserver=null;
+let currentUser=null;
+let currentDb=null;
+const inFlight=new Set();
 
 function appReady(){return getApps().length?getApp():null;}
 async function emailUrl(db){
@@ -17,14 +21,23 @@ async function emailUrl(db){
   return configured;
 }
 async function dispatchBooking(user,db,bookingId){
-  if(!user||!bookingId)return false;
-  const url=await emailUrl(db);
-  if(!url)return false;
-  const idToken=await user.getIdToken();
+  if(!user||!db||!bookingId)return false;
+  const flightKey=`${user.uid}:${bookingId}`;
+  if(inFlight.has(flightKey))return false;
+  inFlight.add(flightKey);
   try{
-    await fetch(url,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({bookingId,idToken})});
+    const url=await emailUrl(db);
+    if(!url)return false;
+    const idToken=await user.getIdToken();
+    console.info('[77 email] dispatch',DISPATCH_VERSION,bookingId,url);
+    await fetch(url,{method:'POST',mode:'no-cors',cache:'no-store',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({bookingId,idToken})});
     return true;
-  }catch(error){console.error('Email dispatch failed',error);return false;}
+  }catch(error){
+    console.error('Email dispatch failed',error);
+    return false;
+  }finally{
+    setTimeout(()=>inFlight.delete(flightKey),1200);
+  }
 }
 async function latestOwnedBooking(user,db){
   const snap=await getDocs(query(collection(db,'bookings'),where('ownerUid','==',user.uid)));
@@ -40,7 +53,8 @@ function watchPublicSuccess(user,db){
   if(publicObserver)return;
   let busy=false;
   const run=async()=>{
-    if(busy||!document.querySelector('#booking .success'))return;
+    const success=document.querySelector('#booking .success.on');
+    if(busy||!success)return;
     busy=true;
     try{
       const row=await latestOwnedBooking(user,db);
@@ -52,7 +66,7 @@ function watchPublicSuccess(user,db){
     }catch(error){console.error('Booking email lookup failed',error);}finally{busy=false;}
   };
   publicObserver=new MutationObserver(()=>queueMicrotask(run));
-  publicObserver.observe(document.querySelector('#app')||document.body,{childList:true,subtree:true});
+  publicObserver.observe(document.querySelector('#app')||document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['class','style']});
   run();
 }
 async function isAdmin(user,db){
@@ -81,8 +95,17 @@ function watchAdmin(user,db){
 async function startForUser(user){
   const app=appReady();if(!app||!user)return;
   const db=getFirestore(app);
+  currentUser=user;
+  currentDb=db;
   if(await isAdmin(user,db))watchAdmin(user,db);else watchPublicSuccess(user,db);
 }
+function dispatchFromEvent(event){
+  const bookingId=String(event?.detail?.bookingId||'').trim();
+  if(!bookingId||!currentUser||!currentDb)return;
+  dispatchBooking(currentUser,currentDb,bookingId);
+}
+window.addEventListener('77waxing:booking-created',dispatchFromEvent);
+window.addEventListener('77waxing:booking-status-changed',dispatchFromEvent);
 function start(){
   if(started)return;started=true;
   const app=appReady();if(!app){started=false;return setTimeout(start,120);}
