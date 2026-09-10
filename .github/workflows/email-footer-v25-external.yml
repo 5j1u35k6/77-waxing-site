@@ -1,0 +1,56 @@
+name: Switch Gmail footer to public image v25
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/email-footer-v25-external.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  update-email-footer:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Update Apps Script to non-CID footer
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('apps-script/Code.gs')
+          s=p.read_text()
+          s=s.replace("const SCRIPT_VERSION = '2026-09-10-email-v24';", "const SCRIPT_VERSION = '2026-09-11-email-v25';")
+          s=s.replace("const EMAIL_FOOTER_DRIVE_FILE_ID = '1-_2y_ObqyN3C_TAzst5CodZR8aFjlQRa';\nconst EMAIL_FOOTER_CID = 'emailFooterV24';", "const EMAIL_FOOTER_IMAGE = 'https://5j1u35k6.github.io/77-waxing-site/assets/email-footer-77waxing-v25.jpg?v=20260911-0035';")
+          s=s.replace("'77waxing｜Footer v24 高解析新圖測試'", "'77waxing｜Footer v25 手機 Gmail 正文圖片測試'")
+          s=s.replace("shell_('Footer v24 高解析新圖測試', '<p>這版直接使用最新 2172×400 高解析橫幅，右上角官方網站文字已再放大，並改成 CID 內嵌圖片避免 Gmail 外部圖片代理造成模糊。</p>')", "shell_('Footer v25 手機 Gmail 正文圖片測試', '<p>這版改回公開 HTTPS 圖片，維持高解析來源，不使用 CID/附件 MIME，避免手機 Gmail 顯示附件卡片。</p>')")
+          s=s.replace("return `footer-inline-hidpi-v24-sent:${STORE_EMAIL}`;", "return `footer-body-image-v25-sent:${STORE_EMAIL}`;")
+          s=s.replace("mode: 'drive-inline-png-hidpi-v24',\n    hasInlineImage: true,\n    driveFileId: EMAIL_FOOTER_DRIVE_FILE_ID,", "mode: 'public-https-body-image-v25',\n    hasInlineImage: false,\n    imageUrl: EMAIL_FOOTER_IMAGE,")
+          s=s.replace('src="cid:${EMAIL_FOOTER_CID}"', 'src="${EMAIL_FOOTER_IMAGE}"')
+          s=s.replace("  options.inlineImages = {};\n  options.inlineImages[EMAIL_FOOTER_CID] = DriveApp.getFileById(EMAIL_FOOTER_DRIVE_FILE_ID).getBlob().setName('email-footer-77waxing-v24.png');\n", "")
+          if 'EMAIL_FOOTER_DRIVE_FILE_ID' in s or 'EMAIL_FOOTER_CID' in s or 'inlineImages' in s:
+              raise SystemExit('CID/Drive footer references still present')
+          p.write_text(s)
+          PY
+
+      - name: Validate non-regression contract
+        run: |
+          grep -q "2026-09-11-email-v25" apps-script/Code.gs
+          grep -q "email-footer-77waxing-v25.jpg" apps-script/Code.gs
+          ! grep -q "inlineImages" apps-script/Code.gs
+          ! grep -q "DriveApp.getFileById" apps-script/Code.gs
+          grep -q "手機 Gmail 中，footer 必須是「信件正文內的圖片」" PROJECT_STATE.md
+          grep -q "開始時間–服務結束時間" PROJECT_STATE.md
+          grep -q "永久刪除" PROJECT_STATE.md
+
+      - name: Commit Apps Script v25 and remove one-time workflow
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm .github/workflows/email-footer-v25-external.yml
+          git add apps-script/Code.gs
+          git commit -m 'fix: render Gmail footer as body image v25 [skip ci]'
+          git push
