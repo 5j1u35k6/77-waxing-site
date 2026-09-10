@@ -1,0 +1,129 @@
+name: Build Gmail footer v22
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/footer-v22-build.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  build-footer-v22:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install image dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y fonts-noto-cjk
+          python -m pip install --upgrade pip
+          pip install pillow opencv-python-headless
+
+      - name: Rebuild high-density baseline JPEG and enlarge website label
+        run: |
+          python <<'PY'
+          from pathlib import Path
+          from PIL import Image, ImageDraw, ImageFont, ImageFilter
+          import cv2
+          import numpy as np
+
+          source = Path('assets/email-footer-77waxing-v19.jpg')
+          output = Path('assets/email-footer-77waxing-v22.jpg')
+
+          im = Image.open(source).convert('RGB')
+          if im.width < 1200:
+              raise SystemExit(f'Unexpected source size: {im.size}')
+
+          # Keep the full 1360px source so the email's 680px display has ~2x pixel density.
+          # A restrained unsharp mask improves text/mountain edge definition without changing layout.
+          im = im.filter(ImageFilter.UnsharpMask(radius=1.0, percent=135, threshold=2))
+
+          arr = np.array(im)
+          h, w = arr.shape[:2]
+
+          # Remove only the previous small upper-right website label + underline.
+          # Coordinates are proportional so this remains stable if the source height differs slightly.
+          x1, y1 = int(w * 0.785), int(h * 0.055)
+          x2, y2 = int(w * 0.992), int(h * 0.335)
+          mask = np.zeros((h, w), dtype=np.uint8)
+          cv2.rectangle(mask, (x1, y1), (x2, y2), 255, -1)
+          arr = cv2.inpaint(arr, mask, 5, cv2.INPAINT_TELEA)
+          im = Image.fromarray(arr)
+
+          draw = ImageDraw.Draw(im)
+          font_path = '/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc'
+          label = '77waxing 官方網站 →'
+          font_size = max(30, round(w * 0.023))
+          font = ImageFont.truetype(font_path, font_size)
+          bbox = draw.textbbox((0, 0), label, font=font)
+          tw = bbox[2] - bbox[0]
+
+          right = round(w * 0.036)
+          x = w - right - tw
+          y = round(h * 0.075)
+          shadow = (25, 22, 20)
+          ink = (229, 211, 184)
+          draw.text((x + 1, y + 1), label, font=font, fill=shadow)
+          draw.text((x, y), label, font=font, fill=ink)
+
+          underline_y = y + font_size + 11
+          draw.line((x, underline_y, w - right, underline_y), fill=(195, 169, 132), width=1)
+
+          # Baseline (non-progressive) JPEG, high quality, 4:4:4 chroma for crisp small text.
+          im.save(output, 'JPEG', quality=95, subsampling=0, optimize=True, progressive=False)
+          print(f'Wrote {output}: {im.size}, {output.stat().st_size} bytes')
+          PY
+
+      - name: Point Apps Script at v22 asset
+        run: |
+          python <<'PY'
+          from pathlib import Path
+
+          p = Path('apps-script/Code.gs')
+          s = p.read_text()
+          replacements = {
+              "const SCRIPT_VERSION = '2026-09-10-email-v21';": "const SCRIPT_VERSION = '2026-09-10-email-v22';",
+              "const EMAIL_FOOTER_IMAGE = 'https://5j1u35k6.github.io/77-waxing-site/assets/email-footer-77waxing-v21.jpg';": "const EMAIL_FOOTER_IMAGE = 'https://5j1u35k6.github.io/77-waxing-site/assets/email-footer-77waxing-v22.jpg';",
+              "'77waxing｜Footer v21 正確格式圖片測試'": "'77waxing｜Footer v22 高清圖片＋官方網站文字測試'",
+              "shell_('Footer v20 穩定圖片路徑測試', '<p>這版使用全新檔名與真正 baseline JPEG，保留原山海構圖與手寫字，其他文字已放大，避免 Gmail 圖片代理沿用舊格式快取。</p>')": "shell_('Footer v22 高清圖片測試', '<p>這版沿用 v21 已成功的 baseline JPEG＋獨立檔名方式，改用 2× 顯示密度圖片並放大右上角「77waxing 官方網站」文字。</p>')",
+              "return `footer-baseline-jpeg-v21-sent:${STORE_EMAIL}`;": "return `footer-hires-v22-sent:${STORE_EMAIL}`;",
+              "mode: 'baseline-jpeg-unique-path-v21'": "mode: 'baseline-jpeg-hires-v22'",
+          }
+          for old, new in replacements.items():
+              if old not in s:
+                  raise SystemExit(f'Missing expected text: {old}')
+              s = s.replace(old, new, 1)
+          p.write_text(s)
+          PY
+
+      - name: Validate JPEG format
+        run: |
+          python <<'PY'
+          from PIL import Image
+          p = 'assets/email-footer-77waxing-v22.jpg'
+          im = Image.open(p)
+          assert im.format == 'JPEG'
+          assert im.width >= 1200
+          assert im.width / 680 >= 1.75
+          print('Validated', im.size, im.mode)
+          PY
+
+      - name: Commit v22 and clean one-time builder
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm .github/workflows/footer-v22-build.yml
+          git add assets/email-footer-77waxing-v22.jpg apps-script/Code.gs
+          git commit -m 'fix: sharpen Gmail footer and enlarge website label'
+          git push
