@@ -34,9 +34,13 @@ jobs:
         run: |
           python <<'PY'
           from pathlib import Path
-          from PIL import Image, ImageDraw, ImageFont, ImageFilter
+          from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageFile
           import cv2
           import numpy as np
+
+          # v19 is a valid browser-displayable asset but its JPEG stream is slightly truncated.
+          # Pillow is instructed to tolerate the missing tail so we can recover its full 1360px canvas.
+          ImageFile.LOAD_TRUNCATED_IMAGES = True
 
           source = Path('assets/email-footer-77waxing-v19.jpg')
           output = Path('assets/email-footer-77waxing-v22.jpg')
@@ -45,15 +49,14 @@ jobs:
           if im.width < 1200:
               raise SystemExit(f'Unexpected source size: {im.size}')
 
-          # Keep the full 1360px source so the email's 680px display has ~2x pixel density.
-          # A restrained unsharp mask improves text/mountain edge definition without changing layout.
+          # Keep the full source so the email's 680px display has ~2x pixel density.
+          # A restrained unsharp mask improves edge definition without changing the composition.
           im = im.filter(ImageFilter.UnsharpMask(radius=1.0, percent=135, threshold=2))
 
           arr = np.array(im)
           h, w = arr.shape[:2]
 
           # Remove only the previous small upper-right website label + underline.
-          # Coordinates are proportional so this remains stable if the source height differs slightly.
           x1, y1 = int(w * 0.785), int(h * 0.055)
           x2, y2 = int(w * 0.992), int(h * 0.335)
           mask = np.zeros((h, w), dtype=np.uint8)
