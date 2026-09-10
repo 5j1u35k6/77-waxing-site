@@ -52,6 +52,14 @@
 4. 每次 push 後檢查 JavaScript syntax、Next.js build（若被觸發）與 GitHub Pages deploy。
 5. 若需求新增或既有功能被指定為不可遺失，立即更新本檔。
 
+## 2026-09-11 正式基準
+
+- Email Apps Script source：`apps-script/Code.gs` v25。
+- 正式 Email footer：`assets/email-footer-77waxing-v25.jpg`，以公開 HTTPS `<img>` 顯示於正文；禁止改回 CID / `inlineImages`，避免手機 Gmail 出現附件卡片。
+- 管理後台 `admin/index.html` 必須最後載入 `assets/admin-critical-preserve.js`，並保留 `admin-time-range.js`、`admin-record-actions.js`。
+- 目前 admin cache-busting 基準為 `20260911-0048`，用來避免瀏覽器繼續使用遺失時間區間／刪除按鈕的舊快取。
+- 任何 Email、圖片、後台 UI 更新完成後，都必須再次驗證：① Gmail footer 在正文內、無附件卡片；② 預約時間為開始–結束；③ 每筆預約都有永久刪除功能。
+
 ## 2026-09-10 最新需求
 
 - 修正手機 Gmail 的 CID 圖片被顯示成附件問題：改回公開 HTTPS 高解析 footer 圖片。
