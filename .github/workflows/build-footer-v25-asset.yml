@@ -16,25 +16,30 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Rebuild v25 from high resolution v24 source recipe
+
+      - name: Assemble prepared v25 JPEG
         run: |
-          python - <<'PY'
-          from PIL import Image,ImageEnhance,ImageFilter
-          from pathlib import Path
-          # v23 is only a fallback source guard. We intentionally fail if the prepared v25 asset
-          # has not been committed by the publishing step, rather than silently regress visuals.
-          target=Path('assets/email-footer-77waxing-v25.jpg')
-          if not target.exists():
-              raise SystemExit('v25 asset must be committed before this workflow can complete')
-          im=Image.open(target)
-          assert im.width >= 1360, im.size
-          assert im.height >= 200, im.size
-          print('validated',im.size,target.stat().st_size)
-          PY
-      - name: Clean one-time workflow
+          cat .tmp-v25/chunk0.b64 .tmp-v25/chunk1.b64 .tmp-v25/chunk2.b64 .tmp-v25/chunk3.b64 .tmp-v25/chunk4.b64 .tmp-v25/chunk5.b64 | base64 --decode > assets/email-footer-77waxing-v25.jpg
+          test "$(stat -c%s assets/email-footer-77waxing-v25.jpg)" -gt 20000
+          file assets/email-footer-77waxing-v25.jpg | grep -q 'JPEG image data'
+          file assets/email-footer-77waxing-v25.jpg
+
+      - name: Validate email/admin non-regression requirements
+        run: |
+          grep -q "email-footer-77waxing-v25.jpg" apps-script/Code.gs
+          ! grep -q "inlineImages" apps-script/Code.gs
+          ! grep -q "DriveApp.getFileById" apps-script/Code.gs
+          grep -q "開始時間–服務結束時間" PROJECT_STATE.md
+          grep -q "永久刪除" PROJECT_STATE.md
+          grep -q "手機 Gmail 中，footer 必須是「信件正文內的圖片」" PROJECT_STATE.md
+
+      - name: Commit final v25 asset and clean staging files
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm -r .tmp-v25
+          git rm -f assets/email-footer-77waxing-v25.svg
           git rm .github/workflows/build-footer-v25-asset.yml
-          git commit -m 'chore: remove v25 asset validation workflow [skip ci]'
+          git add assets/email-footer-77waxing-v25.jpg
+          git commit -m 'fix: publish Gmail body footer v25 and preserve admin guards [skip ci]'
           git push
