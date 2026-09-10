@@ -1,7 +1,7 @@
 const PROJECT_ID = 'waxing-86909';
 const FIRESTORE_BASE = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
 const STORE_EMAIL = '77waxing.mail@gmail.com';
-const SCRIPT_VERSION = '2026-09-10-email-v16';
+const SCRIPT_VERSION = '2026-09-10-email-v17';
 const WEBSITE_URL = 'https://5j1u35k6.github.io/77-waxing-site/';
 const EMAIL_FOOTER_IMAGE = 'https://5j1u35k6.github.io/77-waxing-site/assets/email-footer-77waxing.jpg?v=20260910-1555';
 
@@ -62,15 +62,15 @@ function testSelfEmail() {
 function testFooterInline() {
   send_(
     STORE_EMAIL,
-    '77waxing｜Footer 手機版修正版測試',
-    shell_('Footer 手機版修正版測試', '<p>這版已改為手機優先的穩定版：文字獨立放大，山海只保留在右側視覺區，上下以深色遮罩消除原圖白邊。</p>')
+    '77waxing｜Footer 原圖＋前景文字測試',
+    shell_('Footer 原圖＋前景文字測試', '<p>這版維持原本山海與手寫字構圖，只把 Logo、工作室文字、服務文字與地址放到前景並放大；手寫字本身維持原圖不變。</p>')
   );
-  return `footer-mobile-v16-sent:${STORE_EMAIL}`;
+  return `footer-original-art-foreground-text-v17-sent:${STORE_EMAIL}`;
 }
 
 function debugFooterAsset() {
   const result = {
-    mode: 'external-mobile-stable-footer',
+    mode: 'original-artwork-foreground-html-text',
     hasInlineImage: false,
     imageUrl: EMAIL_FOOTER_IMAGE,
     version: SCRIPT_VERSION,
@@ -208,25 +208,29 @@ function decodeValue_(v) {
 }
 
 function footerHtml_() {
-  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="email-footer-frame" style="width:100%;height:136px;border-collapse:separate;border-spacing:0;margin:0;padding:0;background:#2f2a28;border-radius:14px;overflow:hidden">
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="email-footer-frame" style="width:100%;height:132px;border-collapse:separate;border-spacing:0;margin:0;padding:0;background:#2f2a28;border-radius:14px;overflow:hidden">
     <tr>
-      <td class="email-footer-copy" rowspan="3" width="60%" valign="middle" style="width:60%;height:136px;padding:12px 9px 11px 16px;margin:0;border:0;background:#2f2a28;color:#f7f0e6;vertical-align:middle">
-        <a href="${WEBSITE_URL}" target="_blank" aria-label="前往 77waxing 官方網站" style="display:block;color:#f7f0e6;text-decoration:none;border:0">
-          <div class="email-footer-logo" style="font-family:Georgia,'Times New Roman',serif;font-size:25px;line-height:1;white-space:nowrap;margin:0 0 5px"><span style="color:#c5a070">77</span><span style="color:#f7f0e6">waxing</span></div>
-          <div class="email-footer-studio" style="font-size:8px;line-height:1.25;letter-spacing:.14em;color:#d8cbbb;margin:0 0 7px">77美學工作室</div>
-          <div class="email-footer-tagline" style="font-family:Georgia,'Noto Serif TC','PingFang TC',serif;font-size:14px;line-height:1.34;color:#dfc6a5;margin:0 0 7px">把第一次的緊張，<br>交給77的細心與溫柔。</div>
-          <div class="email-footer-address" style="font-size:9px;line-height:1.28;color:#e8dfd4;white-space:nowrap">● 基隆市中正區義一路56號2樓</div>
-        </a>
+      <td class="email-footer-bg" width="100%" height="132" background="${EMAIL_FOOTER_IMAGE}" valign="middle" style="width:100%;height:132px;padding:0;margin:0;border:0;border-radius:14px;overflow:hidden;background-color:#2f2a28;background-image:url('${EMAIL_FOOTER_IMAGE}');background-repeat:no-repeat;background-position:center center;background-size:112% auto;vertical-align:middle">
+        <table role="presentation" width="100%" height="132" cellpadding="0" cellspacing="0" border="0" class="email-footer-inner" style="width:100%;height:132px;border-collapse:collapse;border-spacing:0;margin:0;padding:0">
+          <tr>
+            <td class="email-footer-copy" width="30%" valign="middle" style="width:30%;height:132px;padding:12px 10px 10px 18px;margin:0;border:0;border-right:1px solid #6b6055;background:#2f2a28;color:#f7f0e6;vertical-align:middle">
+              <a href="${WEBSITE_URL}" target="_blank" aria-label="前往 77waxing 官方網站" style="display:block;color:#f7f0e6;text-decoration:none;border:0">
+                <div class="email-footer-logo" style="font-family:Georgia,'Times New Roman',serif;font-size:28px;line-height:1;white-space:nowrap;margin:0 0 4px"><span style="color:#c5a070">77</span><span style="color:#f7f0e6">waxing</span></div>
+                <div class="email-footer-studio" style="font-size:8px;line-height:1.2;letter-spacing:.13em;color:#d8cbbb;margin:0 0 4px">77美學工作室</div>
+                <div class="email-footer-desc" style="font-size:8.5px;line-height:1.25;color:#e8dfd4">基隆・預約制美學服務</div>
+              </a>
+            </td>
+            <td class="email-footer-address-cell" width="38%" valign="bottom" style="width:38%;height:132px;padding:0 5px 10px 12px;margin:0;border:0;background:transparent;vertical-align:bottom">
+              <a href="${WEBSITE_URL}" target="_blank" aria-label="前往 77waxing 官方網站" style="display:block;width:100%;color:#e8dfd4;text-decoration:none;border:0">
+                <span class="email-footer-address" style="display:block;width:100%;box-sizing:border-box;background:#2f2a28;color:#e8dfd4;font-size:10px;line-height:1.2;padding:6px 5px 5px;border-radius:4px;white-space:nowrap">● 基隆市中正區義一路56號2樓</span>
+              </a>
+            </td>
+            <td width="32%" style="width:32%;height:132px;padding:0;margin:0;border:0;background:transparent;font-size:0;line-height:0">
+              <a href="${WEBSITE_URL}" target="_blank" aria-label="前往 77waxing 官方網站" style="display:block;width:100%;height:132px;text-decoration:none;border:0;font-size:0;line-height:132px">&nbsp;</a>
+            </td>
+          </tr>
+        </table>
       </td>
-      <td width="40%" height="18" style="width:40%;height:18px;padding:0;margin:0;border:0;background:#2f2a28;font-size:0;line-height:0">&nbsp;</td>
-    </tr>
-    <tr>
-      <td class="email-footer-scene" width="40%" height="100" background="${EMAIL_FOOTER_IMAGE}" style="width:40%;height:100px;padding:0;margin:0;border:0;background-color:#2f2a28;background-image:url('${EMAIL_FOOTER_IMAGE}');background-repeat:no-repeat;background-size:640px auto;background-position:82% 47%;font-size:0;line-height:0">
-        <a href="${WEBSITE_URL}" target="_blank" aria-label="前往 77waxing 官方網站" style="display:block;width:100%;height:100px;text-decoration:none;border:0;font-size:0;line-height:100px">&nbsp;</a>
-      </td>
-    </tr>
-    <tr>
-      <td width="40%" height="18" style="width:40%;height:18px;padding:0;margin:0;border:0;background:#2f2a28;font-size:0;line-height:0">&nbsp;</td>
     </tr>
   </table>`;
 }
@@ -288,19 +292,30 @@ function line_(label, value) {
 function shell_(title, body) {
   return `<style type="text/css">
     @media screen and (max-width:480px) {
-      .email-footer-frame { height:136px !important; }
-      .email-footer-copy {
-        width:60% !important;
-        height:136px !important;
-        padding:12px 9px 11px 16px !important;
+      .email-footer-frame,
+      .email-footer-bg,
+      .email-footer-inner { height:76px !important; }
+      .email-footer-bg {
+        background-size:112% auto !important;
+        background-position:center center !important;
       }
-      .email-footer-logo { font-size:30px !important; margin-bottom:6px !important; }
-      .email-footer-studio { font-size:10px !important; margin-bottom:8px !important; }
-      .email-footer-tagline { font-size:18px !important; line-height:1.3 !important; margin-bottom:8px !important; }
-      .email-footer-address { font-size:11px !important; line-height:1.25 !important; }
-      .email-footer-scene {
-        background-size:640px auto !important;
-        background-position:82% 47% !important;
+      .email-footer-copy {
+        width:30% !important;
+        height:76px !important;
+        padding:7px 6px 6px 9px !important;
+      }
+      .email-footer-logo { font-size:26px !important; margin-bottom:2px !important; }
+      .email-footer-studio { font-size:7.5px !important; margin-bottom:2px !important; }
+      .email-footer-desc { font-size:7.5px !important; line-height:1.2 !important; }
+      .email-footer-address-cell {
+        width:38% !important;
+        height:76px !important;
+        padding:0 4px 6px 8px !important;
+      }
+      .email-footer-address {
+        font-size:8.5px !important;
+        line-height:1.2 !important;
+        padding:6px 4px 5px !important;
       }
     }
   </style>
