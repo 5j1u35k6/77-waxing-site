@@ -1,0 +1,117 @@
+name: Build complete Gmail footer v23
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/footer-v23-build.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  build-footer-v23:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install image dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y fonts-noto-cjk
+          python -m pip install --disable-pip-version-check pillow opencv-python-headless
+
+      - name: Restore complete v21 composition at high density
+        run: |
+          python <<'PY'
+          from pathlib import Path
+          from PIL import Image, ImageDraw, ImageFont, ImageFilter
+          import cv2
+          import numpy as np
+
+          source = Path('assets/email-footer-77waxing-v21.jpg')
+          output = Path('assets/email-footer-77waxing-v23.jpg')
+
+          im = Image.open(source).convert('RGB')
+          if im.size != (520, 92):
+              raise SystemExit(f'Unexpected verified v21 size: {im.size}')
+
+          # Preserve every element from the verified v21 image, but provide 3x pixel density.
+          scale = 3
+          im = im.resize((im.width * scale, im.height * scale), Image.Resampling.LANCZOS)
+          im = im.filter(ImageFilter.UnsharpMask(radius=0.8, percent=130, threshold=2))
+
+          # Remove only v21's tiny website label so it can be replaced at a readable size.
+          arr = np.array(im)
+          h, w = arr.shape[:2]
+          mask = np.zeros((h, w), dtype=np.uint8)
+          cv2.rectangle(mask, (432 * scale, 2 * scale), (519 * scale, 19 * scale), 255, -1)
+          bgr = cv2.cvtColor(arr, cv2.COLOR_RGB2BGR)
+          clean = cv2.inpaint(bgr, mask, 5 * scale, cv2.INPAINT_TELEA)
+          im = Image.fromarray(cv2.cvtColor(clean, cv2.COLOR_BGR2RGB))
+
+          # Requested change: larger top-right official website label.
+          draw = ImageDraw.Draw(im)
+          font_path = '/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc'
+          label = '77waxing 官方網站 →'
+          font = ImageFont.truetype(font_path, 10 * scale)
+          bbox = draw.textbbox((0, 0), label, font=font)
+          tw = bbox[2] - bbox[0]
+          x = w - 10 * scale - tw
+          y = 4 * scale
+          draw.text((x + scale, y + scale), label, font=font, fill=(42, 36, 32))
+          draw.text((x, y), label, font=font, fill=(232, 224, 212))
+          underline_y = y + 11 * scale
+          draw.line((x, underline_y, w - 10 * scale, underline_y), fill=(172, 152, 128), width=scale)
+
+          im = im.filter(ImageFilter.UnsharpMask(radius=0.45, percent=55, threshold=2))
+          im.save(output, 'JPEG', quality=96, subsampling=0, optimize=True, progressive=False)
+          print('wrote', output, im.size, output.stat().st_size)
+          PY
+
+      - name: Validate complete footer image
+        run: |
+          python <<'PY'
+          from PIL import Image
+          p = 'assets/email-footer-77waxing-v23.jpg'
+          im = Image.open(p)
+          assert im.format == 'JPEG', im.format
+          assert im.size == (1560, 276), im.size
+          assert im.mode == 'RGB', im.mode
+          print('validated', im.size, im.mode)
+          PY
+          test "$(stat -c%s assets/email-footer-77waxing-v23.jpg)" -gt 50000
+
+      - name: Update Apps Script to v23
+        run: |
+          python <<'PY'
+          from pathlib import Path
+          p = Path('apps-script/Code.gs')
+          s = p.read_text()
+          replacements = {
+            "const SCRIPT_VERSION = '2026-09-10-email-v22';": "const SCRIPT_VERSION = '2026-09-10-email-v23';",
+            "const EMAIL_FOOTER_IMAGE = 'https://5j1u35k6.github.io/77-waxing-site/assets/email-footer-77waxing-v22.jpg';": "const EMAIL_FOOTER_IMAGE = 'https://5j1u35k6.github.io/77-waxing-site/assets/email-footer-77waxing-v23.jpg';",
+            "77waxing｜Footer v22 高清圖片＋官方網站文字測試": "77waxing｜Footer v23 完整元素恢復測試",
+            "Footer v22 高清圖片測試": "Footer v23 完整元素恢復測試",
+            "這版沿用 v21 已成功的 baseline JPEG＋獨立檔名方式，改用 2× 顯示密度圖片並放大右上角「77waxing 官方網站」文字。": "這版恢復 v21 已驗證成功的完整 footer 元素，改用 3× 顯示密度圖片，並保留放大的右上角「77waxing 官方網站」文字。",
+            "footer-hires-v22-sent:": "footer-complete-v23-sent:",
+            "mode: 'baseline-jpeg-hires-v22'": "mode: 'baseline-jpeg-complete-hidpi-v23'",
+          }
+          for old, new in replacements.items():
+              if old not in s:
+                  raise SystemExit(f'Missing expected v22 text: {old}')
+              s = s.replace(old, new, 1)
+          p.write_text(s)
+          PY
+
+      - name: Commit v23 and remove one-time builder
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm .github/workflows/footer-v23-build.yml
+          git add assets/email-footer-77waxing-v23.jpg apps-script/Code.gs
+          git commit -m 'fix: restore complete high-resolution Gmail footer v23 [skip ci]'
+          git push
