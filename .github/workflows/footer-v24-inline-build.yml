@@ -1,0 +1,62 @@
+name: Switch email footer to inline v24
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/footer-v24-inline-build.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  update-footer:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Update Apps Script footer to v24
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('apps-script/Code.gs')
+          s = p.read_text()
+
+          replacements = {
+            "const SCRIPT_VERSION = '2026-09-10-email-v23';": "const SCRIPT_VERSION = '2026-09-10-email-v24';",
+            "const EMAIL_FOOTER_IMAGE = 'https://5j1u35k6.github.io/77-waxing-site/assets/email-footer-77waxing-v23.jpg';": "const EMAIL_FOOTER_DRIVE_FILE_ID = '1-_2y_ObqyN3C_TAzst5CodZR8aFjlQRa';\nconst EMAIL_FOOTER_CID = 'emailFooterV24';",
+            "'77waxing｜Footer v23 完整元素恢復測試'": "'77waxing｜Footer v24 高解析新圖測試'",
+            "shell_('Footer v23 完整元素恢復測試', '<p>這版恢復 v21 已驗證成功的完整 footer 元素，改用 3× 顯示密度圖片，並保留放大的右上角「77waxing 官方網站」文字。</p>')": "shell_('Footer v24 高解析新圖測試', '<p>這版直接使用最新 2172×400 高解析橫幅，右上角官方網站文字已再放大，並改成 CID 內嵌圖片避免 Gmail 外部圖片代理造成模糊。</p>')",
+            "return `footer-complete-v23-sent:${STORE_EMAIL}`;": "return `footer-inline-hidpi-v24-sent:${STORE_EMAIL}`;",
+            "mode: 'baseline-jpeg-complete-hidpi-v23'": "mode: 'drive-inline-png-hidpi-v24'",
+            "hasInlineImage: false": "hasInlineImage: true",
+            "imageUrl: EMAIL_FOOTER_IMAGE": "driveFileId: EMAIL_FOOTER_DRIVE_FILE_ID",
+            "<img src=\"${EMAIL_FOOTER_IMAGE}\" width=\"680\" alt=\"77waxing｜把第一次的緊張，交給77的細心與溫柔。\"": "<img src=\"cid:${EMAIL_FOOTER_CID}\" width=\"680\" alt=\"77waxing｜把第一次的緊張，交給77的細心與溫柔。\"",
+            "  options.htmlBody = html;\n  GmailApp.sendEmail(to, subject, htmlToText_(html), options);": "  options.htmlBody = html;\n  options.inlineImages = {};\n  options.inlineImages[EMAIL_FOOTER_CID] = DriveApp.getFileById(EMAIL_FOOTER_DRIVE_FILE_ID).getBlob().setName('email-footer-77waxing-v24.png');\n  GmailApp.sendEmail(to, subject, htmlToText_(html), options);",
+          }
+
+          for old, new in replacements.items():
+              if old not in s:
+                  raise SystemExit(f'Missing expected v23 text: {old}')
+              s = s.replace(old, new, 1)
+
+          p.write_text(s)
+          PY
+
+      - name: Validate v24 code
+        run: |
+          grep -q "2026-09-10-email-v24" apps-script/Code.gs
+          grep -q "1-_2y_ObqyN3C_TAzst5CodZR8aFjlQRa" apps-script/Code.gs
+          grep -q "cid:${EMAIL_FOOTER_CID}" apps-script/Code.gs || true
+          grep -q "inlineImages" apps-script/Code.gs
+
+      - name: Commit v24 and remove one-time builder
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm .github/workflows/footer-v24-inline-build.yml
+          git add apps-script/Code.gs
+          git commit -m 'fix: use high-resolution inline email footer v24 [skip ci]'
+          git push
