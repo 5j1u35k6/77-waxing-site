@@ -1,9 +1,9 @@
 const PROJECT_ID = 'waxing-86909';
 const FIRESTORE_BASE = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
 const STORE_EMAIL = '77waxing.mail@gmail.com';
-const SCRIPT_VERSION = '2026-09-10-email-v10';
+const SCRIPT_VERSION = '2026-09-10-email-v11';
 const WEBSITE_URL = 'https://5j1u35k6.github.io/77-waxing-site/';
-const EMAIL_FOOTER_IMAGE = 'https://5j1u35k6.github.io/77-waxing-site/assets/email-footer-77waxing.jpg?v=20260910-1455';
+const EMAIL_FOOTER_IMAGE = 'https://5j1u35k6.github.io/77-waxing-site/assets/email-footer-77waxing.jpg?v=20260910-1555';
 
 function senderStatus_() {
   const effectiveEmail = String(Session.getEffectiveUser().getEmail() || '').trim().toLowerCase();
@@ -63,14 +63,14 @@ function testFooterInline() {
   send_(
     STORE_EMAIL,
     '77waxing｜Footer 圖片風格測試',
-    shell_('Footer 圖片風格測試', '<p>信件最下方會使用原本的 77waxing 山海品牌圖片風格，但改成由網站載入，不再作為 Email 內嵌附件。</p>')
+    shell_('Footer 圖片風格測試', '<p>信件最下方使用原始高解析度 77waxing 山海圖，並以滿版背景方式裁掉上下留白。</p>')
   );
-  return `footer-external-image-sent:${STORE_EMAIL}`;
+  return `footer-background-image-sent:${STORE_EMAIL}`;
 }
 
 function debugFooterAsset() {
   const result = {
-    mode: 'external-image-footer',
+    mode: 'external-background-footer',
     hasInlineImage: false,
     imageUrl: EMAIL_FOOTER_IMAGE,
     version: SCRIPT_VERSION,
@@ -208,11 +208,13 @@ function decodeValue_(v) {
 }
 
 function footerHtml_() {
-  return `<div style="display:block;width:100%;overflow:hidden;border-radius:14px;line-height:0;background:#2f2a28">
-    <a href="${WEBSITE_URL}" target="_blank" style="display:block;width:100%;text-decoration:none;border:0;line-height:0">
-      <img src="${EMAIL_FOOTER_IMAGE}" alt="77waxing｜基隆・預約制美學服務｜基隆市中正區義一路56號2樓｜前往官方網站" width="620" style="display:block;width:100%;max-width:620px;height:auto;border:0;margin-top:-7.64%;margin-bottom:-7.96%">
-    </a>
-  </div>`;
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;margin:0;padding:0">
+    <tr>
+      <td width="100%" height="116" background="${EMAIL_FOOTER_IMAGE}" style="width:100%;height:116px;padding:0;margin:0;border:0;border-radius:14px;overflow:hidden;background-image:url('${EMAIL_FOOTER_IMAGE}');background-position:center center;background-repeat:no-repeat;background-size:cover;background-color:#2f2a28;line-height:0;font-size:0">
+        <a href="${WEBSITE_URL}" target="_blank" aria-label="前往 77waxing 官方網站" style="display:block;width:100%;height:116px;text-decoration:none;border:0;line-height:116px;font-size:0">&nbsp;</a>
+      </td>
+    </tr>
+  </table>`;
 }
 
 function send_(to, subject, html) {
@@ -276,7 +278,7 @@ function shell_(title, body) {
       <h2 style="font-size:20px;line-height:1.5;margin:0 0 18px">${esc_(title)}</h2>
       ${body}
     </div>
-    <div style="margin-top:34px">${footerHtml_()}</div>
+    <div style="margin:34px 0 0;padding:0">${footerHtml_()}</div>
   </div>`;
 }
 
