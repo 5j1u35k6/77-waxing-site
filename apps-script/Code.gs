@@ -1,8 +1,9 @@
 const PROJECT_ID = 'waxing-86909';
 const FIRESTORE_BASE = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
 const STORE_EMAIL = '77waxing.mail@gmail.com';
-const SCRIPT_VERSION = '2026-09-10-email-v9';
+const SCRIPT_VERSION = '2026-09-10-email-v10';
 const WEBSITE_URL = 'https://5j1u35k6.github.io/77-waxing-site/';
+const EMAIL_FOOTER_IMAGE = 'https://5j1u35k6.github.io/77-waxing-site/assets/email-footer-77waxing.jpg?v=20260910-1455';
 
 function senderStatus_() {
   const effectiveEmail = String(Session.getEffectiveUser().getEmail() || '').trim().toLowerCase();
@@ -61,17 +62,17 @@ function testSelfEmail() {
 function testFooterInline() {
   send_(
     STORE_EMAIL,
-    '77waxing｜Footer HTML 測試',
-    shell_('Footer HTML 測試', '<p>如果信件最下方正常顯示滿版深色品牌區塊，代表純 HTML Footer 已正常啟用，信件不會再附帶 Footer 圖片。</p>')
+    '77waxing｜Footer 圖片風格測試',
+    shell_('Footer 圖片風格測試', '<p>信件最下方會使用原本的 77waxing 山海品牌圖片風格，但改成由網站載入，不再作為 Email 內嵌附件。</p>')
   );
-  return `footer-html-sent:${STORE_EMAIL}`;
+  return `footer-external-image-sent:${STORE_EMAIL}`;
 }
 
 function debugFooterAsset() {
   const result = {
-    deprecated: true,
-    mode: 'html-footer',
+    mode: 'external-image-footer',
     hasInlineImage: false,
+    imageUrl: EMAIL_FOOTER_IMAGE,
     version: SCRIPT_VERSION,
   };
   console.log(JSON.stringify(result));
@@ -207,19 +208,11 @@ function decodeValue_(v) {
 }
 
 function footerHtml_() {
-  return `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="width:100%;border-collapse:separate;background:#2f2a28;border-radius:14px;overflow:hidden">
-    <tr>
-      <td style="padding:26px 24px;text-align:left;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang TC',sans-serif;line-height:1.8">
-        <a href="${WEBSITE_URL}" target="_blank" style="display:block;color:#f9f6f0;text-decoration:none;border:0">
-          <span style="display:block;font-family:Georgia,serif;font-size:24px;line-height:1.2;color:#ffffff;margin-bottom:10px"><span style="color:#c5a070;font-weight:700">77</span>waxing</span>
-          <span style="display:block;font-size:13px;color:#e6dfd8">基隆・預約制美學服務</span>
-          <span style="display:block;font-size:13px;color:#e6dfd8">基隆市中正區義一路56號2樓</span>
-          <span style="display:block;font-size:13px;color:#d8b98c;margin-top:8px">把第一次的緊張，交給 77 的細心與溫柔。</span>
-          <span style="display:block;font-size:12px;color:#f3e1c5;margin-top:8px">前往官方網站 →</span>
-        </a>
-      </td>
-    </tr>
-  </table>`;
+  return `<div style="display:block;width:100%;overflow:hidden;border-radius:14px;line-height:0;background:#2f2a28">
+    <a href="${WEBSITE_URL}" target="_blank" style="display:block;width:100%;text-decoration:none;border:0;line-height:0">
+      <img src="${EMAIL_FOOTER_IMAGE}" alt="77waxing｜基隆・預約制美學服務｜基隆市中正區義一路56號2樓｜前往官方網站" width="620" style="display:block;width:100%;max-width:620px;height:auto;border:0;margin-top:-7.64%;margin-bottom:-7.96%">
+    </a>
+  </div>`;
 }
 
 function send_(to, subject, html) {
