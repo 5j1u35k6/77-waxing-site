@@ -1,9 +1,9 @@
 const PROJECT_ID = 'waxing-86909';
 const FIRESTORE_BASE = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
 const STORE_EMAIL = '77waxing.mail@gmail.com';
-const SCRIPT_VERSION = '2026-09-10-email-v21';
+const SCRIPT_VERSION = '2026-09-10-email-v22';
 const WEBSITE_URL = 'https://5j1u35k6.github.io/77-waxing-site/';
-const EMAIL_FOOTER_IMAGE = 'https://5j1u35k6.github.io/77-waxing-site/assets/email-footer-77waxing-v21.jpg';
+const EMAIL_FOOTER_IMAGE = 'https://5j1u35k6.github.io/77-waxing-site/assets/email-footer-77waxing-v22.jpg';
 
 function senderStatus_() {
   const effectiveEmail = String(Session.getEffectiveUser().getEmail() || '').trim().toLowerCase();
@@ -62,15 +62,15 @@ function testSelfEmail() {
 function testFooterInline() {
   send_(
     STORE_EMAIL,
-    '77waxing｜Footer v21 正確格式圖片測試',
-    shell_('Footer v20 穩定圖片路徑測試', '<p>這版使用全新檔名與真正 baseline JPEG，保留原山海構圖與手寫字，其他文字已放大，避免 Gmail 圖片代理沿用舊格式快取。</p>')
+    '77waxing｜Footer v22 高清圖片＋官方網站文字測試',
+    shell_('Footer v22 高清圖片測試', '<p>這版沿用 v21 已成功的 baseline JPEG＋獨立檔名方式，改用 2× 顯示密度圖片並放大右上角「77waxing 官方網站」文字。</p>')
   );
-  return `footer-baseline-jpeg-v21-sent:${STORE_EMAIL}`;
+  return `footer-hires-v22-sent:${STORE_EMAIL}`;
 }
 
 function debugFooterAsset() {
   const result = {
-    mode: 'baseline-jpeg-unique-path-v21',
+    mode: 'baseline-jpeg-hires-v22',
     hasInlineImage: false,
     imageUrl: EMAIL_FOOTER_IMAGE,
     version: SCRIPT_VERSION,
