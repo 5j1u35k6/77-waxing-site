@@ -1,9 +1,9 @@
 const PROJECT_ID = 'waxing-86909';
 const FIRESTORE_BASE = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
 const STORE_EMAIL = '77waxing.mail@gmail.com';
-const SCRIPT_VERSION = '2026-09-10-email-v19';
+const SCRIPT_VERSION = '2026-09-10-email-v20';
 const WEBSITE_URL = 'https://5j1u35k6.github.io/77-waxing-site/';
-const EMAIL_FOOTER_IMAGE = 'https://5j1u35k6.github.io/77-waxing-site/assets/email-footer-77waxing-v19.jpg?v=20260910-1916';
+const EMAIL_FOOTER_IMAGE = 'https://5j1u35k6.github.io/77-waxing-site/assets/email-footer-77waxing.jpg?v=20260910-2028';
 
 function senderStatus_() {
   const effectiveEmail = String(Session.getEffectiveUser().getEmail() || '').trim().toLowerCase();
@@ -62,15 +62,15 @@ function testSelfEmail() {
 function testFooterInline() {
   send_(
     STORE_EMAIL,
-    '77waxing｜Footer v19 合成圖層測試',
-    shell_('Footer v19 合成圖層測試', '<p>這版已依照原始 Footer 分離背景與文字後重新合成為單一圖片：保留原山海構圖與手寫字，其他文字放大，並移除圖片上下白邊。</p>')
+    '77waxing｜Footer v20 穩定圖片路徑測試',
+    shell_('Footer v20 穩定圖片路徑測試', '<p>這版改回既有且曾正常顯示的 Footer 圖片網址，並沿用已合成完成的山海橫幅內容，避免 Gmail 顯示破圖。</p>')
   );
-  return `footer-flattened-composite-v19-sent:${STORE_EMAIL}`;
+  return `footer-stable-path-v20-sent:${STORE_EMAIL}`;
 }
 
 function debugFooterAsset() {
   const result = {
-    mode: 'flattened-composite-image-v19',
+    mode: 'flattened-composite-stable-path-v20',
     hasInlineImage: false,
     imageUrl: EMAIL_FOOTER_IMAGE,
     version: SCRIPT_VERSION,
