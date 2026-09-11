@@ -47,11 +47,13 @@
 
 ### 後台功能命名與時段功能
 
-- 後台側欄與功能頁將「服務管理」顯示為「服務功能」、「價格管理」顯示為「價格功能」。
-- 「服務功能」後方新增「時段功能」。
-- 時段功能可依日期將單一 30 分鐘時段或整天空白時段設定為「其他行程／休息／私人行程／暫停預約」，也可以恢復開放。
+- 後台側欄在「顧客資料」後固定依序顯示：`服務功能`、`時段功能`、`價格功能`、`網站設定`；不得再出現「服務管理／價格管理」或重複的「網站設定」。
+- 「服務功能」維持既有服務分類／項目管理；「價格功能」維持既有價格調整。
+- 「時段功能」可依日期將單一 30 分鐘時段或整天空白時段設定為「其他行程／休息／私人行程／暫停預約」，也可以恢復開放。
 - 店家手動時段保留存於 `settings/availability_YYYY-MM-DD`，欄位 `blockedTimes`；沿用既有 `settings/{settingId}` 管理員寫入權限，不新增未部署的 Firestore rule 依賴。
 - 店家手動解除時段只解除店家設定，不得釋放既有顧客 booking lock。
+- `網站設定 > 每日最早可約時間` 的選項從 `08:00` 開始；若尚未設定，預設值為 `08:00`。
+- 正式預約時段來源也必須支援 `08:00` 起每 30 分鐘一格，不能只改後台下拉選單而讓前端仍從 10:00 開始。
 
 ## 前端預約時段不可回歸項目
 
@@ -67,6 +69,7 @@
 - `assets/admin-record-actions.js`：既有預約／顧客刪除功能。
 - `assets/admin-critical-preserve.js`：最後載入的保護層，DOM 被其他管理腳本重繪後會再次補回時間區間與預約刪除按鈕。
 - `assets/admin-functions.js` + `assets/admin-functions.css`：顧客快速資料、`新／舊` 客別、服務／價格功能命名、時段功能。
+- `assets/admin-menu-settings-fix.js`：最後正規化側欄順序／文字，並確保網站設定最早時間可選 08:00。
 - `assets/booking-slot-status.js` + `assets/booking-slot-status.css`：前端黃色保留、灰色已約／店家保留與手動封鎖同步。
 
 ## 修改規則
@@ -82,8 +85,9 @@
 - Email Apps Script source：`apps-script/Code.gs` v25。
 - 正式 Email footer：`assets/email-footer-77waxing-v25.jpg`，以公開 HTTPS `<img>` 顯示於正文；禁止改回 CID / `inlineImages`，避免手機 Gmail 出現附件卡片。
 - 管理後台 `admin/index.html` 必須最後載入 `assets/admin-critical-preserve.js`，並保留 `admin-time-range.js`、`admin-record-actions.js`。
-- Email／時間／刪除基準 cache-busting 為 `20260911-0048`；顧客快速資料、時段功能與前端時段顏色基準為 `20260911-0841`。
-- 任何 Email、圖片、後台 UI 更新完成後，都必須再次驗證：① Gmail footer 在正文內、無附件卡片；② 預約時間為開始–結束；③ 每筆預約都有永久刪除功能；④ 顧客姓名可點出聯絡／歷史資料；⑤ 客別只顯示新／舊；⑥ 時段功能仍可封鎖與恢復；⑦ 前端 held 黃色、confirmed/manual 灰色。
+- Email／時間／刪除基準 cache-busting 為 `20260911-0048`；顧客快速資料、時段功能與前端時段顏色基準為 `20260911-0841`；側欄文字／08:00 起始設定正規化基準為 `20260911-0854`。
+- 預約時段資料源已由 `10:00` 前移至 `08:00`，相關正式腳本（含 `admin-v2.js`、`booking-v3.js`、`firebase-pages.js`、`runtime-settings.js`、`booking-slot-status.js`、`admin-functions.js`）需維持此基準。
+- 任何 Email、圖片、後台 UI 更新完成後，都必須再次驗證：① Gmail footer 在正文內、無附件卡片；② 預約時間為開始–結束；③ 每筆預約都有永久刪除功能；④ 顧客姓名可點出聯絡／歷史資料；⑤ 客別只顯示新／舊；⑥ 時段功能仍可封鎖與恢復；⑦ 前端 held 黃色、confirmed/manual 灰色；⑧ 側欄順序為服務功能／時段功能／價格功能／網站設定；⑨ 網站設定與前端時段可從 08:00 開始。
 
 ## 2026-09-10 最新需求
 
