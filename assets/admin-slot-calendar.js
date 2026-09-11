@@ -30,7 +30,12 @@
     const input=view?.querySelector('[data-slot-date]');
     if(!view||!input)return;
     const originalLabel=input.closest('label');
-    if(originalLabel)originalLabel.hidden=true;
+    if(originalLabel){
+      originalLabel.hidden=true;
+      originalLabel.style.setProperty('display','none','important');
+      originalLabel.setAttribute('aria-hidden','true');
+    }
+    input.setAttribute('tabindex','-1');
     const controls=view.querySelector('.admin-slot-controls');
     if(!controls)return;
 
