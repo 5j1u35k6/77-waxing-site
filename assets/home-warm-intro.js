@@ -1,13 +1,13 @@
 (()=>{
   const B='/77-waxing-site';
-  const KEY='77waxing-brand-intro-v2-seen';
+  const KEY='77waxing-brand-intro-v3-seen';
   const path=location.pathname.startsWith(B)?location.pathname.slice(B.length):location.pathname;
   if(path!=='/'&&path!=='')return;
   try{if(sessionStorage.getItem(KEY)==='1')return;}catch{}
 
   const link=document.createElement('link');
   link.rel='stylesheet';
-  link.href=`${B}/assets/home-warm-intro.css?v=20260911-0949`;
+  link.href=`${B}/assets/home-warm-intro.css?v=20260911-0958`;
   document.head.appendChild(link);
 
   const root=document.createElement('section');
