@@ -1,6 +1,7 @@
 import { loadCatalog, publicCatalog, watchCatalog } from "./service-catalog-store.js?v=20260909-2129";
 
 const B = "/77-waxing-site";
+const CACHE_KEY = "77waxing-public-catalog-v1";
 let catalog = [];
 let scheduled = false;
 let rendering = false;
@@ -16,6 +17,29 @@ const normalizedPath = () => {
 const servicePath = (service) => `${B}/services/${service.slug}/`;
 const serviceByPath = () => catalog.find((service) => normalizedPath() === `/services/${service.slug}/`);
 
+function readCachedCatalog() {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? publicCatalog(parsed) : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeCachedCatalog(next) {
+  try { localStorage.setItem(CACHE_KEY, JSON.stringify(next)); } catch {}
+}
+
+function renderLoading() {
+  const root = app();
+  if (!root || root.querySelector("[data-catalog-loading]")) return;
+  const path = normalizedPath();
+  if (path !== "/menu/" && path !== "/services/" && !path.startsWith("/services/")) return;
+  root.innerHTML = `<section class="section" data-catalog-loading><div class="wrap narrow"><span class="tag">${path === "/menu/" ? "MENU" : "SERVICES"}</span><p class="muted">正在載入最新服務內容…</p></div></section>`;
+}
+
 function markHeader() {
   const nav = document.querySelector(".header nav");
   if (!nav) return;
@@ -26,7 +50,7 @@ function markHeader() {
 }
 
 function serviceSwitcher(activeKey) {
-  return `<nav class="service-switcher" aria-label="其他服務項目">${catalog.map((service) => `<a href="${servicePath(service)}" class="${service.key === activeKey ? "on" : ""}">${esc(service.name)}</a>`).join("")}</nav>`;
+  return `<nav class="service-switcher" aria-label="其他服務項目">${catalog.map((service) => `<a href="${servicePath(service)}" data-catalog-link class="${service.key === activeKey ? "on" : ""}">${esc(service.name)}</a>`).join("")}</nav>`;
 }
 
 function renderService(service) {
@@ -35,7 +59,7 @@ function renderService(service) {
   root.dataset.catalogPath = normalizedPath();
   root.dataset.dynamicCatalog = "1";
   const groups = service.groups.filter((group) => group.items.length);
-  root.innerHTML = `<div class="catalog-page" data-catalog-page="service"><section class="catalog-hero"><div class="wrap"><span class="tag">${esc(service.en)}</span><h1>${esc(service.name)}</h1><p class="lead muted">${esc(service.intro)}</p>${serviceSwitcher(service.key)}</div></section><section class="service-detail-section"><div class="wrap">${groups.map((group) => `<div class="service-group" data-service-group="${esc(group.id)}" data-service-kind="${esc(group.kind)}"><div class="service-group-head"><div><span class="tag">${group.kind === "addon" ? "ADD ON" : "SERVICE"}</span><h2>${esc(group.title)}</h2></div>${group.desc ? `<p class="muted">${esc(group.desc)}</p>` : ""}</div><div class="service-item-grid">${group.items.map((item) => `<article class="service-item-card" data-service-item-id="${esc(item.id)}"><h3>${esc(item.name)}</h3>${item.description ? `<p>${esc(item.description)}</p>` : ""}${item.durationLabel ? `<span class="duration">${esc(item.durationLabel)}</span>` : ""}</article>`).join("")}</div></div>`).join("")}<div class="catalog-actions"><a class="btn dark" href="${B}/booking/">立即預約</a><a class="btn" href="${B}/menu/">查看價目</a></div></div></section></div>`;
+  root.innerHTML = `<div class="catalog-page" data-catalog-page="service"><section class="catalog-hero"><div class="wrap"><span class="tag">${esc(service.en)}</span><h1>${esc(service.name)}</h1><p class="lead muted">${esc(service.intro)}</p>${serviceSwitcher(service.key)}</div></section><section class="service-detail-section"><div class="wrap">${groups.map((group) => `<div class="service-group" data-service-group="${esc(group.id)}" data-service-kind="${esc(group.kind)}"><div class="service-group-head"><div><span class="tag">${group.kind === "addon" ? "ADD ON" : "SERVICE"}</span><h2>${esc(group.title)}</h2></div>${group.desc ? `<p class="muted">${esc(group.desc)}</p>` : ""}</div><div class="service-item-grid">${group.items.map((item) => `<article class="service-item-card" data-service-item-id="${esc(item.id)}"><h3>${esc(item.name)}</h3>${item.description ? `<p>${esc(item.description)}</p>` : ""}${item.durationLabel ? `<span class="duration">${esc(item.durationLabel)}</span>` : ""}</article>`).join("")}</div></div>`).join("")}<div class="catalog-actions"><a class="btn dark" href="${B}/booking/">立即預約</a><a class="btn" href="${B}/menu/" data-catalog-link>查看價目</a></div></div></section></div>`;
   markHeader();
   rendering = false;
   if (location.hash.startsWith("#item=")) setTimeout(() => window.dispatchEvent(new HashChangeEvent("hashchange")), 0);
@@ -66,13 +90,13 @@ function bindPriceJump() {
 }
 
 function syncServiceMenus() {
-  const html = catalog.map((service) => `<a href="${servicePath(service)}"><span>${esc(service.name)}</span><small>${esc(service.en)}</small></a>`).join("");
+  const html = catalog.map((service) => `<a href="${servicePath(service)}" data-catalog-link><span>${esc(service.name)}</span><small>${esc(service.en)}</small></a>`).join("");
   const flyout = document.querySelector(".header nav .service-flyout");
   if (flyout && flyout.dataset.dynamicCatalog !== "1") { flyout.innerHTML = html; flyout.dataset.dynamicCatalog = "1"; }
   const dropdown = document.querySelector(".header nav .service-dropdown");
   if (dropdown) {
     const current = serviceByPath();
-    dropdown.innerHTML = catalog.map((service) => `<a href="${servicePath(service)}" class="${service.key === current?.key ? "on" : ""}"><strong>${esc(service.name)}</strong><small>${esc(service.en)}</small></a>`).join("");
+    dropdown.innerHTML = catalog.map((service) => `<a href="${servicePath(service)}" data-catalog-link class="${service.key === current?.key ? "on" : ""}"><strong>${esc(service.name)}</strong><small>${esc(service.en)}</small></a>`).join("");
     dropdown.dataset.dynamicCatalog = "1";
   }
 }
@@ -89,23 +113,23 @@ function syncHomeCards() {
     skin: "臉部、粉刺、撥筋與身體肌膚保養",
     bust: "依時間與需求選擇不同美胸保養流程",
   };
-  grid.innerHTML = catalog.map((service, index) => `<article class="card"><div class="num">${String(index + 1).padStart(2, "0")}</div><h3>${esc(service.name)}</h3><p>${esc(known[service.key] || service.intro || "查看服務項目與內容")}</p><a href="${servicePath(service)}">了解服務 →</a></article>`).join("");
+  grid.innerHTML = catalog.map((service, index) => `<article class="card"><div class="num">${String(index + 1).padStart(2, "0")}</div><h3>${esc(service.name)}</h3><p>${esc(known[service.key] || service.intro || "查看服務項目與內容")}</p><a href="${servicePath(service)}" data-catalog-link>了解服務 →</a></article>`).join("");
   grid.dataset.dynamicCatalog = "1";
 }
 
 function renderCurrent(force = false) {
-  if (!catalog.length || rendering) return;
+  if (rendering) return;
+  if (!catalog.length) { renderLoading(); return; }
   syncServiceMenus();
   syncHomeCards();
   const root = app(); if (!root) return;
   const path = normalizedPath();
   if (path === "/services/") {
-    location.replace(servicePath(catalog[0]));
-    return;
+    history.replaceState(null, "", servicePath(catalog[0]));
   }
-  const service = serviceByPath();
+  const service = serviceByPath() || (path === "/services/" ? catalog[0] : null);
   if (service) {
-    if (!force && root.dataset.dynamicCatalog === "1" && root.dataset.catalogPath === path && root.querySelector('[data-catalog-page="service"]')) return;
+    if (!force && root.dataset.dynamicCatalog === "1" && root.dataset.catalogPath === normalizedPath() && root.querySelector('[data-catalog-page="service"]')) return;
     renderService(service);
     return;
   }
@@ -122,14 +146,40 @@ function schedule() {
 }
 
 async function start() {
-  catalog = publicCatalog(await loadCatalog());
+  const cached = readCachedCatalog();
+  if (cached.length) {
+    catalog = cached;
+    renderCurrent(true);
+  } else {
+    renderLoading();
+  }
+
+  const fresh = publicCatalog(await loadCatalog());
+  catalog = fresh;
+  writeCachedCatalog(fresh);
   renderCurrent(true);
+
   await watchCatalog((next) => {
-    catalog = publicCatalog(next);
+    const publicNext = publicCatalog(next);
+    catalog = publicNext;
+    writeCachedCatalog(publicNext);
     document.querySelectorAll("[data-dynamic-catalog]").forEach((node) => delete node.dataset.dynamicCatalog);
     renderCurrent(true);
   });
 }
+
+document.addEventListener("click", (event) => {
+  const link = event.target.closest?.("a[data-catalog-link]");
+  if (!link) return;
+  let url;
+  try { url = new URL(link.href, location.href); } catch { return; }
+  if (url.origin !== location.origin || !url.pathname.startsWith(B)) return;
+  const relative = url.pathname.slice(B.length) || "/";
+  if (relative !== "/menu/" && relative !== "/services/" && !relative.startsWith("/services/")) return;
+  event.preventDefault();
+  history.pushState(null, "", url.pathname + url.search + url.hash);
+  renderCurrent(true);
+}, true);
 
 new MutationObserver(() => schedule()).observe(document.querySelector("#app") || document.body, { childList: true, subtree: true });
 addEventListener("popstate", () => setTimeout(() => renderCurrent(true), 0));
