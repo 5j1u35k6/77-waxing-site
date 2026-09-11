@@ -1,0 +1,126 @@
+name: Normalize production asset names once
+
+on:
+  push:
+    paths:
+      - '.github/workflows/normalize-production-assets-once.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  normalize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Rename active assets to stable names
+        shell: bash
+        run: |
+          set -euo pipefail
+          mv assets/nav-v4.js assets/nav.js
+          mv assets/nav-v4.css assets/nav.css
+          mv assets/booking-v3.js assets/booking-core.js
+          mv assets/booking-v3.css assets/booking-core.css
+          mv assets/admin-v2.js assets/admin-core.js
+          mv assets/admin-v2.css assets/admin-core.css
+          mv assets/admin-dashboard-v3.js assets/admin-dashboard.js
+          mv assets/admin-dashboard-v3.css assets/admin-dashboard.css
+          mv assets/catalog-v1.css assets/catalog.css
+          mv assets/footer-v1.css assets/footer.css
+          mv assets/firebase-pages.js assets/admin-firebase.js
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          replacements = {
+            'nav-v4.js':'nav.js',
+            'nav-v4.css':'nav.css',
+            'booking-v3.js':'booking-core.js',
+            'booking-v3.css':'booking-core.css',
+            'admin-v2.js':'admin-core.js',
+            'admin-v2.css':'admin-core.css',
+            'admin-dashboard-v3.js':'admin-dashboard.js',
+            'admin-dashboard-v3.css':'admin-dashboard.css',
+            'catalog-v1.css':'catalog.css',
+            'footer-v1.css':'footer.css',
+            'firebase-pages.js':'admin-firebase.js',
+          }
+          for filename in ['index.html','booking/index.html','admin/index.html']:
+              p=Path(filename)
+              text=p.read_text()
+              for old,new in replacements.items():
+                  text=text.replace(old,new)
+              p.write_text(text)
+
+          p=Path('PROJECT_STATE.md')
+          text=p.read_text()
+          anchor='- 正式站為 GitHub Pages 靜態前台：`/`、`/booking/`、`/admin/`。\n'
+          addition='- 正式資產使用穩定名稱，不再以 `v1/v2/v3/v4` 表示目前版本；核心入口為 `nav.js`、`booking-core.js`、`admin-core.js`、`admin-firebase.js`、`admin-dashboard.js`、`catalog.css`、`footer.css`。\n'
+          if addition not in text:
+              text=text.replace(anchor,anchor+addition)
+          p.write_text(text)
+
+          p=Path('.github/workflows/static-check.yml')
+          text=p.read_text()
+          old="catalog-v1\\.js|catalog-copy-v1\\.js|admin-ui-fixes\\.js|admin-ux\\.js"
+          new="catalog-v1\\.js|catalog-copy-v1\\.js|admin-ui-fixes\\.js|admin-ux\\.js|nav-v4\\.(?:js|css)|booking-v3\\.(?:js|css)|admin-v2\\.(?:js|css)|admin-dashboard-v3\\.(?:js|css)|catalog-v1\\.css|footer-v1\\.css|firebase-pages\\.js"
+          if old not in text:
+              raise SystemExit('static-check retired-reference pattern not found')
+          p.write_text(text.replace(old,new))
+          PY
+
+      - name: Validate renamed production tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          for old in assets/nav-v4.js assets/nav-v4.css assets/booking-v3.js assets/booking-v3.css assets/admin-v2.js assets/admin-v2.css assets/admin-dashboard-v3.js assets/admin-dashboard-v3.css assets/catalog-v1.css assets/footer-v1.css assets/firebase-pages.js; do
+            test ! -e "$old" || { echo "old filename still exists: $old"; exit 1; }
+          done
+          for current in assets/nav.js assets/nav.css assets/booking-core.js assets/booking-core.css assets/admin-core.js assets/admin-core.css assets/admin-dashboard.js assets/admin-dashboard.css assets/catalog.css assets/footer.css assets/admin-firebase.js; do
+            test -e "$current" || { echo "renamed asset missing: $current"; exit 1; }
+          done
+          ! grep -R -n -E 'nav-v4\.(js|css)|booking-v3\.(js|css)|admin-v2\.(js|css)|admin-dashboard-v3\.(js|css)|catalog-v1\.css|footer-v1\.css|firebase-pages\.js' index.html booking admin assets PROJECT_STATE.md || exit 1
+          for file in assets/*.js; do
+            if grep -Eq '^[[:space:]]*(import|export)[[:space:]]' "$file"; then
+              temp="/tmp/$(basename "${file%.js}").mjs"
+              cp "$file" "$temp"
+              node --check "$temp"
+            else
+              node --check "$file"
+            fi
+          done
+          python3 - <<'PY'
+          from pathlib import Path
+          import re, sys
+          missing=[]
+          for html in [Path('index.html'),Path('booking/index.html'),Path('admin/index.html')]:
+              text=html.read_text()
+              for ref in re.findall(r'(?:src|href)=["\']([^"\']+)["\']',text):
+                  if '/assets/' not in ref and not ref.startswith('../assets/'):
+                      continue
+                  clean=ref.split('?',1)[0]
+                  if clean.startswith('/77-waxing-site/'):
+                      target=Path(clean[len('/77-waxing-site/'):])
+                  elif clean.startswith('../'):
+                      target=(html.parent/clean).resolve().relative_to(Path.cwd().resolve())
+                  else:
+                      target=html.parent/clean
+                  if not target.exists(): missing.append(f'{html}: {ref} -> {target}')
+          if missing:
+              print('\n'.join(missing),file=sys.stderr)
+              raise SystemExit(1)
+          PY
+
+      - name: Commit stable asset names
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'refactor: use stable names for active production assets'
+          git push origin HEAD:main
