@@ -40,6 +40,7 @@
 - 時段功能只顯示單一自訂日期按鈕；點擊後開小型月曆，選日後關閉。今天與過去日期不可選。
 - 店家手動封鎖寫入 `settings/availability_YYYY-MM-DD.blockedTimes`；解除店家封鎖不得刪除顧客 booking lock。
 - 編輯預約彈窗底部不得使用深色整塊背景；只保留右下角的「取消／儲存修改」按鈕，取消文字使用紅色。
+- 「儲存網站設定」寫入 `settings/general` 後，必須用 Firestore server read-back 驗證主要欄位完全一致；只有驗證成功才能顯示已儲存。
 
 ## 首頁文案與版面
 
