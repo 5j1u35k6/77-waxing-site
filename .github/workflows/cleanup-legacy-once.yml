@@ -1,5 +1,6 @@
 name: Cleanup legacy runtime once
 
+# Temporary one-shot cleanup. Delete this workflow after the cleanup commit lands.
 on:
   push:
     paths:
