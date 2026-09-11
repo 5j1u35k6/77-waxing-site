@@ -40,7 +40,9 @@ function courses(){
 function bookingShell(){
   return `<section class="section"><div class="wrap booking-wide"><div class="booking" id="booking"></div></div></section>`;
 }
-function catalogShell(){return '<div data-current-catalog-shell></div>';}
+function catalogShell(){
+  return `<section class="section" data-catalog-loading><div class="wrap narrow"><span class="tag">SERVICES</span><p class="muted">正在載入最新服務內容…</p></div></section>`;
+}
 function notFound(){return hero('77WAXING','找不到這個頁面','請從上方選單重新選擇。');}
 
 function normalizedPath(){
