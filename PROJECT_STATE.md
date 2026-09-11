@@ -4,8 +4,8 @@
 
 ## 架構
 
-- 正式站為 GitHub Pages 靜態前台：`/`、`/booking/`、`/admin/`。
-- 正式資產使用穩定名稱，不再以 `v1/v2/v3/v4` 表示目前版本；核心入口為 `nav.js`、`booking-core.js`、`admin-core.js`、`admin-firebase.js`、`admin-dashboard.js`、`catalog.css`、`footer.css`。
+- 正式站為 GitHub Pages 靜態前台：`/`、`/beginner/`、`/booking/`、`/admin/`。
+- 正式資產使用穩定名稱，不再以 `v1/v2/v3/v4` 表示目前版本；核心入口為 `nav.js`、`booking-core.js`、`admin-core.js`、`admin-firebase.js`、`admin-dashboard.js`、`catalog.css`、`footer.css`、`beginner.css`。
 - Firebase Authentication + Cloud Firestore 是正式資料層。
 - Google Apps Script `apps-script/Code.gs` 負責預約 Email。
 - 服務／價目唯一公開 renderer 為 `assets/catalog-dynamic.js`；資料來源為 `services/catalog-main`，並使用瀏覽器快取後再背景同步 Firestore。
@@ -49,7 +49,9 @@
 - `把「會不會尷尬」先放下。` 使用較小字級並維持單行。
 - SAFE SPACE 區塊使用「左側較小品牌情境圖 + 右側三步驟圖文流程」版型；三步驟為 `抵達與接待 → 諮詢與評估 → 施作與衛教`。
 - SAFE SPACE 三步驟每一步都要有柔和米色底、細線條人物情境圖、編號、標題與說明；桌機橫向以細箭頭串接，手機改為縱向流程，整體維持柔和、有質感的視覺。
-- 首頁底部舊的 5 題 FAQ 已移除；新問題集尚未提供前，不顯示舊 FAQ。
+- SAFE SPACE 的首訪按鈕固定連到 `/beginner/`，顯示為「第一次熱蠟｜小白小白專區」。
+- `/beginner/` 標題為「第一次熱蠟，妳可能也會想問..」，完整放置第一次熱蠟的 6 題內容：疼痛、事前準備、所需時間、毛髮再生週期、敏感肌評估、私密處尷尬疑慮，以及「第一次不用很勇敢，剩下的交給77就好。」收尾文案。
+- 首頁不重複顯示整段第一次熱蠟 FAQ；完整內容集中在小白小白專區。
 
 ## 首頁動畫
 
