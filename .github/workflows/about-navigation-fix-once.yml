@@ -1,0 +1,101 @@
+name: Apply About navigation restructure fix once
+
+on:
+  push:
+    paths:
+      - '.github/workflows/about-navigation-fix-once.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Patch About navigation and first-visit route
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def once(text, old, new, label):
+              if old not in text:
+                  raise SystemExit(f'missing anchor: {label}')
+              return text.replace(old, new, 1)
+
+          p=Path('assets/pages.js')
+          text=p.read_text()
+          marker='''}\nfunction space(){'''
+          first='''}\nfunction firstVisit(){
+            return hero('FIRST VISIT','首訪的你','第一次來店前，可以先知道接待、需求確認、服務前說明、施作與術後照護會怎麼進行。')+
+            `<section class="section soft"><div class="wrap narrow"><ol class="flow"><li><b>抵達與接待</b><small>確認預約項目與當天身體狀況。</small></li><li><b>需求諮詢</b><small>第一次、怕痛或有特別在意的地方都可以先說。</small></li><li><b>服務前說明</b><small>開始前確認服務範圍與流程。</small></li><li><b>一對一施作</b><small>過程中有任何不適都可以即時調整。</small></li><li><b>術後照護</b><small>完成後確認居家照護方式與後續建議。</small></li></ol></div></section>`;
+          }
+          function space(){'''
+          text=once(text, marker, first, 'insert firstVisit')
+          text=once(text,
+            "const on=path==='/'?href===`${B}/`:path==='/beginner/'?href===`${B}/about/`:path.startsWith('/services/')?href===`${B}/services/`:href===`${B}${path}`;",
+            "const on=path==='/'?href===`${B}/`:(path==='/beginner/'||path==='/first-visit/')?href===`${B}/about/`:path.startsWith('/services/')?href===`${B}/services/`:href===`${B}${path}`;",
+            'active state')
+          text=once(text,
+            "else if(path==='/about/')app.innerHTML=about();\n  else if(path==='/space/')app.innerHTML=space();",
+            "else if(path==='/about/')app.innerHTML=about();\n  else if(path==='/first-visit/')app.innerHTML=firstVisit();\n  else if(path==='/space/')app.innerHTML=space();",
+            'route')
+          p.write_text(text)
+
+          p=Path('assets/nav.js')
+          nav=p.read_text()
+          nav=nav.replace('// About submenu: About -> 小白小白','// About submenu: story / first visit / beginner',1)
+          nav=once(nav,
+            'flyout.innerHTML=`<a href="${B}/about/" data-link><span>關於77waxing</span><small>ABOUT 77WAXING</small></a><a href="${B}/beginner/" data-link><span>小白小白</span><small>FIRST WAX</small></a>`;',
+            'flyout.innerHTML=`<a href="${B}/about/" data-link><span>77waxing故事</span><small>77WAXING STORY</small></a><a href="${B}/first-visit/" data-link><span>首訪的你</span><small>FIRST VISIT</small></a><a href="${B}/beginner/" data-link><span>小白小白</span><small>FIRST WAX</small></a>`;',
+            'submenu')
+          p.write_text(nav)
+
+          p=Path('index.html')
+          index=p.read_text()
+          index=once(index,'<script src="/77-waxing-site/assets/about-sections.js?v=20260909-1442"></script>','','old about injector')
+          index=index.replace('/assets/pages.js?v=20260911-1922','/assets/pages.js?v=20260911-1944')
+          index=index.replace('/assets/nav.js?v=20260911-1922','/assets/nav.js?v=20260911-1944')
+          p.write_text(index)
+
+          p=Path('PROJECT_STATE.md')
+          state=p.read_text()
+          state=once(state,
+            '- 正式站為 GitHub Pages 靜態前台：`/`、`/beginner/`、`/booking/`、`/admin/`。',
+            '- 正式站為 GitHub Pages 靜態前台：`/`、`/about/`、`/first-visit/`、`/beginner/`、`/booking/`、`/admin/`。',
+            'routes state')
+          anchor='- SAFE SPACE 區塊不顯示「第一次熱蠟｜小白小白專區」按鈕；小白小白由頂部選單 `關於 → 小白小白` 進入。\n'
+          state=once(state,anchor,anchor+'- 頂部「關於」選單固定三項：`77waxing故事 → /about/`、`首訪的你 → /first-visit/`、`小白小白 → /beginner/`。\n- `/about/` 不再內嵌「首訪的你」或「小白小白」區塊；`/first-visit/` 為獨立首訪頁，承接原本的首訪流程內容。\n','navigation state')
+          p.write_text(state)
+          PY
+
+          git rm assets/about-sections.js
+
+      - name: Validate
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check assets/pages.js
+          node --check assets/nav.js
+          grep -q '77waxing故事' assets/nav.js
+          grep -q '/first-visit/' assets/nav.js
+          grep -q 'function firstVisit()' assets/pages.js
+          grep -q "path==='/first-visit/'" assets/pages.js
+          ! grep -q 'about-sections.js' index.html
+          test ! -e assets/about-sections.js
+
+      - name: Commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'feat: restructure About navigation and first-visit page'
+          git push origin main
