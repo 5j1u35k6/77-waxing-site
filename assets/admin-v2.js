@@ -87,7 +87,7 @@ function delegateCatalog(view){
   if(w){
     w.hidden=false;
     w.dataset.catalogOwned="pending";
-    w.innerHTML=`<div class="admin-view-head"><div><span class="tag">${view==="services"?"SERVICES":"PRICING"}</span><h3>${view==="services"?"服務管理":"價格管理"}</h3></div></div><p class="muted">正在載入管理工具…</p>`;
+    w.innerHTML=`<div class="admin-view-head"><div><span class="tag">${view==="services"?"SERVICES":"PRICING"}</span><h3>${view==="services"?"服務功能":"價格功能"}</h3></div></div><p class="muted">正在載入管理工具…</p>`;
   }
   window.dispatchEvent(new CustomEvent("77waxing:admin-catalog-route",{detail:{view}}));
 }
@@ -98,6 +98,7 @@ function renderView(view){
   if(view==="calendar")return renderCalendar();
   if(view==="customers")return renderCustomers();
   if(view==="services"||view==="pricing")return delegateCatalog(view);
+  if(view==="slots"){setBaseVisibility(false);const w=ensureWorkspace();if(w){w.hidden=false;w.innerHTML=`<div class="admin-view-head"><div><span class="tag">AVAILABILITY</span><h3>時段功能</h3></div></div><p class="muted">正在載入時段功能…</p>`;}setTimeout(()=>window.dispatchEvent(new HashChangeEvent("hashchange")),0);return;}
   if(view==="settings")return renderSettings();
   if(view==="bookings"){
     setBaseVisibility(true);
@@ -108,7 +109,7 @@ function renderView(view){
 
 function bindSidebar(){
   const root=activeAdminRoot();if(!root)return false;const sidebar=root.querySelector(".sidebar");if(!sidebar)return false;
-  const map={"總覽":"dashboard","Dashboard":"dashboard","預約管理":"bookings","預約行事曆":"calendar","顧客資料":"customers","服務管理":"services","價格管理":"pricing","網站設定":"settings"};
+  const map={"總覽":"dashboard","Dashboard":"dashboard","預約管理":"bookings","預約行事曆":"calendar","顧客資料":"customers","服務管理":"services","服務功能":"services","時段功能":"slots","價格管理":"pricing","價格功能":"pricing","網站設定":"settings"};
   sidebar.querySelectorAll("a").forEach(link=>{const view=map[(link.textContent||"").trim()];if(!view||link.dataset.adminV2Bound)return;link.dataset.adminV2Bound="1";link.addEventListener("click",(event)=>{event.preventDefault();event.stopImmediatePropagation();sidebar.querySelectorAll("a").forEach(a=>a.classList.remove("on"));link.classList.add("on");history.replaceState(null,"",`${location.pathname}#${view}`);renderView(view);},true);});
   return true;
 }
@@ -122,7 +123,7 @@ function startData(){
 function init(){
   if(initialized)return; if(!getApps().length)return;
   const app=getApp();auth=getAuth(app);db=getFirestore(app);initialized=true;
-  onAuthStateChanged(auth,(user)=>{if(!user||user.isAnonymous)return;const timer=setInterval(()=>{if(bindSidebar()){clearInterval(timer);startData();const hash=(location.hash||"#dashboard").slice(1);if(["bookings","calendar","customers","services","pricing","settings"].includes(hash))renderView(hash);}},120);});
+  onAuthStateChanged(auth,(user)=>{if(!user||user.isAnonymous)return;const timer=setInterval(()=>{if(bindSidebar()){clearInterval(timer);startData();const hash=(location.hash||"#dashboard").slice(1);if(["bookings","calendar","customers","services","slots","pricing","settings"].includes(hash))renderView(hash);}},120);});
 }
 
 const boot=setInterval(()=>{if(getApps().length){clearInterval(boot);init();}},100);

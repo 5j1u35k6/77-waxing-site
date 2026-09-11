@@ -168,7 +168,7 @@ function syncFunctionLabels() {
     if (text === "服務管理") heading.textContent = "服務功能";
     if (text === "價格管理") heading.textContent = "價格功能";
   });
-  if (s?.dataset.adminV2Bound === "1" && !document.querySelector(".sidebar [data-admin-slot-link]")) {
+  if (s?.dataset.adminV2Bound === "1" && ![...document.querySelectorAll(".sidebar a")].some((link)=>(link.textContent||"").trim()==="時段功能")) {
     const link = document.createElement("a");
     link.href = "#slots";
     link.dataset.adminSlotLink = "1";
