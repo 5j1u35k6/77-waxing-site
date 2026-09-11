@@ -27,14 +27,14 @@ function home(){
   <section class="section soft"><div class="wrap narrow"><span class="tag">FAQ</span><h2>第一次最常先問的事</h2>${faqs()}</div></section>`;
 }
 function about(){
-  return hero('ABOUT 77','關於 77waxing','把每一次服務做得清楚、細心，也讓第一次來的人知道自己會經歷什麼。'))+
+  return hero('ABOUT 77','關於 77waxing','把每一次服務做得清楚、細心，也讓第一次來的人知道自己會經歷什麼。')+
   `<section class="section"><div class="wrap narrow"><span class="tag">STUDIO</span><h2>一對一的服務節奏</h2><p>77waxing 以預約制安排服務，讓每位顧客都有足夠的諮詢、施作與整理時間。對於怕痛、害羞或第一次接觸服務的人，也會在開始前先說明流程與注意事項。</p><div class="btns"><a class="btn dark" data-link href="${B}/services/">查看服務</a><a class="btn" href="${B}/booking/">立即預約</a></div></div></section>`;
 }
 function space(){
   return '';
 }
 function courses(){
-  return hero('COURSES','專業教學','教學內容與開課資訊會在確認後於此更新。'))+
+  return hero('COURSES','專業教學','教學內容與開課資訊會在確認後於此更新。')+
   `<section class="section"><div class="wrap narrow"><span class="tag">COURSES</span><h2>目前教學資訊整理中</h2><p>為避免放上尚未確認的課程內容、費用或時數，這個頁面只保留正式公告位置。</p></div></section>`;
 }
 function bookingShell(){
