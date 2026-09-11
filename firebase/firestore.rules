@@ -51,6 +51,9 @@ service cloud.firestore {
           'ownerUid',
           'customerName',
           'customerPhone',
+          'customerPhoneCountry',
+          'customerPhoneDialCode',
+          'customerPhoneInternational',
           'customerEmail',
           'customerLineId',
           'serviceName',
@@ -76,6 +79,13 @@ service cloud.firestore {
         && request.resource.data.customerPhone is string
         && request.resource.data.customerPhone.size() > 0
         && request.resource.data.customerPhone.size() <= 30
+        && request.resource.data.customerPhoneCountry is string
+        && request.resource.data.customerPhoneCountry.size() > 0
+        && request.resource.data.customerPhoneCountry.size() <= 80
+        && request.resource.data.customerPhoneDialCode is string
+        && request.resource.data.customerPhoneDialCode.matches('^\\+[0-9]{1,4}$')
+        && request.resource.data.customerPhoneInternational is string
+        && request.resource.data.customerPhoneInternational.matches('^\\+[0-9]{6,20}$')
         && request.resource.data.customerEmail is string
         && request.resource.data.customerEmail.size() > 3
         && request.resource.data.customerEmail.size() <= 160

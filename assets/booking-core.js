@@ -373,11 +373,26 @@ async function mount(root) {
       const lockIds = lockTimes.map((time) => lockId(selectedDate, time));
       const bookingRef = doc(collection(db, "bookings"));
       const lockRefs = lockIds.map((id) => doc(db, "availabilityLocks", id));
-      await runTransaction(db, async (transaction) => {
+      const phoneMetadataNote = `[手機國際資訊] ${phone.country.name} ${phone.country.dial}｜${phone.international}`;
+      const compatibilityNote = [note, phoneMetadataNote].filter(Boolean).join("\n").slice(0, 1000) || null;
+      const writeBooking = async (includePhoneMetadata) => runTransaction(db, async (transaction) => {
         for (const lockRef of lockRefs) { const snapshot = await transaction.get(lockRef); if (snapshot.exists()) throw new Error("SLOT_CONFLICT"); }
-        transaction.set(bookingRef, { ownerUid: user.uid, customerName: name, customerPhone: phone.local, customerPhoneCountry: phone.country.name, customerPhoneDialCode: phone.country.dial, customerPhoneInternational: phone.international, customerEmail: email, customerLineId: lineId || null, serviceName: `${selectedCategory.name}｜${selectedItem.name}`, preferredDate: selectedDate, preferredTime: selectedTime, status: "pending_confirmation", isFirstVisit: firstVisit, depositRequired: null, depositAmount: null, paymentStatus: "not_requested", durationMinutes: selectedItem.durationMinutes, bufferMinutes: selectedItem.blockMinutes - selectedItem.durationMinutes, lockIds, lockTimes, note: note || null, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+        const bookingData = { ownerUid: user.uid, customerName: name, customerPhone: phone.local, customerEmail: email, customerLineId: lineId || null, serviceName: `${selectedCategory.name}｜${selectedItem.name}`, preferredDate: selectedDate, preferredTime: selectedTime, status: "pending_confirmation", isFirstVisit: firstVisit, depositRequired: null, depositAmount: null, paymentStatus: "not_requested", durationMinutes: selectedItem.durationMinutes, bufferMinutes: selectedItem.blockMinutes - selectedItem.durationMinutes, lockIds, lockTimes, note: includePhoneMetadata ? (note || null) : compatibilityNote, createdAt: serverTimestamp(), updatedAt: serverTimestamp() };
+        if (includePhoneMetadata) {
+          bookingData.customerPhoneCountry = phone.country.name;
+          bookingData.customerPhoneDialCode = phone.country.dial;
+          bookingData.customerPhoneInternational = phone.international;
+        }
+        transaction.set(bookingRef, bookingData);
         lockRefs.forEach((lockRef, index) => transaction.set(lockRef, { bookingId: bookingRef.id, date: selectedDate, time: lockTimes[index], state: "held", createdAt: serverTimestamp(), updatedAt: serverTimestamp() }));
       });
+      try {
+        await writeBooking(true);
+      } catch (writeError) {
+        if (writeError?.code !== "permission-denied") throw writeError;
+        console.warn("Booking phone metadata is not accepted by deployed Firestore rules; retrying with compatible schema.");
+        await writeBooking(false);
+      }
       root.querySelectorAll(".step").forEach((element) => element.classList.remove("on"));
       root.querySelector(".steps").style.display = "none";
       root.querySelector(".success").classList.add("on");
