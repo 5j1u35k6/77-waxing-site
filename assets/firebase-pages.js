@@ -31,7 +31,7 @@ const DURATION_MINUTES = 90;
 const BUFFER_MINUTES = 30;
 const BLOCK_MINUTES = DURATION_MINUTES + BUFFER_MINUTES;
 const TIMES = [];
-for (let minutes = 600; minutes <= 1200; minutes += 30) {
+for (let minutes = 480; minutes <= 1200; minutes += 30) {
   TIMES.push(`${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`);
 }
 

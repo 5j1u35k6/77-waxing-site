@@ -187,7 +187,7 @@ function syncFunctionLabels() {
 }
 
 function timeOptions() {
-  const start = general.bookingStartTime || "10:00";
+  const start = general.bookingStartTime || "08:00";
   const end = general.bookingEndTime || "20:00";
   const [sh, sm] = start.split(":").map(Number);
   const [eh, em] = end.split(":").map(Number);

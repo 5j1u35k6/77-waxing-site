@@ -16,7 +16,7 @@ function applyBookingSettings(){
     if(!banner){banner=document.createElement('div');banner.className='runtime-booking-note';banner.dataset.runtimeBookingNote='1';root.prepend(banner)}
     banner.textContent=message;banner.hidden=false;
   }else if(banner)banner.hidden=true;
-  const start=settings.bookingStartTime||'10:00',end=settings.bookingEndTime||'20:00';
+  const start=settings.bookingStartTime||'08:00',end=settings.bookingEndTime||'20:00';
   root.querySelectorAll('[data-slot-time]').forEach(el=>{const t=el.dataset.slotTime||'';el.hidden=t<start||t>end});
   const max=Number(settings.maxAdvanceDays||60);
   if(Number.isFinite(max)&&max>0){
