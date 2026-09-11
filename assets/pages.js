@@ -22,24 +22,32 @@ const BEGINNER_FAQ=[
   },
   {
     question:'第一次熱蠟，需要先做什麼準備嗎？',
-    body:`<p>其實不用特別準備很多。</p><p>毛髮建議保留約 0.5–1 公分，大約至少一粒米的長度，不用自己先刮短。</p><p>當天保持肌膚乾爽，並先暫停去角質、酸類或較刺激性的保養。</p><p>如果真的不知道自己的毛長度適不適合，也不用太緊張，可以先私訊77詢問唷。🥰</p>`
+    body:`<p>其實不用特別準備很多。</p><p><mark class="beginner-highlight">毛髮建議保留約 0.5–1 公分</mark>，大約至少一粒米的長度，不用自己先刮短。</p><p>當天保持肌膚乾爽，並先暫停去角質、酸類或較刺激性的保養。</p><p>如果真的不知道自己的毛長度適不適合，也不用太緊張，可以先私訊77詢問唷。</p>`
   },
   {
     question:'一次大約需要多久？',
-    body:`<p>會依照不同部位、毛量，以及第一次或固定保養而有所不同。</p><p>以女士私密處熱蠟為例，77會預留約 1.5 小時，包含前面的簡單諮詢、確認肌膚狀況及完整操作時間。</p><p>77比較在意操作的細節和肌膚狀況，不會單純追求速度。</p><p>第一次來，我也會先跟妳說明等等怎麼進行、需要怎麼配合，不會一躺下就直接開始，讓妳慢慢熟悉之後再進行，也會安心很多。🥰</p>`
+    body:`<p>會依照不同部位、毛量，以及第一次或固定保養而有所不同。</p><p>以女士私密處熱蠟為例，77會預留約 1.5 小時，包含前面的簡單諮詢、確認肌膚狀況及完整操作時間。</p><p>77比較在意操作的<mark class="beginner-highlight">細節和肌膚狀況</mark>，不會單純追求速度。</p><p>第一次來，我也會先跟妳說明等等怎麼進行、需要怎麼配合，不會一躺下就直接開始，讓妳慢慢熟悉之後再進行，也會安心很多。</p>`
   },
   {
     question:'做一次之後，就不會再長了嗎？',
-    body:`<p>還是會長喔！</p><p>熱蠟是將毛髮從根部帶走，但因為毛髮本身有不同的生長週期，所以之後還是會慢慢長回來。</p><p>固定保養一段時間後，很多客人會發現新長出來的毛髮比較細，摸起來也不會像刮毛後一樣刺刺的。</p><p>之後再依照每個人的毛髮生長速度，大約4-6週安排適合自己的保養時間就可以了。</p>`
+    body:`<p>還是會長喔！</p><p>熱蠟是將毛髮從根部帶走，但因為毛髮本身有不同的生長週期，所以之後還是<mark class="beginner-highlight">會慢慢長回來。</mark></p><p>固定保養一段時間後，很多客人會發現新長出來的毛髮比較細，摸起來也不會像刮毛後一樣刺刺的。</p><p><mark class="beginner-highlight beginner-highlight-long">之後再依照每個人的毛髮生長速度，大約4-6週安排適合自己的保養時間就可以了。</mark></p>`
   },
   {
     question:'我的皮膚比較敏感，也適合做熱蠟嗎？',
-    body:`<p>大部分情況都可以先評估，但不是每一種肌膚狀態都一定適合當下操作。</p><p>如果有明顯破皮、發炎、感染、曬傷，或近期正在使用較刺激性的酸類、藥物，都會先確認當下的肌膚狀況，再決定是否適合進行。</p><p>對77來說，能不能安全地做，比一定要把這次服務做完更重要。</p>`
+    body:`<p>大部分情況都可以先評估，但<mark class="beginner-highlight">不是每一種肌膚狀態都一定適合當下操作</mark>。</p><p>如果有明顯破皮、發炎、感染、曬傷，或近期正在使用較刺激性的酸類、藥物，都會先確認當下的肌膚狀況，再決定是否適合進行。</p><p>對77來說，能不能安全地做，比一定要把這次服務做完更重要。</p>`
   },
   {
     question:'第一次做私密處熱蠟，會不會很尷尬？',
-    body:`<p>這真的是第一次來的客人最常擔心的事情之一。🥹</p><p>但對77來說，私密處熱蠟就是很日常、也很專業的一項服務。</p><p>過程中我會一步一步告訴妳現在要做什麼、姿勢要怎麼調整，也會盡量減少不必要的暴露。</p><p>所以真的不用擔心自己的毛量、膚色，或者身體狀態是不是「很奇怪」。</p><p>每個人的身體本來就不一樣。</p><p>妳只需要安心躺好，剩下的交給77就可以了。🤍</p>`
+    body:`<p>這真的是第一次來的客人最常擔心的事情之一。</p><p>但對77來說，私密處熱蠟就是很日常、也很專業的一項服務。</p><p>過程中我會一步一步告訴妳現在要做什麼、姿勢要怎麼調整，也會盡量減少不必要的暴露。</p><p>所以真的不用擔心自己的毛量、膚色，或者身體狀態是不是「很奇怪」。</p><p>每個人的身體本來就不一樣。</p><p><mark class="beginner-highlight beginner-highlight-long">妳只需要安心躺好，剩下的交給77就可以了。</mark></p>`
   }
+];
+const HOME_FAQ=[
+  ['熱蠟除毛會很痛嗎？','每個人的疼痛感受都不一樣。第一次因為毛髮通常比較粗、毛量也比較多，感覺會相對明顯一些；77會依照部位、毛髮方向及肌膚狀況調整手法。'],
+  ['第一次熱蠟，需要先做什麼準備嗎？','毛髮建議保留約 0.5–1 公分，大約至少一粒米的長度，不用自己先刮短。當天保持肌膚乾爽，並先暫停去角質、酸類或較刺激性的保養。'],
+  ['一次大約需要多久？','會依照不同部位、毛量，以及第一次或固定保養而有所不同。以女士私密處熱蠟為例，77會預留約 1.5 小時，包含簡單諮詢、確認肌膚狀況及完整操作時間。'],
+  ['做一次之後，就不會再長了嗎？','還是會長喔！熱蠟將毛髮從根部帶走，但毛髮有不同的生長週期，之後會慢慢長回來；可依每個人的生長速度，大約 4–6 週安排保養。'],
+  ['我的皮膚比較敏感，也適合做熱蠟嗎？','大部分情況都可以先評估，但不是每一種肌膚狀態都一定適合當下操作。若有破皮、發炎、感染、曬傷，或近期使用較刺激性的酸類、藥物，會先確認肌膚狀況。'],
+  ['第一次做私密處熱蠟，會不會很尷尬？','不用擔心毛量、膚色，或者身體狀態是不是「很奇怪」。過程中會一步一步說明，也會盡量減少不必要的暴露；妳只需要安心躺好，剩下的交給77就可以了。']
 ];
 const FLOW_SCENES={
   arrival:`<svg viewBox="0 0 220 190" aria-hidden="true"><path class="scene-bg" d="M29 170V87C29 42 65 10 110 10s81 32 81 77v83Z"/><g class="scene-line"><path d="M35 157c20-10 41-13 63-8m68 8c-8-16-20-25-37-29"/><circle cx="83" cy="67" r="20"/><path d="M64 65c4-19 29-29 43-11m-37 27c4 7 10 10 17 10 8 0 14-3 19-11M70 92l-6 48m40-47 8 45M64 111c17 7 31 7 48 0"/><path d="M77 105h36l-4 31H73Z"/><circle cx="151" cy="93" r="17"/><path d="M139 79c17-10 31 1 30 17m-37 28c5-13 12-20 21-21 14-2 25 11 26 38m-45-3c3-11 8-20 16-25"/><path d="M51 126c-9 4-15 9-20 17m151-15c6 7 10 14 12 23"/></g></svg>`,
@@ -52,10 +60,11 @@ const experienceFlow=()=>`<div class="experience-flow">${FLOW_STEPS.map(([scene,
 function home(){
   return `<section class="hero"><div class="wrap hero-grid"><div><span class="tag">77WAXING · KEELUNG BEAUTY STUDIO</span><h1 class="home-reassurance"><span>只需要安心躺好，剩下的交給77就可以了。</span><small>安心瞓好，剩低嘅交畀77就得喇。</small></h1><p class="lead">怕痛、害羞、不知道第一次要準備什麼，都不用先變成專家。把服務、流程、價目與預約說清楚，讓你在決定以前就先感到安心。</p><div class="btns"><a class="btn dark" href="${B}/booking/">預約時段讓自己更好</a><a class="btn" data-link href="${B}/services/">77waxing提供的服務</a></div></div><div class="art" aria-hidden="true"></div></div></section>
   <section class="section soft"><div class="wrap"><div class="head"><div><span class="tag">START HERE</span><h2>第一次，不需要一次懂全部。</h2></div></div><div class="grid4">${SERVICE_CARDS.map(([name,desc,slug],i)=>`<article class="card"><div class="num">0${i+1}</div><h3>${name}</h3><p>${desc}</p><a href="${B}/services/${slug}/" data-catalog-link>了解服務 →</a></article>`).join('')}</div></div></section>
-  <section class="section home-safe-section"><div class="wrap home-safe-layout"><div class="art home-safe-art" aria-hidden="true"></div><div class="home-safe-copy"><span class="tag">SAFE SPACE</span><h2 class="home-safe-title">把「會不會尷尬」先放下。</h2>${experienceFlow()}<a class="btn home-safe-button" data-link href="${B}/beginner/">第一次熱蠟｜小白小白專區 →</a></div></div></section>`;
+  <section class="section home-safe-section"><div class="wrap home-safe-layout"><div class="art home-safe-art" aria-hidden="true"></div><div class="home-safe-copy"><span class="tag">SAFE SPACE</span><h2 class="home-safe-title">把「會不會尷尬」先放下。</h2>${experienceFlow()}</div></div></section>
+  <section class="section home-faq-section"><div class="wrap narrow"><div class="home-faq-head"><span class="tag">FIRST WAX FAQ</span><h2>第一次熱蠟，可能也會想問...</h2></div><div class="home-faq">${HOME_FAQ.map(([q,a],i)=>`<details><summary><span>Q${i+1}</span>${q}</summary><p>${a}</p></details>`).join('')}</div></div></section>`;
 }
 function beginner(){
-  return `<section class="pagehero beginner-hero"><div class="wrap narrow"><span class="tag">FIRST WAX · 小白小白專區</span><h1>第一次熱蠟，妳可能也會想問..</h1><p class="lead">第一次嘗試熱蠟，會緊張、怕痛，甚至不知道要先準備什麼，其實都很正常。</p><p class="lead">希望在來之前，先把妳最在意的事情說清楚，讓第一次也可以安心一點。🥰</p></div></section>
+  return `<section class="pagehero beginner-hero"><div class="wrap narrow"><span class="tag">FIRST WAX · 小白小白專區</span><h1>第一次熱蠟，可能也會想問...</h1><p class="lead">第一次嘗試熱蠟，會緊張、怕痛，甚至不知道要先準備什麼，其實都很正常。</p><p class="lead">希望在來之前，先把最在意的事情說清楚，讓第一次也可以安心一點。</p></div></section>
   <section class="section beginner-section"><div class="wrap narrow"><div class="beginner-faq">${BEGINNER_FAQ.map((item,i)=>`<article class="beginner-card"><div class="beginner-q">Q${i+1}</div><div class="beginner-copy"><h2>${item.question}</h2>${item.body}</div></article>`).join('')}</div><div class="beginner-outro"><strong>第一次不用很勇敢，剩下的交給77就好。</strong><p>從諮詢、確認肌膚狀況，到每一次操作，我都會一步一步告訴妳現在正在做什麼。</p><p>比起把速度做到最快，77WAXING 更在意每一次拉除的細節、妳當下的感受，以及做完之後，妳會願意放心地再回來。</p><div class="btns"><a class="btn dark" href="${B}/booking/">安心預約第一次</a></div></div></div></section>`;
 }
 function about(){
@@ -94,7 +103,7 @@ function applyRedirectQuery(){
 function syncHeader(path){
   document.querySelectorAll('.header nav > a').forEach(a=>{
     const href=new URL(a.href,location.href).pathname;
-    const on=path==='/'?href===`${B}/`:path.startsWith('/services/')?href===`${B}/services/`:href===`${B}${path}`;
+    const on=path==='/'?href===`${B}/`:path==='/beginner/'?href===`${B}/about/`:path.startsWith('/services/')?href===`${B}/services/`:href===`${B}${path}`;
     a.classList.toggle('on',on);
   });
 }

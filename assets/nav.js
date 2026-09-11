@@ -199,3 +199,52 @@
  sync();
  requestAnimationFrame(()=>syncCursor(true));
 })();
+
+
+// About submenu: About -> 小白小白
+(()=>{
+  const header=document.querySelector('.header');
+  const nav=header?.querySelector('nav');
+  if(!header||!nav||nav.querySelector('.about-flyout'))return;
+  const B=location.hostname.endsWith('github.io')?'/77-waxing-site':'';
+  const aboutLink=[...nav.children].find(el=>{
+    if(!el.matches?.('a'))return false;
+    try{return new URL(el.href,location.href).pathname.replace(/\/$/,'').endsWith('/about')}catch{return false}
+  });
+  if(!aboutLink)return;
+  const flyout=document.createElement('div');
+  flyout.className='about-flyout';
+  flyout.setAttribute('aria-label','關於選單');
+  flyout.innerHTML=`<a href="${B}/about/" data-link><span>關於77waxing</span><small>ABOUT 77WAXING</small></a><a href="${B}/beginner/" data-link><span>小白小白</span><small>FIRST WAX</small></a>`;
+  aboutLink.after(flyout);
+  aboutLink.dataset.aboutTrigger='1';
+  aboutLink.setAttribute('aria-haspopup','true');
+  aboutLink.setAttribute('aria-expanded','false');
+  const isDesktop=()=>innerWidth>850;
+  let timer=0;
+  const position=()=>{
+    if(!isDesktop())return;
+    const nr=nav.getBoundingClientRect(),r=aboutLink.getBoundingClientRect();
+    flyout.style.left=`${r.left-nr.left+r.width/2}px`;
+    flyout.style.top=`${r.bottom-nr.top+16}px`;
+  };
+  const show=()=>{clearTimeout(timer);position();flyout.classList.add('on');aboutLink.classList.add('about-open');aboutLink.setAttribute('aria-expanded','true')};
+  const hide=()=>{clearTimeout(timer);flyout.classList.remove('on');aboutLink.classList.remove('about-open');aboutLink.setAttribute('aria-expanded','false')};
+  const schedule=()=>{if(isDesktop()){clearTimeout(timer);timer=setTimeout(hide,130)}};
+  aboutLink.addEventListener('mouseenter',()=>{if(isDesktop())show()});
+  aboutLink.addEventListener('mouseleave',schedule);
+  aboutLink.addEventListener('focus',()=>{if(isDesktop())show()});
+  flyout.addEventListener('mouseenter',()=>clearTimeout(timer));
+  flyout.addEventListener('mouseleave',schedule);
+  flyout.addEventListener('focusin',()=>clearTimeout(timer));
+  flyout.addEventListener('focusout',e=>{if(isDesktop()&&!flyout.contains(e.relatedTarget))schedule()});
+  aboutLink.addEventListener('click',event=>{
+    if(isDesktop())return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    flyout.classList.contains('on')?hide():show();
+  },true);
+  flyout.addEventListener('click',hide);
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')hide()});
+  addEventListener('resize',hide);
+})();
