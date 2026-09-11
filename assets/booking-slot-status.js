@@ -119,6 +119,16 @@ function schedule() {
   queued = true;
   requestAnimationFrame(augment);
 }
+function hasValidPickedSlot() {
+  return Boolean(document.querySelector("#booking [data-dayrail] .slot.pick:not(.blocked):not(.held):not(:disabled)"));
+}
+function returnToSlotStep() {
+  const root = document.querySelector("#booking");
+  const step4Prev = root?.querySelector('[data-step="4"] [data-prev]');
+  const step3Prev = root?.querySelector('[data-step="3"] [data-prev]');
+  if (step4Prev) step4Prev.click();
+  setTimeout(() => { if (step3Prev) step3Prev.click(); }, 0);
+}
 function start() {
   if (started) return;
   started = true;
@@ -126,7 +136,22 @@ function start() {
   new MutationObserver(schedule).observe(appRoot, { childList: true, subtree: true });
   window.addEventListener("77waxing:catalog-ready", schedule);
   document.addEventListener("click", (event) => {
-    if (event.target.closest?.("#booking [data-booking-item],#booking [data-visible-date],#booking [data-anchor-date],#booking [data-slot-time]")) setTimeout(schedule, 0);
+    const target = event.target.closest?.("#booking [data-booking-item],#booking [data-visible-date],#booking [data-anchor-date],#booking [data-slot-time]");
+    if (target) setTimeout(schedule, 0);
+    const step2Next = event.target.closest?.('#booking [data-step="2"] [data-next]');
+    if (step2Next && !hasValidPickedSlot()) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      alert("請重新選擇可預約時段。");
+      return;
+    }
+    const submit = event.target.closest?.("#booking [data-submit]");
+    if (submit && !hasValidPickedSlot()) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      alert("剛才選擇的時段目前已無法預約，請重新選擇。");
+      returnToSlotStep();
+    }
   }, true);
   schedule();
 }
