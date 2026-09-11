@@ -74,6 +74,14 @@
 - 店家手動保留需依服務實際占用區間做重疊判定，不能只檢查單一起始 30 分鐘。
 - 若顧客已選的時段之後被店家封鎖，進入下一步或送出前必須阻止使用舊選擇並要求重選。
 
+## 前端服務／價目資料不可回歸項目
+
+- 正式服務頁與價目頁只能由 `assets/catalog-dynamic.js` 一套 renderer 產生；不得再恢復 `catalog-v1.js` 先畫靜態舊資料、再由動態資料覆蓋的雙 renderer 架構。
+- 已移除 `assets/catalog-v1.js` 與 `assets/catalog-copy-v1.js`；`catalog-v1.css` 僅作正式動態服務頁的樣式表，可保留。
+- 手機與桌機進入「服務」四個分類時，不得先閃現缺少項目、錯誤施作時間或其他舊資料，再數秒後更新。
+- `catalog-dynamic.js` 使用 `localStorage` key `77waxing-public-catalog-v1` 快取最近一次已確認的公開服務資料：有快取時立即顯示，再由 Firestore 背景更新；沒有快取時只顯示中性的「正在載入最新服務內容…」，不可顯示假資料或舊資料。
+- Firestore 最新資料載入後必須更新本機快取，並由 `watchCatalog()` 持續同步後台服務／價格異動。
+
 ## 首頁開場動畫不可回歸項目
 
 - 首頁開場不再使用檯燈／拉繩／點燈互動；正式版本為深色背景上的純 `77waxing` 品牌字標動畫。
@@ -109,9 +117,9 @@
 - Email Apps Script source：`apps-script/Code.gs` v25。
 - 正式 Email footer：`assets/email-footer-77waxing-v25.jpg`，以公開 HTTPS `<img>` 顯示於正文；禁止改回 CID / `inlineImages`，避免手機 Gmail 出現附件卡片。
 - 管理後台 `admin/index.html` 必須最後載入 `assets/admin-critical-preserve.js`，並保留 `admin-time-range.js`、`admin-record-actions.js`。
-- Email／時間／刪除基準 cache-busting 為 `20260911-0048`；顧客快速資料與前端時段顏色基準為 `20260911-0841`；原生側欄路由基準為 `20260911-0904`；`admin-ux.js` 路由式側欄正規化基準為 `20260911-0912`；時段功能彈出式日期月曆基準為 `20260911-0916`；單一日期選項隱藏原生欄位基準為 `20260911-0921`；時段日期「最早明天」同步前端邏輯基準為 `20260911-0924`；首頁品牌字標動畫最新基準為 `20260911-1015`。
+- Email／時間／刪除基準 cache-busting 為 `20260911-0048`；顧客快速資料與前端時段顏色基準為 `20260911-0841`；原生側欄路由基準為 `20260911-0904`；`admin-ux.js` 路由式側欄正規化基準為 `20260911-0912`；時段功能彈出式日期月曆基準為 `20260911-0916`；單一日期選項隱藏原生欄位基準為 `20260911-0921`；時段日期「最早明天」同步前端邏輯基準為 `20260911-0924`；首頁品牌字標動畫最新基準為 `20260911-1015`；前端單一動態 catalog 基準為 `20260911-1022`。
 - 預約時段資料源已由 `10:00` 前移至 `08:00`，相關正式腳本（含 `admin-v2.js`、`booking-v3.js`、`firebase-pages.js`、`runtime-settings.js`、`booking-slot-status.js`、`admin-functions.js`）需維持此基準。
-- 任何 Email、圖片、後台 UI 更新完成後，都必須再次驗證：① Gmail footer 在正文內、無附件卡片；② 預約時間為開始–結束；③ 每筆預約都有永久刪除功能；④ 顧客姓名可點出聯絡／歷史資料；⑤ 客別只顯示新／舊；⑥ 時段功能仍可封鎖與恢復；⑦ 前端 held 黃色、confirmed/manual 灰色；⑧ 側欄順序與點擊路由皆為服務功能／時段功能／價格功能／網站設定，且每個路由只出現一次；⑨ 網站設定與前端時段可從 08:00 開始；⑩ 時段功能只顯示左側日期選項，點擊後彈出小型月曆，選日後自動關閉；⑪ 前端與後台時段月曆都禁止選今天與過去日期，最早可選明天；⑫ 首頁開場維持 `77` 金色、`waxing` 淺暖白、掃亮約 4.28 秒、`g` 不裁切，且桌機／手機掃光範圍縮小約 5–10%。
+- 任何 Email、圖片、後台 UI 更新完成後，都必須再次驗證：① Gmail footer 在正文內、無附件卡片；② 預約時間為開始–結束；③ 每筆預約都有永久刪除功能；④ 顧客姓名可點出聯絡／歷史資料；⑤ 客別只顯示新／舊；⑥ 時段功能仍可封鎖與恢復；⑦ 前端 held 黃色、confirmed/manual 灰色；⑧ 側欄順序與點擊路由皆為服務功能／時段功能／價格功能／網站設定，且每個路由只出現一次；⑨ 網站設定與前端時段可從 08:00 開始；⑩ 時段功能只顯示左側日期選項，點擊後彈出小型月曆，選日後自動關閉；⑪ 前端與後台時段月曆都禁止選今天與過去日期，最早可選明天；⑫ 首頁開場維持 `77` 金色、`waxing` 淺暖白、掃亮約 4.28 秒、`g` 不裁切，且桌機／手機掃光範圍縮小約 5–10%；⑬ 手機／桌機服務頁只使用 dynamic catalog，不閃現舊資料或錯誤施作時間。
 
 ## 2026-09-10 最新需求
 
@@ -124,6 +132,7 @@
 - 已移除未被正式頁面載入的舊 runtime／補丁：`admin-catalog-route-bridge.js`、`booking-boot.js`、`booking-display-fix.js`、`booking-prefill-direct.js`。
 - 已移除舊首頁實驗資產 `home-intro.css` 與 `/intro-demo/`，正式首頁仍保留目前實際使用的 `home-warm-intro.js/.css`。
 - 已移除 Next.js 已被 `booking-wizard-v2.tsx` 取代的 `booking-wizard.tsx`。
+- 已移除舊前台靜態 catalog renderer `catalog-v1.js` 與舊文案補丁 `catalog-copy-v1.js`；正式服務／價目只保留 `catalog-dynamic.js`。
 - `admin-functions.js` 不再改寫側欄文字或動態插入 `#slots`；側欄唯一來源維持 `firebase-pages.js` + `admin-v2.js`。
 - `booking-v3.js` 已移除不再使用的 `booking-boot` 相容碼。
 - 一次性舊 footer workflow 與 CI workflow 的整理由 GitHub 連線直接處理，不由 Actions 自我修改。
