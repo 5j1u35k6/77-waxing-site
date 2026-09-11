@@ -5,6 +5,7 @@
 ## 架構
 
 - 正式站為 GitHub Pages 靜態前台：`/`、`/booking/`、`/admin/`。
+- 正式資產使用穩定名稱，不再以 `v1/v2/v3/v4` 表示目前版本；核心入口為 `nav.js`、`booking-core.js`、`admin-core.js`、`admin-firebase.js`、`admin-dashboard.js`、`catalog.css`、`footer.css`。
 - Firebase Authentication + Cloud Firestore 是正式資料層。
 - Google Apps Script `apps-script/Code.gs` 負責預約 Email。
 - 服務／價目唯一公開 renderer 為 `assets/catalog-dynamic.js`；資料來源為 `services/catalog-main`，並使用瀏覽器快取後再背景同步 Firestore。
