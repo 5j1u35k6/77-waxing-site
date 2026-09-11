@@ -201,7 +201,7 @@
 })();
 
 
-// About submenu: About -> 小白小白
+// About submenu: story / first visit / beginner
 (()=>{
   const header=document.querySelector('.header');
   const nav=header?.querySelector('nav');
@@ -215,7 +215,7 @@
   const flyout=document.createElement('div');
   flyout.className='about-flyout';
   flyout.setAttribute('aria-label','關於選單');
-  flyout.innerHTML=`<a href="${B}/about/" data-link><span>關於77waxing</span><small>ABOUT 77WAXING</small></a><a href="${B}/beginner/" data-link><span>小白小白</span><small>FIRST WAX</small></a>`;
+  flyout.innerHTML=`<a href="${B}/about/" data-link><span>77waxing故事</span><small>77WAXING STORY</small></a><a href="${B}/first-visit/" data-link><span>首訪的你</span><small>FIRST VISIT</small></a><a href="${B}/beginner/" data-link><span>小白小白</span><small>FIRST WAX</small></a>`;
   aboutLink.after(flyout);
   aboutLink.dataset.aboutTrigger='1';
   aboutLink.setAttribute('aria-haspopup','true');

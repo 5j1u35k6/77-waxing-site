@@ -4,7 +4,7 @@
 
 ## 架構
 
-- 正式站為 GitHub Pages 靜態前台：`/`、`/beginner/`、`/booking/`、`/admin/`。
+- 正式站為 GitHub Pages 靜態前台：`/`、`/about/`、`/first-visit/`、`/beginner/`、`/booking/`、`/admin/`。
 - 正式資產使用穩定名稱，不再以 `v1/v2/v3/v4` 表示目前版本；核心入口為 `nav.js`、`booking-core.js`、`admin-core.js`、`admin-firebase.js`、`admin-dashboard.js`、`catalog.css`、`footer.css`、`beginner.css`。
 - Firebase Authentication + Cloud Firestore 是正式資料層。
 - Google Apps Script `apps-script/Code.gs` 負責預約 Email。
@@ -50,6 +50,8 @@
 - SAFE SPACE 區塊使用「左側較小品牌情境圖 + 右側三步驟圖文流程」版型；三步驟為 `抵達與接待 → 諮詢與評估 → 施作與衛教`。
 - SAFE SPACE 三步驟每一步都要有柔和米色底、細線條人物情境圖、編號、標題與說明；桌機橫向以細箭頭串接，手機改為縱向流程，整體維持柔和、有質感的視覺。
 - SAFE SPACE 區塊不顯示「第一次熱蠟｜小白小白專區」按鈕；小白小白由頂部選單 `關於 → 小白小白` 進入。
+- 頂部「關於」選單固定三項：`77waxing故事 → /about/`、`首訪的你 → /first-visit/`、`小白小白 → /beginner/`。
+- `/about/` 不再內嵌「首訪的你」或「小白小白」區塊；`/first-visit/` 為獨立首訪頁，承接原本的首訪流程內容。
 - 首頁底部 FAQ 使用小白小白專區內容的精簡版，共 6 題，以摺疊問答顯示；完整說明仍保留在 `/beginner/`。
 - `/beginner/` 標題固定為「第一次熱蠟，可能也會想問...」；副標「希望在來之前，先把最在意的事情說清楚，讓第一次也可以安心一點。」不使用「妳」。
 - `/beginner/` 全頁不使用表情符號。Q1 的「原來沒有想像中那麼可怕。」維持引用標記；Q2「毛髮建議保留約 0.5–1 公分」、Q3「細節和肌膚狀況」、Q4「會慢慢長回來。」及「之後再依照每個人的毛髮生長速度，大約4-6週安排適合自己的保養時間就可以了。」、Q5「不是每一種肌膚狀態都一定適合當下操作」、Q6「妳只需要安心躺好，剩下的交給77就可以了。」使用同系暖色重點標記。

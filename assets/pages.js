@@ -71,6 +71,10 @@ function about(){
   return hero('ABOUT 77','關於 77waxing','把每一次服務做得清楚、細心，也讓第一次來的人知道自己會經歷什麼。')+
   `<section class="section"><div class="wrap narrow"><span class="tag">STUDIO</span><h2>一對一的服務節奏</h2><p>77waxing 以預約制安排服務，讓每位顧客都有足夠的諮詢、施作與整理時間。對於怕痛、害羞或第一次接觸服務的人，也會在開始前先說明流程與注意事項。</p><div class="btns"><a class="btn dark" data-link href="${B}/services/">查看服務</a><a class="btn" href="${B}/booking/">立即預約</a></div></div></section>`;
 }
+function firstVisit(){
+  return hero('FIRST VISIT','首訪的你','第一次來店前，可以先知道接待、需求確認、服務前說明、施作與術後照護會怎麼進行。')+
+  `<section class="section soft"><div class="wrap narrow"><ol class="flow"><li><b>抵達與接待</b><small>確認預約項目與當天身體狀況。</small></li><li><b>需求諮詢</b><small>第一次、怕痛或有特別在意的地方都可以先說。</small></li><li><b>服務前說明</b><small>開始前確認服務範圍與流程。</small></li><li><b>一對一施作</b><small>過程中有任何不適都可以即時調整。</small></li><li><b>術後照護</b><small>完成後確認居家照護方式與後續建議。</small></li></ol></div></section>`;
+}
 function space(){
   return '';
 }
@@ -103,7 +107,7 @@ function applyRedirectQuery(){
 function syncHeader(path){
   document.querySelectorAll('.header nav > a').forEach(a=>{
     const href=new URL(a.href,location.href).pathname;
-    const on=path==='/'?href===`${B}/`:path==='/beginner/'?href===`${B}/about/`:path.startsWith('/services/')?href===`${B}/services/`:href===`${B}${path}`;
+    const on=path==='/'?href===`${B}/`:(path==='/beginner/'||path==='/first-visit/')?href===`${B}/about/`:path.startsWith('/services/')?href===`${B}/services/`:href===`${B}${path}`;
     a.classList.toggle('on',on);
   });
 }
@@ -122,6 +126,7 @@ function render(){
   if(path==='/')app.innerHTML=home();
   else if(path==='/beginner/')app.innerHTML=beginner();
   else if(path==='/about/')app.innerHTML=about();
+  else if(path==='/first-visit/')app.innerHTML=firstVisit();
   else if(path==='/space/')app.innerHTML=space();
   else if(path==='/courses/')app.innerHTML=courses();
   else if(path==='/booking/')app.innerHTML=bookingShell();
