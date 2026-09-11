@@ -58,7 +58,7 @@
 - `assets/admin-ux.js` 若需正規化側欄，只能依 `#dashboard/#bookings/#calendar/#customers/#services/#slots/#pricing/#settings` 路由辨識；禁止依 DOM 位置改文字，且必須自動移除重複路由連結。
 - 「服務功能」維持既有服務分類／項目管理；「價格功能」維持既有價格調整。
 - 「時段功能」可依日期將單一 30 分鐘時段或整天空白時段設定為「其他行程／休息／私人行程／暫停預約」，也可以恢復開放。
-- 「時段功能」日期欄平時只顯示目前選定日期；點擊日期後才開啟與後台風格一致的小型卡片式月曆視窗，選擇日期後自動關閉。不可恢復成整張月曆長駐頁面，也不以原生 date input 作為主要介面。
+- 「時段功能」日期區只保留左側自訂日期按鈕；原生 `date` 輸入欄只作資料同步且必須隱藏，不可同時顯示兩個日期欄位。點擊左側日期按鈕後才開啟與後台風格一致的小型卡片式月曆視窗，選擇日期後自動關閉。
 - 店家手動時段保留存於 `settings/availability_YYYY-MM-DD`，欄位 `blockedTimes`；沿用既有 `settings/{settingId}` 管理員寫入權限，不新增未部署的 Firestore rule 依賴。
 - 店家手動解除時段只解除店家設定，不得釋放既有顧客 booking lock。
 - `網站設定 > 每日最早可約時間` 的選項從 `08:00` 開始；若尚未設定，預設值為 `08:00`。
@@ -78,7 +78,7 @@
 - `assets/admin-record-actions.js`：既有預約／顧客刪除功能。
 - `assets/admin-critical-preserve.js`：最後載入的保護層，DOM 被其他管理腳本重繪後會再次補回時間區間與預約刪除按鈕。
 - `assets/admin-functions.js` + `assets/admin-functions.css`：顧客快速資料、`新／舊` 客別、時段功能資料操作。
-- `assets/admin-slot-calendar.js` + `assets/admin-slot-calendar.css`：時段功能的日期按鈕＋小型彈出月曆；透過既有 `data-slot-date` 事件同步日期，不重寫 Firestore 操作。
+- `assets/admin-slot-calendar.js` + `assets/admin-slot-calendar.css`：時段功能的單一日期按鈕＋小型彈出月曆；透過隱藏的 `data-slot-date` 欄位同步日期，不重寫 Firestore 操作。
 - `assets/admin-ux.js`：依 hash 路由固定側欄文字／順序並去除重複項目；不得再改回位置式 labels 陣列。
 - `assets/booking-slot-status.js` + `assets/booking-slot-status.css`：前端黃色保留、灰色已約／店家保留與手動封鎖同步。
 - 已移除舊的 `assets/admin-menu-settings-fix.js`；不得恢復以 DOM 位置重命名／隱藏側欄的做法。
@@ -96,9 +96,9 @@
 - Email Apps Script source：`apps-script/Code.gs` v25。
 - 正式 Email footer：`assets/email-footer-77waxing-v25.jpg`，以公開 HTTPS `<img>` 顯示於正文；禁止改回 CID / `inlineImages`，避免手機 Gmail 出現附件卡片。
 - 管理後台 `admin/index.html` 必須最後載入 `assets/admin-critical-preserve.js`，並保留 `admin-time-range.js`、`admin-record-actions.js`。
-- Email／時間／刪除基準 cache-busting 為 `20260911-0048`；顧客快速資料與前端時段顏色基準為 `20260911-0841`；原生側欄路由基準為 `20260911-0904`；`admin-ux.js` 路由式側欄正規化基準為 `20260911-0912`；時段功能彈出式日期月曆基準為 `20260911-0916`。
+- Email／時間／刪除基準 cache-busting 為 `20260911-0048`；顧客快速資料與前端時段顏色基準為 `20260911-0841`；原生側欄路由基準為 `20260911-0904`；`admin-ux.js` 路由式側欄正規化基準為 `20260911-0912`；時段功能彈出式日期月曆基準為 `20260911-0916`；單一日期選項隱藏原生欄位基準為 `20260911-0921`。
 - 預約時段資料源已由 `10:00` 前移至 `08:00`，相關正式腳本（含 `admin-v2.js`、`booking-v3.js`、`firebase-pages.js`、`runtime-settings.js`、`booking-slot-status.js`、`admin-functions.js`）需維持此基準。
-- 任何 Email、圖片、後台 UI 更新完成後，都必須再次驗證：① Gmail footer 在正文內、無附件卡片；② 預約時間為開始–結束；③ 每筆預約都有永久刪除功能；④ 顧客姓名可點出聯絡／歷史資料；⑤ 客別只顯示新／舊；⑥ 時段功能仍可封鎖與恢復；⑦ 前端 held 黃色、confirmed/manual 灰色；⑧ 側欄順序與點擊路由皆為服務功能／時段功能／價格功能／網站設定，且每個路由只出現一次；⑨ 網站設定與前端時段可從 08:00 開始；⑩ 時段功能日期為點擊後彈出小型月曆，選日後自動關閉。
+- 任何 Email、圖片、後台 UI 更新完成後，都必須再次驗證：① Gmail footer 在正文內、無附件卡片；② 預約時間為開始–結束；③ 每筆預約都有永久刪除功能；④ 顧客姓名可點出聯絡／歷史資料；⑤ 客別只顯示新／舊；⑥ 時段功能仍可封鎖與恢復；⑦ 前端 held 黃色、confirmed/manual 灰色；⑧ 側欄順序與點擊路由皆為服務功能／時段功能／價格功能／網站設定，且每個路由只出現一次；⑨ 網站設定與前端時段可從 08:00 開始；⑩ 時段功能只顯示左側日期選項，點擊後彈出小型月曆，選日後自動關閉。
 
 ## 2026-09-10 最新需求
 
