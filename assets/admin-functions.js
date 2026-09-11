@@ -2,7 +2,7 @@ import { getApp, getApps } from "https://www.gstatic.com/firebasejs/12.18.0/fire
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
 import { collection, doc, getFirestore, onSnapshot, query, serverTimestamp, setDoc, where } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
 
-const VERSION = "20260911-0841";
+const VERSION = "20260911-0931";
 let db = null;
 let auth = null;
 let bookings = [];
@@ -150,40 +150,6 @@ function enhanceBookingRows() {
       }
     }
   });
-}
-
-function serviceLink() {
-  return [...document.querySelectorAll(".sidebar a")].find((link) => ["服務管理", "服務功能"].includes((link.textContent || "").trim()));
-}
-function priceLink() {
-  return [...document.querySelectorAll(".sidebar a")].find((link) => ["價格管理", "價格功能"].includes((link.textContent || "").trim()));
-}
-function syncFunctionLabels() {
-  const s = serviceLink();
-  const p = priceLink();
-  if (s?.dataset.adminV2Bound === "1" && (s.textContent || "").trim() !== "服務功能") s.textContent = "服務功能";
-  if (p?.dataset.adminV2Bound === "1" && (p.textContent || "").trim() !== "價格功能") p.textContent = "價格功能";
-  document.querySelectorAll(".catalog-admin-head h3,.admin-v2-workspace .admin-view-head h3").forEach((heading) => {
-    const text = (heading.textContent || "").trim();
-    if (text === "服務管理") heading.textContent = "服務功能";
-    if (text === "價格管理") heading.textContent = "價格功能";
-  });
-  if (s?.dataset.adminV2Bound === "1" && ![...document.querySelectorAll(".sidebar a")].some((link)=>(link.textContent||"").trim()==="時段功能")) {
-    const link = document.createElement("a");
-    link.href = "#slots";
-    link.dataset.adminSlotLink = "1";
-    link.textContent = "時段功能";
-    s.insertAdjacentElement("afterend", link);
-    link.addEventListener("click", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      document.querySelectorAll(".sidebar a").forEach((node) => node.classList.remove("on"));
-      link.classList.add("on");
-      history.replaceState(null, "", `${location.pathname}#slots`);
-      renderSlotView();
-      window.dispatchEvent(new HashChangeEvent("hashchange"));
-    });
-  }
 }
 
 function timeOptions() {
@@ -349,7 +315,6 @@ function scheduleEnhance() {
   enhanceQueued = true;
   requestAnimationFrame(() => {
     enhanceQueued = false;
-    syncFunctionLabels();
     enhanceBookingRows();
     if (route() === "slots" && !workspace()?.querySelector("[data-admin-slot-view]")) renderSlotView();
   });
@@ -370,7 +335,7 @@ function startData() {
 function init() {
   scheduleEnhance();
   const observer = new MutationObserver(scheduleEnhance);
-  observer.observe(document.querySelector("#app") || document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["data-admin-v2-bound"] });
+  observer.observe(document.querySelector("#app") || document.body, { childList: true, subtree: true });
   document.addEventListener("click", (event) => {
     const customerButton = event.target.closest?.("[data-customer-quick]");
     if (customerButton) {

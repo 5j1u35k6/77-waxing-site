@@ -107,3 +107,15 @@
 - 修正手機 Gmail 的 CID 圖片被顯示成附件問題：改回公開 HTTPS 高解析 footer 圖片。
 - 恢復並固定保留管理後台的開始–結束時間。
 - 恢復並固定保留每筆預約永久刪除功能。
+
+
+## 2026-09-11 舊程式清理基準
+
+- 已移除未被正式頁面載入的舊 runtime／補丁：`admin-catalog-route-bridge.js`、`booking-boot.js`、`booking-display-fix.js`、`booking-prefill-direct.js`。
+- 已移除舊首頁實驗資產 `home-intro.css` 與 `/intro-demo/`，正式首頁仍保留目前實際使用的 `home-warm-intro.js/.css`。
+- 已移除 Next.js 已被 `booking-wizard-v2.tsx` 取代的 `booking-wizard.tsx`。
+- `admin-functions.js` 不再改寫側欄文字或動態插入 `#slots`；側欄唯一來源維持 `firebase-pages.js` + `admin-v2.js`。
+- `booking-v3.js` 已移除不再使用的 `booking-boot` 相容碼。
+- 一次性舊 footer workflow 與 CI workflow 的整理由 GitHub 連線直接處理，不由 Actions 自我修改。
+- v19/v21/v22/v23 等舊 Email footer 圖片暫時保留，因為歷史已寄出的 Email 可能仍直接引用這些公開 URL；刪除會造成舊信件破圖。
+- 後續若要刪除任何公開 URL 資產，先確認沒有既有 Email、書籤或外部頁面仍引用。

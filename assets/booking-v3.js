@@ -135,12 +135,11 @@ async function mount(root) {
   } catch (error) {
     console.error(error);
     root.innerHTML = `<div class="notice"><b>服務資料載入失敗</b><p>請重新整理頁面後再試。</p></div>`;
-    document.body.classList.remove("booking-boot");
     return;
   }
   root.dataset.bookingV3Mounted = "1";
   root.innerHTML = bookingMarkup(catalog);
-  if (!catalog.length) { document.body.classList.remove("booking-boot"); return; }
+  if (!catalog.length) return;
 
   const earliestDate = addDays(taipeiToday(), 1);
   const search = new URLSearchParams(location.search);
