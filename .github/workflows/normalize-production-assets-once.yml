@@ -63,14 +63,6 @@ jobs:
           if addition not in text:
               text=text.replace(anchor,anchor+addition)
           p.write_text(text)
-
-          p=Path('.github/workflows/static-check.yml')
-          text=p.read_text()
-          old="catalog-v1\\.js|catalog-copy-v1\\.js|admin-ui-fixes\\.js|admin-ux\\.js"
-          new="catalog-v1\\.js|catalog-copy-v1\\.js|admin-ui-fixes\\.js|admin-ux\\.js|nav-v4\\.(?:js|css)|booking-v3\\.(?:js|css)|admin-v2\\.(?:js|css)|admin-dashboard-v3\\.(?:js|css)|catalog-v1\\.css|footer-v1\\.css|firebase-pages\\.js"
-          if old not in text:
-              raise SystemExit('static-check retired-reference pattern not found')
-          p.write_text(text.replace(old,new))
           PY
 
       - name: Validate renamed production tree
