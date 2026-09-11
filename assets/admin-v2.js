@@ -109,7 +109,7 @@ function renderView(view){
 
 function bindSidebar(){
   const root=activeAdminRoot();if(!root)return false;const sidebar=root.querySelector(".sidebar");if(!sidebar)return false;
-  const map={"總覽":"dashboard","Dashboard":"dashboard","預約管理":"bookings","預約行事曆":"calendar","顧客資料":"customers","服務管理":"services","服務功能":"services","時段功能":"slots","價格管理":"pricing","價格功能":"pricing","網站設定":"settings"};
+  const map={"總覽":"dashboard","預約管理":"bookings","預約行事曆":"calendar","顧客資料":"customers","服務功能":"services","時段功能":"slots","價格功能":"pricing","網站設定":"settings"};
   sidebar.querySelectorAll("a").forEach(link=>{const view=map[(link.textContent||"").trim()];if(!view||link.dataset.adminV2Bound)return;link.dataset.adminV2Bound="1";link.addEventListener("click",(event)=>{event.preventDefault();event.stopImmediatePropagation();sidebar.querySelectorAll("a").forEach(a=>a.classList.remove("on"));link.classList.add("on");history.replaceState(null,"",`${location.pathname}#${view}`);renderView(view);},true);});
   return true;
 }
@@ -123,7 +123,7 @@ function startData(){
 function init(){
   if(initialized)return; if(!getApps().length)return;
   const app=getApp();auth=getAuth(app);db=getFirestore(app);initialized=true;
-  onAuthStateChanged(auth,(user)=>{if(!user||user.isAnonymous)return;const timer=setInterval(()=>{if(bindSidebar()){clearInterval(timer);startData();const hash=(location.hash||"#dashboard").slice(1);if(["bookings","calendar","customers","services","slots","pricing","settings"].includes(hash))renderView(hash);}},120);});
+  onAuthStateChanged(auth,(user)=>{if(!user||user.isAnonymous)return;const timer=setInterval(()=>{if(bindSidebar()){clearInterval(timer);startData();const hash=(location.hash||"#dashboard").slice(1);const allowed=["dashboard","bookings","calendar","customers","services","slots","pricing","settings"];renderView(allowed.includes(hash)?hash:"dashboard");}},120);});
 }
 
 const boot=setInterval(()=>{if(getApps().length){clearInterval(boot);init();}},100);

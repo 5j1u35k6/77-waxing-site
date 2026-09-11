@@ -12,17 +12,8 @@
   const serviceLink=findTop('/services');
   const serviceMenu=()=>nav.querySelector('.service-flyout');
 
-  function ensureBustCare(){
-    const menu=serviceMenu();
-    if(!menu)return;
-    const exists=[...menu.querySelectorAll('a[href]')].some(a=>{
-      try{return new URL(a.href,location.href).pathname.includes('/services/bust-care/')}catch{return false}
-    });
-    if(exists)return;
-    menu.insertAdjacentHTML('beforeend',`<a href="${B}/services/bust-care/" data-catalog-link><span>美胸保養</span><small>BUST CARE</small></a>`);
-  }
 
-  if(!aboutLink){ensureBustCare();return;}
+  if(!aboutLink)return;
   const ABOUT_ITEMS=[
     ['理念','philosophy','PHILOSOPHY'],
     ['首訪的你','first-visit','FIRST VISIT'],
@@ -62,7 +53,6 @@
   };
   const show=()=>{
     clearTimeout(closeTimer);
-    ensureBustCare();
     const sm=serviceMenu();
     if(sm){sm.classList.remove('on');serviceLink?.classList.remove('service-open');serviceLink?.setAttribute('aria-expanded','false');}
     position();
@@ -106,7 +96,6 @@
     if(direct&&direct.parentElement===nav&&direct!==aboutLink)hide();
   });
   document.addEventListener('keydown',event=>{if(event.key==='Escape')hide()});
-  addEventListener('resize',()=>{hide();ensureBustCare()});
-  new MutationObserver(()=>{ensureBustCare();if(aboutMenu.classList.contains('on'))position()}).observe(nav,{childList:true,subtree:true});
-  ensureBustCare();
+  addEventListener('resize',hide);
+  new MutationObserver(()=>{if(aboutMenu.classList.contains('on'))position()}).observe(nav,{childList:true,subtree:true});
 })();

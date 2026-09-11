@@ -1,6 +1,6 @@
 import { getApp, getApps, initializeApp } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";
 import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
-import { collection, doc, getDoc, getDocs, getFirestore, onSnapshot, serverTimestamp, setDoc } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
+import { doc, getDoc, getFirestore, onSnapshot, serverTimestamp, setDoc } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
 import { firebaseConfig, firebaseConfigured } from "./firebase-config.js";
 
 export const CATALOG_DOC_ID = "catalog-main";
@@ -196,18 +196,12 @@ function normalizeItem(item, index) {
 
 function normalizeGroup(group, index) {
   const title = String(group?.title || `服務項目 ${index + 1}`).trim();
-  const rawDesc = String(group?.desc || "").trim();
-  const hiddenLegacyCopy = new Set([
-    "可搭配主服務加購。",
-    "可依主要服務需求加購。",
-    "肌膚管理中的身體保養項目。",
-  ]);
   return {
     id: String(group?.id || makeCatalogId(`group${index}`)),
     title,
     priceTitle: String(group?.priceTitle || title).trim(),
     kind: group?.kind === "addon" || /加購/.test(title) ? "addon" : "main",
-    desc: hiddenLegacyCopy.has(rawDesc) ? "" : rawDesc,
+    desc: String(group?.desc || "").trim(),
     items: Array.isArray(group?.items) ? group.items.map(normalizeItem) : [],
   };
 }
@@ -247,36 +241,13 @@ async function ensureSignedIn() {
   return credential.user;
 }
 
-function legacyServiceId(category, name) {
-  return `${category}-${encodeURIComponent(name).replace(/%/g, "")}`;
-}
-
-async function applyLegacyOverrides(catalog) {
-  try {
-    const snap = await getDocs(collection(db, "services"));
-    const map = new Map();
-    snap.forEach((entry) => {
-      if (entry.id === CATALOG_DOC_ID) return;
-      map.set(entry.id, entry.data());
-    });
-    catalog.forEach((category) => category.groups.forEach((group) => group.items.forEach((entry) => {
-      const legacy = map.get(legacyServiceId(category.key, entry.name));
-      if (!legacy) return;
-      if (typeof legacy.priceLabel === "string" && legacy.priceLabel.trim()) entry.priceLabel = legacy.priceLabel.trim();
-      if (typeof legacy.enabled === "boolean") entry.enabled = legacy.enabled;
-    })));
-  } catch (error) {
-    console.warn("77waxing catalog legacy merge skipped", error);
-  }
-  return catalog;
-}
 
 export async function loadCatalog() {
   await ensureSignedIn();
   const ref = doc(db, "services", CATALOG_DOC_ID);
   const snap = await getDoc(ref);
   if (snap.exists() && Array.isArray(snap.data()?.categories)) return normalizeCatalog(snap.data().categories);
-  return applyLegacyOverrides(normalizeCatalog(clone(DEFAULT_CATALOG)));
+  return normalizeCatalog(clone(DEFAULT_CATALOG));
 }
 
 export async function saveCatalog(categories) {
@@ -301,7 +272,7 @@ export async function watchCatalog(callback) {
     }
     if (fallbackLoaded) return;
     fallbackLoaded = true;
-    callback(await applyLegacyOverrides(normalizeCatalog(clone(DEFAULT_CATALOG))));
+    callback(normalizeCatalog(clone(DEFAULT_CATALOG)));
   });
 }
 

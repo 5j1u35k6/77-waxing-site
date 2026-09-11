@@ -1,18 +1,11 @@
 (()=>{
   const B='/77-waxing-site';
-  const PREFILL_KEY='77waxing-booking-prefill';
-  const BOOKING_CACHE='20260909-1915';
   const FALLBACK_SLUGS={women:'women-waxing',men:'men-waxing',skin:'skin-care',bust:'bust-care'};
 
   const itemHash=name=>`#item=${encodeURIComponent(name)}`;
   const bookingHref=(category,item)=>{
     const payload=`category=${encodeURIComponent(category)}&item=${encodeURIComponent(item)}`;
-    return `${B}/booking/?v=${BOOKING_CACHE}#${payload}`;
-  };
-  const rememberPrefill=(category,item)=>{
-    const payload=JSON.stringify({category,item,ts:Date.now()});
-    try{sessionStorage.setItem(PREFILL_KEY,payload)}catch{}
-    try{localStorage.setItem(PREFILL_KEY,payload)}catch{}
+    return `${B}/booking/#${payload}`;
   };
 
   function closeRows(except=null){
@@ -55,7 +48,6 @@
       actions.querySelector('.booking')?.addEventListener('click',event=>{
         event.preventDefault();
         event.stopPropagation();
-        rememberPrefill(category,name);
         location.assign(href);
       });
 
