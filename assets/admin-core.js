@@ -1,6 +1,6 @@
 import { getApp, getApps } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
-import { collection, doc, getDoc, getFirestore, onSnapshot, orderBy, query, serverTimestamp, setDoc } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
+import { collection, doc, getDoc, getDocFromServer, getFirestore, onSnapshot, orderBy, query, serverTimestamp, setDoc } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
 
 const pad = (n)=>String(n).padStart(2,"0");
 const dateKey = (d)=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
@@ -78,7 +78,43 @@ async function renderSettings(){
   const start=live.bookingStartTime||"08:00",end=live.bookingEndTime||"20:00",max=Number(live.maxAdvanceDays||60),enabled=live.bookingEnabled!==false,notice=live.bookingNotice||"";
   const timeOptions=Array.from({length:25},(_,i)=>{const mins=480+i*30;return `${pad(Math.floor(mins/60))}:${pad(mins%60)}`;});
   w.innerHTML=`<div class="admin-view-head"><div><span class="tag">SETTINGS</span><h3>網站設定</h3></div></div><div class="settings-grid"><label class="setting-switch"><span><b>開放線上預約</b><small>關閉時顧客無法選擇服務與時段</small></span><input type="checkbox" name="bookingEnabled" ${enabled?"checked":""}><i></i></label><label>每日最早可約時間<select name="bookingStartTime">${timeOptions.map(t=>`<option ${t===start?"selected":""}>${t}</option>`).join("")}</select></label><label>每日最晚開始時間<select name="bookingEndTime">${timeOptions.map(t=>`<option ${t===end?"selected":""}>${t}</option>`).join("")}</select></label><label>最遠可預約天數<input name="maxAdvanceDays" type="number" min="7" max="180" value="${max}"></label><label class="full">預約頁公告<textarea name="bookingNotice" rows="4" placeholder="例如：近期較忙，送出後請等待確認。">${escapeHtml(notice)}</textarea></label></div><div class="actions"><button class="btn dark" type="button" data-save-settings>儲存網站設定</button><span class="muted" data-settings-message></span></div>`;
-  w.querySelector("[data-save-settings]").onclick=async()=>{const button=w.querySelector("[data-save-settings]");const msg=w.querySelector("[data-settings-message]");const a=w.querySelector('[name="bookingStartTime"]').value,b=w.querySelector('[name="bookingEndTime"]').value;if(a>b){msg.textContent="最晚開始時間不可早於最早時間。";return;}button.disabled=true;msg.textContent="儲存中…";try{settings={bookingEnabled:w.querySelector('[name="bookingEnabled"]').checked,bookingStartTime:a,bookingEndTime:b,maxAdvanceDays:Number(w.querySelector('[name="maxAdvanceDays"]').value||60),bookingNotice:w.querySelector('[name="bookingNotice"]').value.trim()};await setDoc(doc(db,"settings","general"),{...settings,updatedAt:serverTimestamp()},{merge:true});msg.textContent="已儲存，前台會套用最新設定。";}catch(e){console.error(e);msg.textContent="儲存失敗，請稍後再試。";}finally{button.disabled=false;}};
+  w.querySelector("[data-save-settings]").onclick=async()=>{
+    const button=w.querySelector("[data-save-settings]");
+    const msg=w.querySelector("[data-settings-message]");
+    const a=w.querySelector('[name="bookingStartTime"]').value;
+    const b=w.querySelector('[name="bookingEndTime"]').value;
+    if(a>b){msg.textContent="最晚開始時間不可早於最早時間。";return;}
+    const expected={
+      bookingEnabled:w.querySelector('[name="bookingEnabled"]').checked,
+      bookingStartTime:a,
+      bookingEndTime:b,
+      maxAdvanceDays:Number(w.querySelector('[name="maxAdvanceDays"]').value||60),
+      bookingNotice:w.querySelector('[name="bookingNotice"]').value.trim()
+    };
+    button.disabled=true;
+    msg.textContent="儲存中…";
+    try{
+      const settingsRef=doc(db,"settings","general");
+      await setDoc(settingsRef,{...expected,updatedAt:serverTimestamp()},{merge:true});
+      msg.textContent="確認儲存結果中…";
+      const verifySnap=await getDocFromServer(settingsRef);
+      if(!verifySnap.exists())throw new Error("settings document missing after save");
+      const saved=verifySnap.data();
+      const verified=saved.bookingEnabled===expected.bookingEnabled
+        && String(saved.bookingStartTime||"")===expected.bookingStartTime
+        && String(saved.bookingEndTime||"")===expected.bookingEndTime
+        && Number(saved.maxAdvanceDays)===expected.maxAdvanceDays
+        && String(saved.bookingNotice||"")===expected.bookingNotice;
+      if(!verified)throw new Error("settings verification mismatch");
+      settings={...saved};
+      msg.textContent="已儲存並確認，前台會套用最新設定。";
+    }catch(e){
+      console.error("settings save/verify failed",e);
+      msg.textContent="儲存或驗證失敗，請稍後再試。";
+    }finally{
+      button.disabled=false;
+    }
+  };
 }
 
 function delegateCatalog(view){
