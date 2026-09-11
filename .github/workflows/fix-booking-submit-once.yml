@@ -1,0 +1,110 @@
+name: Fix booking submit schema once
+
+on:
+  push:
+    paths:
+      - '.github/workflows/fix-booking-submit-once.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Repair booking submit compatibility
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          js_path = Path('assets/booking-core.js')
+          js = js_path.read_text()
+          old = '''      await runTransaction(db, async (transaction) => {
+        for (const lockRef of lockRefs) { const snapshot = await transaction.get(lockRef); if (snapshot.exists()) throw new Error("SLOT_CONFLICT"); }
+        transaction.set(bookingRef, { ownerUid: user.uid, customerName: name, customerPhone: phone.local, customerPhoneCountry: phone.country.name, customerPhoneDialCode: phone.country.dial, customerPhoneInternational: phone.international, customerEmail: email, customerLineId: lineId || null, serviceName: `${selectedCategory.name}｜${selectedItem.name}`, preferredDate: selectedDate, preferredTime: selectedTime, status: "pending_confirmation", isFirstVisit: firstVisit, depositRequired: null, depositAmount: null, paymentStatus: "not_requested", durationMinutes: selectedItem.durationMinutes, bufferMinutes: selectedItem.blockMinutes - selectedItem.durationMinutes, lockIds, lockTimes, note: note || null, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+        lockRefs.forEach((lockRef, index) => transaction.set(lockRef, { bookingId: bookingRef.id, date: selectedDate, time: lockTimes[index], state: "held", createdAt: serverTimestamp(), updatedAt: serverTimestamp() }));
+      });
+'''
+          new = '''      const writeBooking = async (includePhoneMetadata) => runTransaction(db, async (transaction) => {
+        for (const lockRef of lockRefs) { const snapshot = await transaction.get(lockRef); if (snapshot.exists()) throw new Error("SLOT_CONFLICT"); }
+        const compatibilityNote = [note, `[手機國際資訊] ${phone.country.name} ${phone.country.dial}｜${phone.international}`].filter(Boolean).join("\\n") || null;
+        const bookingData = { ownerUid: user.uid, customerName: name, customerPhone: phone.local, customerEmail: email, customerLineId: lineId || null, serviceName: `${selectedCategory.name}｜${selectedItem.name}`, preferredDate: selectedDate, preferredTime: selectedTime, status: "pending_confirmation", isFirstVisit: firstVisit, depositRequired: null, depositAmount: null, paymentStatus: "not_requested", durationMinutes: selectedItem.durationMinutes, bufferMinutes: selectedItem.blockMinutes - selectedItem.durationMinutes, lockIds, lockTimes, note: includePhoneMetadata ? (note || null) : compatibilityNote, createdAt: serverTimestamp(), updatedAt: serverTimestamp() };
+        if (includePhoneMetadata) {
+          bookingData.customerPhoneCountry = phone.country.name;
+          bookingData.customerPhoneDialCode = phone.country.dial;
+          bookingData.customerPhoneInternational = phone.international;
+        }
+        transaction.set(bookingRef, bookingData);
+        lockRefs.forEach((lockRef, index) => transaction.set(lockRef, { bookingId: bookingRef.id, date: selectedDate, time: lockTimes[index], state: "held", createdAt: serverTimestamp(), updatedAt: serverTimestamp() }));
+      });
+      try {
+        await writeBooking(true);
+      } catch (writeError) {
+        if (writeError?.code !== "permission-denied") throw writeError;
+        console.warn("Booking phone metadata is not accepted by deployed Firestore rules; retrying with compatible schema.");
+        await writeBooking(false);
+      }
+'''
+          if old not in js:
+              raise SystemExit('booking transaction anchor not found')
+          js = js.replace(old, new, 1)
+          js_path.write_text(js)
+
+          rules_path = Path('firebase/firestore.rules')
+          rules = rules_path.read_text()
+          old_keys = """          'customerPhone',\n          'customerEmail',"""
+          new_keys = """          'customerPhone',\n          'customerPhoneCountry',\n          'customerPhoneDialCode',\n          'customerPhoneInternational',\n          'customerEmail',"""
+          if old_keys in rules:
+              rules = rules.replace(old_keys, new_keys, 1)
+          elif "'customerPhoneCountry'" not in rules:
+              raise SystemExit('firestore key anchor not found')
+          old_validation = """        && request.resource.data.customerPhone.size() <= 30\n        && request.resource.data.customerEmail is string"""
+          new_validation = """        && request.resource.data.customerPhone.size() <= 30\n        && request.resource.data.customerPhoneCountry is string\n        && request.resource.data.customerPhoneCountry.size() > 0\n        && request.resource.data.customerPhoneCountry.size() <= 80\n        && request.resource.data.customerPhoneDialCode is string\n        && request.resource.data.customerPhoneDialCode.matches('^\\\\+[0-9]{1,4}$')\n        && request.resource.data.customerPhoneInternational is string\n        && request.resource.data.customerPhoneInternational.matches('^\\\\+[0-9]{6,20}$')\n        && request.resource.data.customerEmail is string"""
+          if old_validation in rules:
+              rules = rules.replace(old_validation, new_validation, 1)
+          elif 'customerPhoneInternational.matches' not in rules:
+              raise SystemExit('firestore validation anchor not found')
+          rules_path.write_text(rules)
+
+          booking_path = Path('booking/index.html')
+          html = booking_path.read_text()
+          html = html.replace('booking-core.js?v=20260911-1132', 'booking-core.js?v=20260911-1712')
+          booking_path.write_text(html)
+
+          state_path = Path('PROJECT_STATE.md')
+          state = state_path.read_text()
+          anchor = '- 預約聯絡資料的手機欄位使用「英文國名 + 國際冠碼」選單（A→Z，預設 Taiwan +886）與本地號碼同框顯示；依國家嚴格限制允許位數，Taiwan 必須 10 碼、Japan 必須 11 碼。Firestore 保留本地號碼並另外儲存國家、冠碼與完整國際格式。\n'
+          replacement = anchor + '- 預約送出優先寫入上述三個國際手機欄位；若正式 Firestore rules 尚未同步而回傳 `permission-denied`，前端必須自動改用相容 schema 重試並把國際資訊附記於 note，不能讓整筆預約因此失敗。\n'
+          if replacement not in state:
+              if anchor not in state:
+                  raise SystemExit('PROJECT_STATE phone anchor not found')
+              state = state.replace(anchor, replacement, 1)
+          state_path.write_text(state)
+          PY
+
+      - name: Validate repair
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp assets/booking-core.js /tmp/booking-core.mjs
+          node --check /tmp/booking-core.mjs
+          grep -q 'retrying with compatible schema' assets/booking-core.js
+          grep -q "'customerPhoneInternational'" firebase/firestore.rules
+          grep -q 'booking-core.js?v=20260911-1712' booking/index.html
+
+      - name: Commit repair
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add assets/booking-core.js firebase/firestore.rules booking/index.html PROJECT_STATE.md
+          git commit -m 'fix: keep booking submit compatible with deployed rules'
+          git push origin HEAD:main
