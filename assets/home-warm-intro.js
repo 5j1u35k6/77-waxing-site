@@ -1,13 +1,13 @@
 (()=>{
   const B='/77-waxing-site';
-  const KEY='77waxing-brand-intro-v1-seen';
+  const KEY='77waxing-brand-intro-v2-seen';
   const path=location.pathname.startsWith(B)?location.pathname.slice(B.length):location.pathname;
   if(path!=='/'&&path!=='')return;
   try{if(sessionStorage.getItem(KEY)==='1')return;}catch{}
 
   const link=document.createElement('link');
   link.rel='stylesheet';
-  link.href=`${B}/assets/home-warm-intro.css?v=20260911-0943`;
+  link.href=`${B}/assets/home-warm-intro.css?v=20260911-0949`;
   document.head.appendChild(link);
 
   const root=document.createElement('section');
@@ -47,8 +47,8 @@
         return;
       }
       later(()=>root.classList.add('is-logo-lit'),90);
-      later(()=>root.classList.add('is-reveal'),1450);
-      later(exit,2240);
+      later(()=>root.classList.add('is-reveal'),4450);
+      later(exit,5240);
     }));
   };
 
