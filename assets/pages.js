@@ -69,7 +69,7 @@ function ensureBrandIntro(path){
   brandIntroRequested=true;
   if(document.querySelector('script[data-home-brand-intro]'))return;
   const script=document.createElement('script');
-  script.src=`${B}/assets/home-warm-intro.js?v=20260911-0949`;
+  script.src=`${B}/assets/home-warm-intro.js?v=20260911-0958`;
   script.dataset.homeBrandIntro='1';
   document.body.appendChild(script);
 }
