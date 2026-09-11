@@ -57,4 +57,4 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ! grep -R -n -E 'catalog-v1\.js|catalog-copy-v1\.js|admin-ui-fixes\.js|admin-ux\.js' index.html booking admin assets --include='*.html' --include='*.js' || exit 1
+          ! grep -R -n -E 'catalog-v1\.js|catalog-copy-v1\.js|admin-ui-fixes\.js|admin-ux\.js|nav-v4\.(js|css)|booking-v3\.(js|css)|admin-v2\.(js|css)|admin-dashboard-v3\.(js|css)|catalog-v1\.css|footer-v1\.css|firebase-pages\.js' index.html booking admin assets --include='*.html' --include='*.js' --include='*.css' || exit 1
