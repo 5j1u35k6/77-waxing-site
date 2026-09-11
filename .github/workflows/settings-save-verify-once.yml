@@ -115,3 +115,5 @@ jobs:
           git add assets/admin-core.js admin/index.html PROJECT_STATE.md
           git commit -m 'fix: verify website settings after save'
           git push origin HEAD:main
+
+# trigger
