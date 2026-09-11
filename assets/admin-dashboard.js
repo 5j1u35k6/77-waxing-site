@@ -79,7 +79,7 @@ function render(force=false){
 
   panel.innerHTML=`
     <div class="admin-view-head dashboard-overview-head">
-      <div><span class="tag">BUSINESS PULSE</span><h3>營運總覽</h3><p class="muted">總覽版型固定存在；有資料時填入趨勢，尚無資料時保留同一個位置顯示 0 與空白狀態。</p></div>
+      <div><span class="tag">BUSINESS PULSE</span><h3>營運總覽</h3></div>
       <div class="dashboard-overview-actions"><button type="button" data-overview-calendar>看行事曆</button><button type="button" data-overview-customers>看顧客</button></div>
     </div>
 
@@ -99,13 +99,11 @@ function render(force=false){
       <section class="dashboard-attention-summary">
         <div class="dashboard-v3-title"><div><small>ACTION</small><h4>待處理</h4></div><button type="button" data-overview-bookings>前往處理</button></div>
         <div class="dashboard-attention-counts"><article><b>${pending.length}</b><span>待確認</span></article><article><b>${unpaid.length}</b><span>待收訂金</span></article></div>
-        <p class="muted">只有需要人工處理的數量，不在總覽重複列出整張預約表。</p>
       </section>
 
       <section class="dashboard-week-panel ${weekTotal===0?'is-empty':''}">
         <div class="dashboard-v3-title"><div><small>7 DAYS</small><h4>未來 7 天預約量</h4></div><b>${weekTotal} 筆</b></div>
         <div class="dashboard-week-bars">${weekDays.map((d,i)=>`<div><span>${dayLabel(d)}</span><i><em style="height:${weekCounts[i]===0?0:Math.max(8,Math.round(weekCounts[i]/weekMax*100))}%"></em></i><b>${weekCounts[i]}</b><small>${d.getMonth()+1}/${d.getDate()}</small></div>`).join('')}</div>
-        ${weekTotal===0?`<p class="dashboard-inline-empty">未來 7 天目前沒有預約，圖表會保留在原位。</p>`:''}
       </section>
 
       <section class="dashboard-service-panel ${!hasMonthData?'is-empty':''}">
