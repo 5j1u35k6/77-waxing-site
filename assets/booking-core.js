@@ -393,6 +393,7 @@ async function mount(root) {
         console.warn("Booking phone metadata is not accepted by deployed Firestore rules; retrying with compatible schema.");
         await writeBooking(false);
       }
+      window.dispatchEvent(new CustomEvent("77waxing:booking-created", { detail: { bookingId: bookingRef.id } }));
       root.querySelectorAll(".step").forEach((element) => element.classList.remove("on"));
       root.querySelector(".steps").style.display = "none";
       root.querySelector(".success").classList.add("on");

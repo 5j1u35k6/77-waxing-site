@@ -12,6 +12,7 @@
 
 ## Email
 
+- 新預約建立後必須以實際 `bookingId` 立即觸發 Email dispatch；若 Email module 尚未完成 Firebase 初始化要先排隊，並使用 `keepalive` 加一次延遲重送。Apps Script 端以 bookingId + status 去重，因此重送不得造成重複信。
 - 寄件顯示名稱為 `77waxing`，店家信箱為 `77waxing.mail@gmail.com`。
 - 信件 footer 必須在 Gmail 正文內顯示，不使用 CID/inlineImages 附件 MIME。
 - 正式 footer 使用公開 HTTPS 圖片 `assets/email-footer-77waxing-v25.jpg`，整張可點擊回官方網站。

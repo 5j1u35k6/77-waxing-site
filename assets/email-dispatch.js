@@ -4,7 +4,7 @@ import { collection, doc, getDoc, getDocs, getFirestore, onSnapshot, query, wher
 
 const DEFAULT_APPS_SCRIPT_EMAIL_URL='https://script.google.com/macros/s/AKfycbx6iC26KXbHWYte5XhLGNRMmG16Yydx2vPHDxYpmp4rmWn3plk__6Qwwr7Y09hLptTW/exec';
 const LEGACY_APPS_SCRIPT_EMAIL_URL='https://script.google.com/macros/s/AKfycby1y-oojBtmNsT8T1UPMydCTPkaZIjRss7QvxXkWi2duOs4mKI8p3tbIzvhi2xwd_Zb/exec';
-const DISPATCH_VERSION='20260910-1518';
+const DISPATCH_VERSION='20260911-1755';
 let started=false;
 let adminUnsub=null;
 let statusMap=new Map();
@@ -12,6 +12,8 @@ let publicObserver=null;
 let currentUser=null;
 let currentDb=null;
 const inFlight=new Set();
+const queuedCreated=new Set();
+const pendingCreated=new Set();
 
 function appReady(){return getApps().length?getApp():null;}
 async function emailUrl(db){
@@ -30,7 +32,7 @@ async function dispatchBooking(user,db,bookingId){
     if(!url)return false;
     const idToken=await user.getIdToken();
     console.info('[77 email] dispatch',DISPATCH_VERSION,bookingId,url);
-    await fetch(url,{method:'POST',mode:'no-cors',cache:'no-store',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({bookingId,idToken})});
+    await fetch(url,{method:'POST',mode:'no-cors',cache:'no-store',keepalive:true,headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({bookingId,idToken})});
     return true;
   }catch(error){
     console.error('Email dispatch failed',error);
@@ -38,6 +40,17 @@ async function dispatchBooking(user,db,bookingId){
   }finally{
     setTimeout(()=>inFlight.delete(flightKey),1200);
   }
+}
+function queueCreatedBooking(user,db,bookingId){
+  const id=String(bookingId||'').trim();
+  if(!id)return;
+  if(!user||!db){pendingCreated.add(id);return;}
+  const queueKey=`${user.uid}:${id}`;
+  if(queuedCreated.has(queueKey))return;
+  queuedCreated.add(queueKey);
+  try{sessionStorage.setItem(`77-email-created-queued-${id}`,'1');}catch(_error){}
+  dispatchBooking(user,db,id);
+  setTimeout(()=>dispatchBooking(user,db,id),4000);
 }
 async function latestOwnedBooking(user,db){
   const snap=await getDocs(query(collection(db,'bookings'),where('ownerUid','==',user.uid)));
@@ -59,10 +72,9 @@ function watchPublicSuccess(user,db){
     try{
       const row=await latestOwnedBooking(user,db);
       if(!row)return;
-      const key=`77-email-created-${row.id}`;
-      if(sessionStorage.getItem(key))return;
-      const sent=await dispatchBooking(user,db,row.id);
-      if(sent)sessionStorage.setItem(key,'1');
+      const key=`77-email-created-queued-${row.id}`;
+      try{if(sessionStorage.getItem(key))return;}catch(_error){}
+      queueCreatedBooking(user,db,row.id);
     }catch(error){console.error('Booking email lookup failed',error);}finally{busy=false;}
   };
   publicObserver=new MutationObserver(()=>queueMicrotask(run));
@@ -97,15 +109,23 @@ async function startForUser(user){
   const db=getFirestore(app);
   currentUser=user;
   currentDb=db;
+  if(pendingCreated.size){
+    [...pendingCreated].forEach(id=>{pendingCreated.delete(id);queueCreatedBooking(user,db,id);});
+  }
   if(await isAdmin(user,db))watchAdmin(user,db);else watchPublicSuccess(user,db);
 }
-function dispatchFromEvent(event){
+function dispatchCreatedFromEvent(event){
+  const bookingId=String(event?.detail?.bookingId||'').trim();
+  if(!bookingId)return;
+  queueCreatedBooking(currentUser,currentDb,bookingId);
+}
+function dispatchStatusFromEvent(event){
   const bookingId=String(event?.detail?.bookingId||'').trim();
   if(!bookingId||!currentUser||!currentDb)return;
   dispatchBooking(currentUser,currentDb,bookingId);
 }
-window.addEventListener('77waxing:booking-created',dispatchFromEvent);
-window.addEventListener('77waxing:booking-status-changed',dispatchFromEvent);
+window.addEventListener('77waxing:booking-created',dispatchCreatedFromEvent);
+window.addEventListener('77waxing:booking-status-changed',dispatchStatusFromEvent);
 function start(){
   if(started)return;started=true;
   const app=appReady();if(!app){started=false;return setTimeout(start,120);}
