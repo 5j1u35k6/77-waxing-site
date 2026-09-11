@@ -2,7 +2,7 @@
 const B='/77-waxing-site';
 const app=document.querySelector('#app');
 if(!app)return;
-let warmIntroRequested=false;
+let brandIntroRequested=false;
 
 const FAQ=[
   ['第一次熱蠟會很痛嗎？','每個人的感受與部位不同。施作前會先說明流程，過程中也可以隨時反映感受。'],
@@ -64,21 +64,14 @@ function syncHeader(path){
     a.classList.toggle('on',on);
   });
 }
-function ensureWarmIntro(path){
-  if(path!=='/'||warmIntroRequested)return;
-  warmIntroRequested=true;
-  if(!document.querySelector('script[data-home-warm-intro]')){
-    const script=document.createElement('script');
-    script.src=`${B}/assets/home-warm-intro.js?v=20260909-2236`;
-    script.dataset.homeWarmIntro='1';
-    document.body.appendChild(script);
-  }
-  if(!window.gsap&&!document.querySelector('script[data-warm-gsap]')){
-    const gs=document.createElement('script');
-    gs.src='https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js';
-    gs.dataset.warmGsap='1';
-    document.head.appendChild(gs);
-  }
+function ensureBrandIntro(path){
+  if(path!=='/'||brandIntroRequested)return;
+  brandIntroRequested=true;
+  if(document.querySelector('script[data-home-brand-intro]'))return;
+  const script=document.createElement('script');
+  script.src=`${B}/assets/home-warm-intro.js?v=20260911-0943`;
+  script.dataset.homeBrandIntro='1';
+  document.body.appendChild(script);
 }
 function render(){
   const path=normalizedPath();
@@ -90,7 +83,7 @@ function render(){
   else if(path==='/booking/')app.innerHTML=bookingShell();
   else if(path==='/menu/'||path==='/services/'||path.startsWith('/services/'))app.innerHTML=catalogShell();
   else app.innerHTML=notFound();
-  ensureWarmIntro(path);
+  ensureBrandIntro(path);
   window.scrollTo({top:0,behavior:'auto'});
 }
 
