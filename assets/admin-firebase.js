@@ -23,6 +23,19 @@ import { firebaseConfig, firebaseConfigured } from "./firebase-config.js";
 
 const REPO_BASE = "/77-waxing-site";
 const B = location.hostname.endsWith("github.io") ? REPO_BASE : "";
+
+let app = null;
+let auth = null;
+let db = null;
+let adminUnsubscribe = null;
+let authPersistenceReady = Promise.resolve();
+
+if (firebaseConfigured) {
+  app = initializeApp(firebaseConfig);
+  auth = getAuth(app);
+  db = getFirestore(app);
+  authPersistenceReady = setPersistence(auth, browserLocalPersistence).catch(() => {});
+}
 const statusText = (status) => ({
   pending_confirmation: "待確認",
   pending_payment: "待付款",
@@ -62,10 +75,10 @@ function adminShellMarkup() {
 }
 
 async function verifyAdmin(user) {
-  if (!user || user.isAnonymous) return false;
+  if (!user || user.isAnonymous || !db) return false;
   try {
-    await getDoc(doc(db, "admins", user.uid));
-    return true;
+    const snapshot = await getDoc(doc(db, "admins", user.uid));
+    return snapshot.exists();
   } catch {
     return false;
   }
