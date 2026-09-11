@@ -29,6 +29,20 @@ jobs:
               node --check "$file"
             fi
           done
+      - name: Check admin Firebase bootstrap
+        shell: bash
+        run: |
+          set -euo pipefail
+          file='assets/admin-firebase.js'
+          grep -q '^let auth = null;' "$file"
+          grep -q '^let db = null;' "$file"
+          grep -q '^let adminUnsubscribe = null;' "$file"
+          grep -q '^let authPersistenceReady = Promise.resolve();' "$file"
+          grep -q 'initializeApp(firebaseConfig)' "$file"
+          grep -q 'auth = getAuth(app)' "$file"
+          grep -q 'db = getFirestore(app)' "$file"
+          grep -q 'setPersistence(auth, browserLocalPersistence)' "$file"
+          grep -q 'return snapshot.exists();' "$file"
       - name: Check static asset references
         shell: bash
         run: |
