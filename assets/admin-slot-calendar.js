@@ -26,6 +26,7 @@
     if(originalLabel)originalLabel.hidden=true;
 
     let panel=view.querySelector('[data-admin-slot-calendar]');
+    if(panel?.dataset.bound==='1')return;
     if(!panel){
       panel=document.createElement('section');
       panel.className='admin-slot-calendar';
@@ -33,22 +34,24 @@
       const controls=view.querySelector('.admin-slot-controls');
       controls?.insertAdjacentElement('beforebegin',panel);
     }
-    let month=panel.dataset.month||monthStart(input.value||new Date().toISOString().slice(0,10));
-    if(!panel.dataset.month)panel.dataset.month=month;
+    panel.dataset.bound='1';
+    let month=monthStart(input.value||new Date().toISOString().slice(0,10));
+    panel.dataset.month=month;
 
     const draw=()=>{
       const selected=input.value;
+      panel.dataset.month=month;
       panel.innerHTML=`<div class="admin-slot-calendar-bar"><button type="button" data-slot-cal-prev aria-label="上個月">←</button><b>${monthLabel(month)}</b><button type="button" data-slot-cal-next aria-label="下個月">→</button></div><div class="admin-slot-calendar-week">${'日一二三四五六'.split('').map(x=>`<span>${x}</span>`).join('')}</div><div class="admin-slot-calendar-grid">${cells(month).map(date=>date?`<button type="button" class="${date===selected?'on':''}" data-slot-cal-date="${date}">${parse(date).getUTCDate()}</button>`:'<span></span>').join('')}</div>`;
-      panel.querySelector('[data-slot-cal-prev]').onclick=()=>{month=moveMonth(month,-1);panel.dataset.month=month;draw();};
-      panel.querySelector('[data-slot-cal-next]').onclick=()=>{month=moveMonth(month,1);panel.dataset.month=month;draw();};
+      panel.querySelector('[data-slot-cal-prev]').onclick=()=>{month=moveMonth(month,-1);draw();};
+      panel.querySelector('[data-slot-cal-next]').onclick=()=>{month=moveMonth(month,1);draw();};
       panel.querySelectorAll('[data-slot-cal-date]').forEach(button=>button.onclick=()=>{
         input.value=button.dataset.slotCalDate;
         month=monthStart(input.value);
-        panel.dataset.month=month;
         input.dispatchEvent(new Event('change',{bubbles:true}));
         draw();
       });
     };
+    input.addEventListener('change',()=>{month=monthStart(input.value||month);draw();});
     draw();
   }
   const schedule=()=>{if(queued)return;queued=true;requestAnimationFrame(mount);};
