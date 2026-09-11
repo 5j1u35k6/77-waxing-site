@@ -38,11 +38,36 @@
 - 「取消預約」與「永久刪除」是兩個不同功能，兩者都要保留。
 - 顧客資料既有的刪除顧客功能不可因預約刪除功能調整而消失。
 
+### 顧客快速資料
+
+- 預約管理的「顧客」姓名必須可以點擊。
+- 點擊後顯示聯絡資訊，版型為：第一列「姓名／電話／性別」，第二列「信箱／LINE ID」，下方顯示此顧客更早的預約紀錄。
+- 舊資料的性別若仍寫在備註 `[性別] ...`，顧客快速資料仍需能解析顯示。
+- 預約表「客別」固定只顯示一個字：`新` 或 `舊`。
+
+### 後台功能命名與時段功能
+
+- 後台側欄與功能頁將「服務管理」顯示為「服務功能」、「價格管理」顯示為「價格功能」。
+- 「服務功能」後方新增「時段功能」。
+- 時段功能可依日期將單一 30 分鐘時段或整天空白時段設定為「其他行程／休息／私人行程／暫停預約」，也可以恢復開放。
+- 店家手動時段保留存於 `settings/availability_YYYY-MM-DD`，欄位 `blockedTimes`；沿用既有 `settings/{settingId}` 管理員寫入權限，不新增未部署的 Firestore rule 依賴。
+- 店家手動解除時段只解除店家設定，不得釋放既有顧客 booking lock。
+
+## 前端預約時段不可回歸項目
+
+- `availabilityLocks.state == held`：時段仍顯示但不可點，使用黃色，不在時段內顯示「保留中」文字。
+- 已確認預約原本隱藏的開始時段必須改為顯示灰色且不可點，不顯示狀態說明文字。
+- 店家透過「時段功能」設定的休息／其他行程，同樣顯示灰色且不可點，不顯示原因文字。
+- 店家手動保留需依服務實際占用區間做重疊判定，不能只檢查單一起始 30 分鐘。
+- 若顧客已選的時段之後被店家封鎖，進入下一步或送出前必須阻止使用舊選擇並要求重選。
+
 ## 目前保護層
 
 - `assets/admin-time-range.js`：既有時間區間增強。
 - `assets/admin-record-actions.js`：既有預約／顧客刪除功能。
 - `assets/admin-critical-preserve.js`：最後載入的保護層，DOM 被其他管理腳本重繪後會再次補回時間區間與預約刪除按鈕。
+- `assets/admin-functions.js` + `assets/admin-functions.css`：顧客快速資料、`新／舊` 客別、服務／價格功能命名、時段功能。
+- `assets/booking-slot-status.js` + `assets/booking-slot-status.css`：前端黃色保留、灰色已約／店家保留與手動封鎖同步。
 
 ## 修改規則
 
@@ -57,8 +82,8 @@
 - Email Apps Script source：`apps-script/Code.gs` v25。
 - 正式 Email footer：`assets/email-footer-77waxing-v25.jpg`，以公開 HTTPS `<img>` 顯示於正文；禁止改回 CID / `inlineImages`，避免手機 Gmail 出現附件卡片。
 - 管理後台 `admin/index.html` 必須最後載入 `assets/admin-critical-preserve.js`，並保留 `admin-time-range.js`、`admin-record-actions.js`。
-- 目前 admin cache-busting 基準為 `20260911-0048`，用來避免瀏覽器繼續使用遺失時間區間／刪除按鈕的舊快取。
-- 任何 Email、圖片、後台 UI 更新完成後，都必須再次驗證：① Gmail footer 在正文內、無附件卡片；② 預約時間為開始–結束；③ 每筆預約都有永久刪除功能。
+- Email／時間／刪除基準 cache-busting 為 `20260911-0048`；顧客快速資料、時段功能與前端時段顏色基準為 `20260911-0841`。
+- 任何 Email、圖片、後台 UI 更新完成後，都必須再次驗證：① Gmail footer 在正文內、無附件卡片；② 預約時間為開始–結束；③ 每筆預約都有永久刪除功能；④ 顧客姓名可點出聯絡／歷史資料；⑤ 客別只顯示新／舊；⑥ 時段功能仍可封鎖與恢復；⑦ 前端 held 黃色、confirmed/manual 灰色。
 
 ## 2026-09-10 最新需求
 
