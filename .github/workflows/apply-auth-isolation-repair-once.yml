@@ -1,0 +1,58 @@
+name: Apply auth isolation repair once
+
+on:
+  push:
+    paths:
+      - '.github/workflows/apply-auth-isolation-repair-once.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Reuse validated repair patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import textwrap
+          source = Path('.github/workflows/fix-public-admin-auth-isolation-once.yml').read_text()
+          marker = "          python3 - <<'PY'\n"
+          start = source.index(marker) + len(marker)
+          end = source.index("\n          PY\n", start)
+          code = textwrap.dedent(source[start:end])
+          exec(compile(code, 'auth-isolation-repair', 'exec'))
+          PY
+          # The GitHub Actions token cannot update workflow files. Keep the
+          # functional repair and leave the static-check workflow for a direct
+          # connector update after this commit lands.
+          git checkout -- .github/workflows/static-check.yml
+      - name: Validate repair
+        shell: bash
+        run: |
+          set -euo pipefail
+          for file in assets/public-firebase.js assets/service-catalog-store.js assets/booking-core.js assets/runtime-settings.js assets/booking-slot-status.js assets/email-dispatch.js; do
+            cp "$file" "/tmp/$(basename "${file%.js}").mjs"
+            node --check "/tmp/$(basename "${file%.js}").mjs"
+          done
+          grep -q '77waxing-public' assets/public-firebase.js
+          grep -q 'ADMIN_AUTH_REQUIRED' assets/service-catalog-store.js
+          grep -q 'admin-service-catalog.js?v=20260912-1330' admin/index.html
+          grep -q 'booking-core.js?v=20260912-1330' booking/index.html
+          grep -q 'runtime-settings.js?v=20260912-1330' index.html
+      - name: Commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add assets index.html booking/index.html admin/index.html PROJECT_STATE.md
+          git commit -m 'fix: isolate public anonymous auth from admin session'
+          git push origin main
