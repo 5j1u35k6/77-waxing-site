@@ -1,15 +1,11 @@
 (()=>{
-  const B='/77-waxing-site';
+  const B=location.hostname.endsWith('github.io')?'/77-waxing-site':'';
   const KEY='77waxing-brand-intro-v5-seen';
   const path=location.pathname.startsWith(B)?location.pathname.slice(B.length):location.pathname;
   if(path!=='/'&&path!=='')return;
-  try{if(sessionStorage.getItem(KEY)==='1')return;}catch{}
+  try{if(sessionStorage.getItem(KEY)==='1')return;sessionStorage.setItem(KEY,'1')}catch{}
 
-  const link=document.createElement('link');
-  link.rel='stylesheet';
-  link.href=`${B}/assets/home-warm-intro.css?v=20260911-1015`;
-  document.head.appendChild(link);
-
+  const html=document.documentElement;
   const root=document.createElement('section');
   root.id='brandIntro';
   root.setAttribute('aria-label','77waxing 開場動畫');
@@ -28,12 +24,13 @@
     if(finished)return;
     finished=true;
     timers.forEach(clearTimeout);
-    try{sessionStorage.setItem(KEY,'1')}catch{}
+    html.classList.remove('brand-intro-pending');
     document.body.style.overflow=prevOverflow;
     root.remove();
   };
   const exit=()=>{
     if(finished)return;
+    html.classList.remove('brand-intro-pending');
     root.classList.add('is-exiting');
     later(finish,reduced?180:600);
   };
@@ -53,6 +50,5 @@
   };
 
   root.querySelector('[data-brand-skip]')?.addEventListener('click',exit);
-  link.addEventListener('load',start,{once:true});
-  later(start,220);
+  start();
 })();
