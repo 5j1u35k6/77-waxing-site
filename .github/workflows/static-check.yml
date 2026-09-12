@@ -54,6 +54,19 @@ jobs:
           grep -q 'getPublicFirebase' assets/booking-slot-status.js
           grep -q 'isAdminContext' assets/email-dispatch.js
           ! grep -q 'initializeApp(firebaseConfig);' assets/booking-core.js
+      - name: Check service catalog ordering integration
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q 'function moveEntry' assets/admin-service-catalog.js
+          grep -q 'data-move-category' assets/admin-service-catalog.js
+          grep -q 'data-move-group' assets/admin-service-catalog.js
+          grep -q 'data-move-item' assets/admin-service-catalog.js
+          grep -q 'catalog-order-actions' assets/admin-service-catalog.css
+          grep -q 'function serviceSwitcher' assets/catalog-dynamic.js
+          grep -q 'data-price-jump' assets/catalog-dynamic.js
+          grep -q 'const services=catalog.filter' assets/nav-service-catalog-sync.js
+          grep -q 'const source = publicCatalog(await loadCatalog())' assets/booking-core.js
       - name: Check static asset references
         shell: bash
         run: |
