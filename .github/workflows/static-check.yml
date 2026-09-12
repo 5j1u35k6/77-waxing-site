@@ -43,6 +43,17 @@ jobs:
           grep -q 'db = getFirestore(app)' "$file"
           grep -q 'setPersistence(auth, browserLocalPersistence)' "$file"
           grep -q 'return snapshot.exists();' "$file"
+      - name: Check public and admin Firebase auth isolation
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q 'PUBLIC_FIREBASE_APP_NAME = "77waxing-public"' assets/public-firebase.js
+          grep -q 'ADMIN_AUTH_REQUIRED' assets/service-catalog-store.js
+          grep -q 'getPublicFirebase' assets/booking-core.js
+          grep -q 'getPublicFirebase' assets/runtime-settings.js
+          grep -q 'getPublicFirebase' assets/booking-slot-status.js
+          grep -q 'isAdminContext' assets/email-dispatch.js
+          ! grep -q 'initializeApp(firebaseConfig);' assets/booking-core.js
       - name: Check static asset references
         shell: bash
         run: |
