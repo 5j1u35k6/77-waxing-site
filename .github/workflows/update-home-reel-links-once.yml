@@ -25,24 +25,27 @@ jobs:
 
           js = Path('assets/home-video-carousel.js')
           text = js.read_text()
-          new_posts = '''  const POSTS=[
-    ['DUuGt-Rk3pz','https://www.instagram.com/reel/DUuGt-Rk3pz/'],
-    ['DUGhMGBE8sE','https://www.instagram.com/reel/DUGhMGBE8sE/'],
-    ['DTlAcQUE61G','https://www.instagram.com/reel/DTlAcQUE61G/'],
-    ['DR95-4vE6o-','https://www.instagram.com/reel/DR95-4vE6o-/'],
-    ['DRKZWu4E-Hw','https://www.instagram.com/reel/DRKZWu4E-Hw/'],
-    ['DQfzi4mCuJq','https://www.instagram.com/reel/DQfzi4mCuJq/'],
-    ['DQIhm6Wk_yM','https://www.instagram.com/reel/DQIhm6Wk_yM/'],
-    ['DPOe_Akk4NT','https://www.instagram.com/reel/DPOe_Akk4NT/'],
-    ['DLQ0lbzS-rv','https://www.instagram.com/reel/DLQ0lbzS-rv/'],
-    ['DKfIfq6yHbU','https://www.instagram.com/reel/DKfIfq6yHbU/'],
-    ['DKEnFFgSYsV','https://www.instagram.com/reel/DKEnFFgSYsV/'],
-    ['DH0JFjtzA4P','https://www.instagram.com/reel/DH0JFjtzA4P/'],
-    ['DHlXkunTxvL','https://www.instagram.com/reel/DHlXkunTxvL/'],
-    ['DGmOSY_TaJ1','https://www.instagram.com/reel/DGmOSY_TaJ1/'],
-    ['DGNabU8zg-R','https://www.instagram.com/reel/DGNabU8zg-R/'],
-    ['DDTsBunzhMW','https://www.instagram.com/reel/DDTsBunzhMW/']
-  ].map(([code,url],index)=>({code,url,index}));'''
+          rows = [
+              "  const POSTS=[",
+              "    ['DUuGt-Rk3pz','https://www.instagram.com/reel/DUuGt-Rk3pz/'],",
+              "    ['DUGhMGBE8sE','https://www.instagram.com/reel/DUGhMGBE8sE/'],",
+              "    ['DTlAcQUE61G','https://www.instagram.com/reel/DTlAcQUE61G/'],",
+              "    ['DR95-4vE6o-','https://www.instagram.com/reel/DR95-4vE6o-/'],",
+              "    ['DRKZWu4E-Hw','https://www.instagram.com/reel/DRKZWu4E-Hw/'],",
+              "    ['DQfzi4mCuJq','https://www.instagram.com/reel/DQfzi4mCuJq/'],",
+              "    ['DQIhm6Wk_yM','https://www.instagram.com/reel/DQIhm6Wk_yM/'],",
+              "    ['DPOe_Akk4NT','https://www.instagram.com/reel/DPOe_Akk4NT/'],",
+              "    ['DLQ0lbzS-rv','https://www.instagram.com/reel/DLQ0lbzS-rv/'],",
+              "    ['DKfIfq6yHbU','https://www.instagram.com/reel/DKfIfq6yHbU/'],",
+              "    ['DKEnFFgSYsV','https://www.instagram.com/reel/DKEnFFgSYsV/'],",
+              "    ['DH0JFjtzA4P','https://www.instagram.com/reel/DH0JFjtzA4P/'],",
+              "    ['DHlXkunTxvL','https://www.instagram.com/reel/DHlXkunTxvL/'],",
+              "    ['DGmOSY_TaJ1','https://www.instagram.com/reel/DGmOSY_TaJ1/'],",
+              "    ['DGNabU8zg-R','https://www.instagram.com/reel/DGNabU8zg-R/'],",
+              "    ['DDTsBunzhMW','https://www.instagram.com/reel/DDTsBunzhMW/']",
+              "  ].map(([code,url],index)=>({code,url,index}));",
+          ]
+          new_posts = '\n'.join(rows)
           text, count = re.subn(r'  const POSTS=\[.*?\n  \]\.map\(\(\[code,url\],index\)=>\(\{code,url,index\}\)\);', new_posts, text, count=1, flags=re.S)
           if count != 1:
               raise SystemExit('POSTS block not found')
@@ -74,10 +77,10 @@ jobs:
         run: |
           set -euo pipefail
           node --check assets/home-video-carousel.js
-          grep -q "\['DUuGt-Rk3pz','https://www.instagram.com/reel/DUuGt-Rk3pz/'\]" assets/home-video-carousel.js
-          grep -q "\['DDTsBunzhMW','https://www.instagram.com/reel/DDTsBunzhMW/'\]" assets/home-video-carousel.js
+          grep -q "DUuGt-Rk3pz.*instagram.com/reel/DUuGt-Rk3pz" assets/home-video-carousel.js
+          grep -q "DDTsBunzhMW.*instagram.com/reel/DDTsBunzhMW" assets/home-video-carousel.js
           grep -q "DKfIfq6yHbU" assets/home-video-carousel.js
-          ! grep -q "DCWqB-SOrI1" assets/home-video-carousel.js
+          if grep -q "DCWqB-SOrI1" assets/home-video-carousel.js; then exit 1; fi
           grep -q 'instagram.com/reel/\${post.code}/embed/' assets/home-video-carousel.js
           grep -q 'home-video-carousel.js?v=20260912-1548' index.html
           grep -q '最新提供的 16 個 @77waxing Instagram Reel' PROJECT_STATE.md
