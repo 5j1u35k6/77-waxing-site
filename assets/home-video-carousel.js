@@ -68,7 +68,7 @@
     const stage=root.querySelector('[data-video-stage]');
     stage.innerHTML=POSTS.map(post=>`<article class="home-video-card" data-offset="3" data-video-index="${post.index}" aria-hidden="true">
       <div class="home-video-embed-wrap">
-        <iframe data-video-iframe data-src="https://www.instagram.com/reel/${post.code}/embed/" loading="lazy" allowfullscreen title="77waxing Instagram 影片 ${pad(post.index+1)}"></iframe>
+        <iframe data-video-iframe data-src="https://www.instagram.com/reel/${post.code}/embed/" loading="lazy" scrolling="no" tabindex="-1" aria-hidden="true" title="77waxing Instagram 影片 ${pad(post.index+1)}"></iframe>
         <button type="button" class="home-video-card-select" data-select-video="${post.index}" aria-label="切換到第 ${post.index+1} 支影片"></button>
       </div>
     </article>`).join('');
@@ -103,6 +103,10 @@
       if(ignoreCardClick){event.preventDefault();return}
       const next=Number(button.dataset.selectVideo);
       if(!Number.isInteger(next))return;
+      if(next===active){
+        window.open(POSTS[next].url,'_blank','noopener,noreferrer');
+        return;
+      }
       active=next;
       render();
     }));
@@ -173,6 +177,8 @@
       card.dataset.offset=String(offset);
       card.classList.toggle('is-active',isActive);
       card.setAttribute('aria-hidden',Math.abs(delta)<=2?'false':'true');
+      const select=card.querySelector('[data-select-video]');
+      if(select)select.setAttribute('aria-label',isActive?`在 Instagram 開啟第 ${postIndex+1} 支影片`:`切換到第 ${postIndex+1} 支影片`);
       if(Math.abs(delta)<=2)ensureIframe(card);
     });
 
