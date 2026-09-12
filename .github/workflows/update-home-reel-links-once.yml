@@ -1,0 +1,92 @@
+name: Update home Reel links once
+
+on:
+  push:
+    paths:
+      - '.github/workflows/update-home-reel-links-once.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Update Reel sources
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          js = Path('assets/home-video-carousel.js')
+          text = js.read_text()
+          new_posts = '''  const POSTS=[
+    ['DUuGt-Rk3pz','https://www.instagram.com/reel/DUuGt-Rk3pz/'],
+    ['DUGhMGBE8sE','https://www.instagram.com/reel/DUGhMGBE8sE/'],
+    ['DTlAcQUE61G','https://www.instagram.com/reel/DTlAcQUE61G/'],
+    ['DR95-4vE6o-','https://www.instagram.com/reel/DR95-4vE6o-/'],
+    ['DRKZWu4E-Hw','https://www.instagram.com/reel/DRKZWu4E-Hw/'],
+    ['DQfzi4mCuJq','https://www.instagram.com/reel/DQfzi4mCuJq/'],
+    ['DQIhm6Wk_yM','https://www.instagram.com/reel/DQIhm6Wk_yM/'],
+    ['DPOe_Akk4NT','https://www.instagram.com/reel/DPOe_Akk4NT/'],
+    ['DLQ0lbzS-rv','https://www.instagram.com/reel/DLQ0lbzS-rv/'],
+    ['DKfIfq6yHbU','https://www.instagram.com/reel/DKfIfq6yHbU/'],
+    ['DKEnFFgSYsV','https://www.instagram.com/reel/DKEnFFgSYsV/'],
+    ['DH0JFjtzA4P','https://www.instagram.com/reel/DH0JFjtzA4P/'],
+    ['DHlXkunTxvL','https://www.instagram.com/reel/DHlXkunTxvL/'],
+    ['DGmOSY_TaJ1','https://www.instagram.com/reel/DGmOSY_TaJ1/'],
+    ['DGNabU8zg-R','https://www.instagram.com/reel/DGNabU8zg-R/'],
+    ['DDTsBunzhMW','https://www.instagram.com/reel/DDTsBunzhMW/']
+  ].map(([code,url],index)=>({code,url,index}));'''
+          text, count = re.subn(r'  const POSTS=\[.*?\n  \]\.map\(\(\[code,url\],index\)=>\(\{code,url,index\}\)\);', new_posts, text, count=1, flags=re.S)
+          if count != 1:
+              raise SystemExit('POSTS block not found')
+          text = text.replace('https://www.instagram.com/p/${post.code}/embed/', 'https://www.instagram.com/reel/${post.code}/embed/')
+          js.write_text(text)
+
+          index = Path('index.html')
+          html = index.read_text().replace('home-video-carousel.css?v=20260912-1538','home-video-carousel.css?v=20260912-1548').replace('home-video-carousel.js?v=20260912-1538','home-video-carousel.js?v=20260912-1548')
+          index.write_text(html)
+
+          state = Path('PROJECT_STATE.md')
+          s = state.read_text()
+          old = '- `7777waxing video` 已串接使用者提供的 16 個 @77waxing Instagram 貼文連結，依使用者提供順序固定為 01–16；正式前台以 Instagram 官方 embed iframe 播放。左側分類在尚未取得／確認內容語意分類前不得自行猜測服務類別，先使用中性的 `全部影片`、`01—04`、`05—08`、`09—12`、`13—16` 分組；之後若使用者指定實際分類，再改成內容分類。'
+          new = '- `7777waxing video` 以使用者 2026-09-12 最新提供的 16 個 @77waxing Instagram Reel 連結為唯一正式來源，依使用者提供順序固定為 01–16；這批 Reel 取代先前 `/p/` 貼文連結，包含新增 `DKfIfq6yHbU` 並移除舊的 `DCWqB-SOrI1`。正式前台以 Instagram Reel embed iframe 播放。左側分類在尚未取得／確認內容語意分類前不得自行猜測服務類別，先使用中性的 `全部影片`、`01—04`、`05—08`、`09—12`、`13—16` 分組；之後若使用者指定實際分類，再改成內容分類。'
+          if old in s:
+              s = s.replace(old, new, 1)
+          elif new not in s:
+              anchor = '- 首頁 `7777waxing video` 區塊的正式呈現方式：'
+              pos = s.find(anchor)
+              if pos < 0:
+                  s += '\n' + new + '\n'
+              else:
+                  end = s.find('\n', pos)
+                  s = s[:end+1] + new + '\n' + s[end+1:]
+          state.write_text(s)
+          PY
+      - name: Validate
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check assets/home-video-carousel.js
+          grep -q "\['DUuGt-Rk3pz','https://www.instagram.com/reel/DUuGt-Rk3pz/'\]" assets/home-video-carousel.js
+          grep -q "\['DDTsBunzhMW','https://www.instagram.com/reel/DDTsBunzhMW/'\]" assets/home-video-carousel.js
+          grep -q "DKfIfq6yHbU" assets/home-video-carousel.js
+          ! grep -q "DCWqB-SOrI1" assets/home-video-carousel.js
+          grep -q 'instagram.com/reel/\${post.code}/embed/' assets/home-video-carousel.js
+          grep -q 'home-video-carousel.js?v=20260912-1548' index.html
+          grep -q '最新提供的 16 個 @77waxing Instagram Reel' PROJECT_STATE.md
+      - name: Commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add assets/home-video-carousel.js index.html PROJECT_STATE.md
+          git commit -m 'feat: use latest Instagram Reel sources'
+          git push origin main
