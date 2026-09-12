@@ -30,8 +30,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          git restore .github/workflows/static-check.yml
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add assets/pages.js assets/about-story.css index.html PROJECT_STATE.md .github/workflows/static-check.yml
+          git add assets/pages.js assets/about-story.css index.html PROJECT_STATE.md
           git commit -m 'feat: build 77waxing brand story page'
           git push origin main
