@@ -1,0 +1,44 @@
+name: Save homepage video layout once
+
+on:
+  push:
+    paths:
+      - '.github/workflows/save-home-video-layout-once.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  save:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Save requirement
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('PROJECT_STATE.md')
+          s = p.read_text()
+          line = '- 首頁 `7777waxing video` 區塊的正式呈現方式：桌機採左側影片分類／右側 3D perspective 卡片輪播；中央目前影片最大且正面，左右相鄰影片縮小、後退並帶透視角度形成疊卡效果，底部提供左右切換與分頁點；可滑動／拖曳切換，手機改為適合觸控的單列輪播。此視覺參考使用者 2026-09-12 提供的範例圖，但網站不得顯示範例圖中的 source code 區塊。實際影片來源待使用者提供 Instagram Reel 連結後串接。'
+          if line not in s:
+              anchor = '- 首頁底部固定改為兩個區塊，順序為 `7777waxing video` → `為什麼大家都推薦77waxing？`；在使用者提供影片或推薦內容前，不自行杜撰可見文案。'
+              if anchor in s:
+                  s = s.replace(anchor, anchor + '\n' + line, 1)
+              else:
+                  s += '\n' + line + '\n'
+              p.write_text(s)
+          PY
+      - name: Commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add PROJECT_STATE.md
+          git diff --cached --quiet && exit 0
+          git commit -m 'docs: persist homepage video carousel layout'
+          git push origin main
