@@ -7,6 +7,8 @@
 - 正式站為 GitHub Pages 靜態前台：`/`、`/about/`、`/first-visit/`、`/beginner/`、`/booking/`、`/admin/`。
 - 正式資產使用穩定名稱，不再以 `v1/v2/v3/v4` 表示目前版本；核心入口為 `nav.js`、`booking-core.js`、`admin-core.js`、`admin-firebase.js`、`admin-dashboard.js`、`catalog.css`、`footer.css`、`beginner.css`。
 - Firebase Authentication + Cloud Firestore 是正式資料層。
+- 公開前台匿名 Firebase Auth 固定使用獨立命名 app `77waxing-public`；不得與管理後台 `[DEFAULT]` 的管理員登入共用 Auth persistence，避免公開頁面匿名登入覆蓋後台 session。
+- 管理後台讀寫 `services/catalog-main` 時只能使用 `[DEFAULT]` 的非匿名管理員 Auth；admin context 不得自動執行匿名登入。
 - Google Apps Script `apps-script/Code.gs` 負責預約 Email。
 - 服務／價目唯一公開 renderer 為 `assets/catalog-dynamic.js`；資料來源為 `services/catalog-main`，並使用瀏覽器快取後再背景同步 Firestore。
 

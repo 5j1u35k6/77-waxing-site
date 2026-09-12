@@ -1,7 +1,8 @@
-import { getApp, getApps, initializeApp } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";
+import { getApp, getApps } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";
 import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
 import { doc, getDoc, getFirestore, onSnapshot, serverTimestamp, setDoc } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
-import { firebaseConfig, firebaseConfigured } from "./firebase-config.js";
+import { firebaseConfigured } from "./firebase-config.js";
+import { getPublicFirebase } from "./public-firebase.js?v=20260912-1330";
 
 export const CATALOG_DOC_ID = "catalog-main";
 
@@ -226,19 +227,35 @@ export function normalizeCatalog(input) {
 let app = null;
 let auth = null;
 let db = null;
+const isAdminContext = () => /\/admin(?:\/|$)/.test(location.pathname);
 function ensureFirebase() {
   if (!firebaseConfigured) throw new Error("FIREBASE_NOT_READY");
-  app = getApps().length ? getApp() : initializeApp(firebaseConfig);
-  auth = getAuth(app);
-  db = getFirestore(app);
+  if (isAdminContext()) {
+    const defaultApp = getApps().find((candidate) => candidate.name === "[DEFAULT]");
+    if (!defaultApp) throw new Error("ADMIN_FIREBASE_NOT_READY");
+    app = getApp();
+    auth = getAuth(app);
+    db = getFirestore(app);
+  } else {
+    ({ app, auth, db } = getPublicFirebase());
+  }
   return { app, auth, db };
 }
 
 async function ensureSignedIn() {
   ensureFirebase();
-  if (auth.currentUser) return auth.currentUser;
-  const credential = await signInAnonymously(auth);
-  return credential.user;
+  if (typeof auth.authStateReady === "function") await auth.authStateReady();
+  if (auth.currentUser) {
+    if (isAdminContext() && auth.currentUser.isAnonymous) throw new Error("ADMIN_AUTH_REQUIRED");
+    return auth.currentUser;
+  }
+  if (isAdminContext()) throw new Error("ADMIN_AUTH_REQUIRED");
+  if (!window.__77_PUBLIC_ANON_AUTH_PROMISE__) {
+    window.__77_PUBLIC_ANON_AUTH_PROMISE__ = signInAnonymously(auth)
+      .then((credential) => credential.user)
+      .finally(() => { window.__77_PUBLIC_ANON_AUTH_PROMISE__ = null; });
+  }
+  return window.__77_PUBLIC_ANON_AUTH_PROMISE__;
 }
 
 

@@ -1,6 +1,6 @@
-import { getApp, getApps } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";
-import { getAuth, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
-import { doc, getFirestore, onSnapshot } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
+import { onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
+import { doc, onSnapshot } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
+import { getPublicFirebase } from "./public-firebase.js?v=20260912-1330";
 
 let db=null,auth=null,settings={};
 
@@ -53,21 +53,22 @@ async function ensureSignedIn(){
     const existing=await waitForExistingSignIn();
     if(existing)return existing;
   }
-  if(!window.__77_ANON_AUTH_PROMISE__){
-    window.__77_ANON_AUTH_PROMISE__=signInAnonymously(auth)
+  if(!window.__77_PUBLIC_ANON_AUTH_PROMISE__){
+    window.__77_PUBLIC_ANON_AUTH_PROMISE__=signInAnonymously(auth)
       .then(credential=>credential.user)
-      .finally(()=>{window.__77_ANON_AUTH_PROMISE__=null});
+      .finally(()=>{window.__77_PUBLIC_ANON_AUTH_PROMISE__=null});
   }
-  return window.__77_ANON_AUTH_PROMISE__;
+  return window.__77_PUBLIC_ANON_AUTH_PROMISE__;
 }
 
 async function init(){
-  if(!getApps().length)return;
-  const app=getApp();auth=getAuth(app);db=getFirestore(app);
-  try{await ensureSignedIn()}catch(e){console.error(e);return}
+  try{
+    const firebase=getPublicFirebase();
+    auth=firebase.auth;db=firebase.db;
+    await ensureSignedIn();
+  }catch(e){console.error(e);return}
   onSnapshot(doc(db,'settings','general'),snap=>{settings=snap.exists()?snap.data():{};applyAll()});
   new MutationObserver(()=>queueMicrotask(applyAll)).observe(document.querySelector('#app')||document.body,{childList:true,subtree:true});
   applyAll();
 }
-const timer=setInterval(()=>{if(getApps().length){clearInterval(timer);init()}},100);
-setTimeout(()=>clearInterval(timer),15000);
+init();

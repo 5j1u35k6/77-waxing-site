@@ -1,10 +1,11 @@
 import { getApp, getApps } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
 import { collection, doc, getDoc, getDocs, getFirestore, onSnapshot, query, where } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
+import { getPublicFirebase } from "./public-firebase.js?v=20260912-1330";
 
 const DEFAULT_APPS_SCRIPT_EMAIL_URL='https://script.google.com/macros/s/AKfycbx6iC26KXbHWYte5XhLGNRMmG16Yydx2vPHDxYpmp4rmWn3plk__6Qwwr7Y09hLptTW/exec';
 const LEGACY_APPS_SCRIPT_EMAIL_URL='https://script.google.com/macros/s/AKfycby1y-oojBtmNsT8T1UPMydCTPkaZIjRss7QvxXkWi2duOs4mKI8p3tbIzvhi2xwd_Zb/exec';
-const DISPATCH_VERSION='20260911-1755';
+const DISPATCH_VERSION='20260912-1330';
 let started=false;
 let adminUnsub=null;
 let statusMap=new Map();
@@ -15,7 +16,11 @@ const inFlight=new Set();
 const queuedCreated=new Set();
 const pendingCreated=new Set();
 
-function appReady(){return getApps().length?getApp():null;}
+const isAdminContext=()=>/\/admin(?:\/|$)/.test(location.pathname);
+function appReady(){
+  if(isAdminContext())return getApps().some(app=>app.name==='[DEFAULT]')?getApp():null;
+  try{return getPublicFirebase().app}catch{return null}
+}
 async function emailUrl(db){
   const snap=await getDoc(doc(db,'settings','general')).catch(()=>null);
   const configured=snap?.exists()?String(snap.data().appsScriptEmailUrl||'').trim():'';

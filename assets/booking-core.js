@@ -1,8 +1,8 @@
-import { getApp, getApps, initializeApp } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";
-import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
-import { collection, doc, getDocsFromServer, getFirestore, query, runTransaction, serverTimestamp, where } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
-import { firebaseConfig, firebaseConfigured } from "./firebase-config.js";
-import { loadCatalog, publicCatalog } from "./service-catalog-store.js?v=20260909-2035";
+import { signInAnonymously } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
+import { collection, doc, getDocsFromServer, query, runTransaction, serverTimestamp, where } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
+import { firebaseConfigured } from "./firebase-config.js";
+import { getPublicFirebase } from "./public-firebase.js?v=20260912-1330";
+import { loadCatalog, publicCatalog } from "./service-catalog-store.js?v=20260912-1330";
 
 const REPO_BASE = "/77-waxing-site";
 const B = location.hostname.endsWith("github.io") ? REPO_BASE : "";
@@ -103,21 +103,19 @@ let app = null;
 let auth = null;
 let db = null;
 if (firebaseConfigured) {
-  app = getApps().length ? getApp() : initializeApp(firebaseConfig);
-  auth = getAuth(app);
-  db = getFirestore(app);
+  ({ app, auth, db } = getPublicFirebase());
 }
 
 async function ensureSignedIn() {
   if (!auth) throw new Error("FIREBASE_NOT_READY");
   if (typeof auth.authStateReady === "function") await auth.authStateReady();
   if (auth.currentUser) return auth.currentUser;
-  if (!window.__77_ANON_AUTH_PROMISE__) {
-    window.__77_ANON_AUTH_PROMISE__ = signInAnonymously(auth)
+  if (!window.__77_PUBLIC_ANON_AUTH_PROMISE__) {
+    window.__77_PUBLIC_ANON_AUTH_PROMISE__ = signInAnonymously(auth)
       .then((credential) => credential.user)
-      .finally(() => { window.__77_ANON_AUTH_PROMISE__ = null; });
+      .finally(() => { window.__77_PUBLIC_ANON_AUTH_PROMISE__ = null; });
   }
-  return window.__77_ANON_AUTH_PROMISE__;
+  return window.__77_PUBLIC_ANON_AUTH_PROMISE__;
 }
 
 async function dynamicCatalog() {

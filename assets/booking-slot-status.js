@@ -1,6 +1,6 @@
-import { getApp, getApps } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";
-import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
-import { doc, getFirestore, onSnapshot } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
+import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
+import { doc, onSnapshot } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
+import { getPublicFirebase } from "./public-firebase.js?v=20260912-1330";
 
 const TIMES = [];
 for (let minutes = 480; minutes <= 1200; minutes += 30) TIMES.push(`${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`);
@@ -156,10 +156,10 @@ function start() {
   schedule();
 }
 function boot() {
-  if (!getApps().length) return setTimeout(boot, 100);
-  const app = getApp();
-  db = getFirestore(app);
-  const auth = getAuth(app);
+  let firebase;
+  try { firebase = getPublicFirebase(); } catch { return setTimeout(boot, 100); }
+  db = firebase.db;
+  const auth = firebase.auth;
   const ready = (user) => { if (user) start(); };
   ready(auth.currentUser);
   onAuthStateChanged(auth, ready);
