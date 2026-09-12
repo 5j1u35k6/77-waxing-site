@@ -179,6 +179,7 @@ document.addEventListener("click", (event) => {
   event.preventDefault();
   history.pushState(null, "", url.pathname + url.search + url.hash);
   renderCurrent(true);
+  if (!url.hash) requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: "auto" }));
 }, true);
 
 new MutationObserver(() => schedule()).observe(document.querySelector("#app") || document.body, { childList: true, subtree: true });
