@@ -29,6 +29,8 @@
   let category='all';
   let active=0;
   let startX=null;
+  let dragged=false;
+  let ignoreCardClick=false;
 
   const section=()=>document.querySelector('.home-video-section');
   const currentGroup=()=>GROUPS.find(group=>group.key===category)||GROUPS[0];
@@ -58,22 +60,59 @@
       </div>
     </div>`;
 
+    buildCards(root);
+    bindEvents(root);
+    render();
+  }
+
+  function buildCards(root){
+    const stage=root.querySelector('[data-video-stage]');
+    stage.innerHTML=POSTS.map(post=>`<article class="home-video-card" data-offset="3" data-video-index="${post.index}" aria-hidden="true">
+      <div class="home-video-embed-wrap">
+        <iframe data-video-iframe data-src="https://www.instagram.com/reel/${post.code}/embed/" loading="lazy" allowfullscreen title="77waxing Instagram 影片 ${pad(post.index+1)}"></iframe>
+        <button type="button" class="home-video-card-select" data-select-video="${post.index}" aria-label="切換到第 ${post.index+1} 支影片"></button>
+      </div>
+    </article>`).join('');
+  }
+
+  function bindEvents(root){
     root.querySelector('[data-video-prev]').addEventListener('click',()=>move(-1));
     root.querySelector('[data-video-next]').addEventListener('click',()=>move(1));
+
     root.querySelector('[data-video-stage]').addEventListener('keydown',event=>{
       if(event.key==='ArrowLeft'){event.preventDefault();move(-1)}
       if(event.key==='ArrowRight'){event.preventDefault();move(1)}
     });
-    root.querySelector('[data-video-stage]').addEventListener('pointerdown',event=>{startX=event.clientX});
+
+    root.querySelector('[data-video-stage]').addEventListener('pointerdown',event=>{
+      startX=event.clientX;
+      dragged=false;
+    });
+    root.querySelector('[data-video-stage]').addEventListener('pointermove',event=>{
+      if(startX===null)return;
+      if(Math.abs(event.clientX-startX)>8)dragged=true;
+    });
     root.querySelector('[data-video-stage]').addEventListener('pointerup',event=>{
       if(startX===null)return;
       const delta=event.clientX-startX;
       startX=null;
       if(Math.abs(delta)<44)return;
+      ignoreCardClick=true;
+      setTimeout(()=>{ignoreCardClick=false},0);
       move(delta<0?1:-1);
     });
-    root.querySelector('[data-video-stage]').addEventListener('pointercancel',()=>{startX=null});
-    render();
+    root.querySelector('[data-video-stage]').addEventListener('pointercancel',()=>{
+      startX=null;
+      dragged=false;
+    });
+
+    root.querySelectorAll('[data-select-video]').forEach(button=>button.addEventListener('click',event=>{
+      if(ignoreCardClick||dragged){event.preventDefault();return}
+      const next=Number(button.dataset.selectVideo);
+      if(!Number.isInteger(next))return;
+      active=next;
+      render();
+    }));
   }
 
   function move(step){
@@ -99,6 +138,19 @@
     return delta;
   }
 
+  function visualOffset(delta){
+    if(delta<-2)return -3;
+    if(delta>2)return 3;
+    return delta;
+  }
+
+  function ensureIframe(card){
+    const frame=card.querySelector('[data-video-iframe]');
+    if(frame&&!frame.src){
+      frame.src=frame.dataset.src;
+    }
+  }
+
   function renderCategories(root){
     const nav=root.querySelector('[data-video-categories]');
     nav.innerHTML=GROUPS.map(group=>`<button type="button" class="${group.key===category?'on':''}" data-video-category="${group.key}"><span>${group.label}</span><small>${pad(group.indexes.length)}</small></button>`).join('');
@@ -112,32 +164,35 @@
     const set=currentSet();
     if(!set.includes(active))active=set[0];
     const activePos=set.indexOf(active);
-    const stage=root.querySelector('[data-video-stage]');
-    const visible=[];
-    set.forEach((postIndex,pos)=>{
+
+    root.querySelectorAll('[data-video-index]').forEach(card=>{
+      const postIndex=Number(card.dataset.videoIndex);
+      const pos=set.indexOf(postIndex);
+      if(pos<0){
+        card.dataset.offset='3';
+        card.classList.remove('is-active');
+        card.setAttribute('aria-hidden','true');
+        return;
+      }
       const delta=ringDelta(pos,activePos,set.length);
-      if(Math.abs(delta)<=2)visible.push({postIndex,delta});
-    });
-    stage.innerHTML=visible.map(({postIndex,delta})=>{
-      const post=POSTS[postIndex];
+      const offset=visualOffset(delta);
       const isActive=delta===0;
-      return `<article class="home-video-card ${isActive?'is-active':''}" data-offset="${delta}" data-video-index="${postIndex}" aria-hidden="${isActive?'false':'true'}">
-        <div class="home-video-embed-wrap">
-          <iframe src="https://www.instagram.com/reel/${post.code}/embed/" loading="lazy" allowfullscreen title="77waxing Instagram 影片 ${pad(postIndex+1)}"></iframe>
-          ${isActive?'':`<button type="button" class="home-video-card-select" data-select-video="${postIndex}" aria-label="切換到第 ${postIndex+1} 支影片"></button>`}
-        </div>
-      </article>`;
-    }).join('');
-    stage.querySelectorAll('[data-select-video]').forEach(button=>button.addEventListener('click',()=>{active=Number(button.dataset.selectVideo);render()}));
+      card.dataset.offset=String(offset);
+      card.classList.toggle('is-active',isActive);
+      card.setAttribute('aria-hidden',Math.abs(delta)<=2?'false':'true');
+      if(Math.abs(delta)<=2)ensureIframe(card);
+    });
 
     root.querySelector('[data-video-frame]').textContent=`FRAME ${pad(active+1)}`;
     root.querySelector('[data-video-count]').textContent=`${pad(activePos+1)} / ${pad(set.length)}`;
-    const original=root.querySelector('[data-video-original]');
-    original.href=POSTS[active].url;
+    root.querySelector('[data-video-original]').href=POSTS[active].url;
 
     const dots=root.querySelector('[data-video-dots]');
     dots.innerHTML=set.map((postIndex,pos)=>`<button type="button" class="${postIndex===active?'on':''}" data-dot-video="${postIndex}" aria-label="第 ${pos+1} 支影片"></button>`).join('');
-    dots.querySelectorAll('[data-dot-video]').forEach(button=>button.addEventListener('click',()=>{active=Number(button.dataset.dotVideo);render()}));
+    dots.querySelectorAll('[data-dot-video]').forEach(button=>button.addEventListener('click',()=>{
+      active=Number(button.dataset.dotVideo);
+      render();
+    }));
   }
 
   const observer=new MutationObserver(()=>mount());
