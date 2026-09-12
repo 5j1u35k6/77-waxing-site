@@ -43,6 +43,7 @@
 - 店家手動封鎖寫入 `settings/availability_YYYY-MM-DD.blockedTimes`；解除店家封鎖不得刪除顧客 booking lock。
 - 編輯預約彈窗底部不得使用深色整塊背景；只保留右下角的「取消／儲存修改」按鈕，取消文字使用紅色。
 - 「儲存網站設定」寫入 `settings/general` 後，必須用 Firestore server read-back 驗證主要欄位完全一致；只有驗證成功才能顯示已儲存。
+- 服務管理必須可對「服務分類（母項目）／分類內區塊／區塊內服務項目（次項目）」逐層上移、下移；排序直接儲存在 `services/catalog-main.categories` 陣列順序，並同步決定前端服務選單、服務頁置頂切換標籤、價目表分類／內容與預約服務選項順序。
 
 ## 首頁文案與版面
 

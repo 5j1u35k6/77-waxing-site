@@ -2,7 +2,7 @@ import { getApp, getApps } from "https://www.gstatic.com/firebasejs/12.18.0/fire
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
 import { DEFAULT_CATALOG, loadCatalog, makeCatalogId, makeSlug, saveCatalog, watchCatalog } from "./service-catalog-store.js?v=20260912-1330";
 
-const VERSION = "20260909-2035";
+const VERSION = "20260912-1350";
 let catalog = JSON.parse(JSON.stringify(DEFAULT_CATALOG));
 let hydrated = false;
 let hydrating = false;
@@ -16,6 +16,16 @@ const workspace = () => document.querySelector("body.admin-page #admin-preview .
 const categoryAt = (key, source = catalog) => source.find((category) => category.key === key);
 const groupAt = (category, id) => category?.groups?.find((group) => group.id === id);
 const itemAt = (group, id) => group?.items?.find((item) => item.id === id);
+
+function moveEntry(list, predicate, direction) {
+  if (!Array.isArray(list) || ![-1, 1].includes(direction)) return false;
+  const from = list.findIndex(predicate);
+  const to = from + direction;
+  if (from < 0 || to < 0 || to >= list.length) return false;
+  const [entry] = list.splice(from, 1);
+  list.splice(to, 0, entry);
+  return true;
+}
 
 function ensureBusy() {
   let node = document.querySelector("[data-catalog-admin-busy]");
@@ -71,7 +81,7 @@ function openForm({ title, fields, submitText = "儲存" }) {
 }
 
 function servicesMarkup() {
-  return `<div class="catalog-admin-shell" data-dynamic-catalog-view="services" data-catalog-version="${VERSION}"><div class="catalog-admin-head"><div><span class="tag">SERVICES</span><h3>服務管理</h3><p class="catalog-admin-note">新增或刪除後，前台服務選單、服務頁、價目表與預約項目會讀取同一份資料。</p></div><div class="catalog-category-actions"><button class="catalog-mini-btn primary" type="button" data-add-category>＋ 新增服務分類</button></div></div>${catalog.map((category) => `<section class="catalog-category-card" data-category="${esc(category.key)}"><div class="catalog-category-head"><div><h4>${esc(category.name)}</h4><small>${esc(category.en)} · /services/${esc(category.slug)}/</small></div><div class="catalog-category-actions"><label class="catalog-toggle"><input type="checkbox" data-category-toggle ${category.enabled !== false ? "checked" : ""}> 開放前台</label><button class="catalog-mini-btn" type="button" data-edit-category>編輯</button><button class="catalog-mini-btn" type="button" data-add-group>＋ 新增區塊</button><button class="catalog-mini-btn danger" type="button" data-delete-category>刪除分類</button></div></div>${category.groups.map((group) => `<div class="catalog-group-card" data-group="${esc(group.id)}"><div class="catalog-group-head"><div><h5>${esc(group.title)}</h5><span class="catalog-kind">${group.kind === "addon" ? "ADD-ON 加購" : "SERVICE 一般服務"}</span></div><div class="catalog-group-actions"><button class="catalog-mini-btn" type="button" data-add-item>＋ ${group.kind === "addon" ? "新增加購項目" : "新增服務項目"}</button><button class="catalog-mini-btn danger" type="button" data-delete-group>刪除區塊</button></div></div><div class="catalog-item-list">${group.items.length ? group.items.map((item) => `<div class="catalog-item-row" data-item="${esc(item.id)}"><div><b>${esc(item.name)}</b><small>${esc(item.description || "尚未填寫服務說明")}</small></div><div><b>${esc(item.durationLabel)}</b><small>${esc(item.durationMinutes)} 分鐘</small></div><div class="price">${esc(item.priceLabel || "尚未設定價格")}</div><div class="catalog-item-actions"><label class="catalog-toggle"><input type="checkbox" data-item-toggle ${item.enabled !== false ? "checked" : ""}> 開放</label><button class="catalog-mini-btn" type="button" data-edit-item>編輯</button><button class="catalog-mini-btn danger" type="button" data-delete-item>刪除</button></div></div>`).join("") : `<div class="catalog-admin-empty">這個區塊目前沒有項目。</div>`}</div></div>`).join("")}</section>`).join("")}</div>`;
+  return `<div class="catalog-admin-shell" data-dynamic-catalog-view="services" data-catalog-version="${VERSION}"><div class="catalog-admin-head"><div><span class="tag">SERVICES</span><h3>服務管理</h3><p class="catalog-admin-note">新增或刪除後，前台服務選單、服務頁、價目表與預約項目會讀取同一份資料。</p></div><div class="catalog-category-actions"><button class="catalog-mini-btn primary" type="button" data-add-category>＋ 新增服務分類</button></div></div>${catalog.map((category, categoryIndex) => `<section class="catalog-category-card" data-category="${esc(category.key)}"><div class="catalog-category-head"><div><h4>${esc(category.name)}</h4><small>${esc(category.en)} · /services/${esc(category.slug)}/</small></div><div class="catalog-category-actions"><span class="catalog-order-actions" aria-label="分類排序"><button class="catalog-mini-btn" type="button" data-move-category="-1" title="上移分類" ${categoryIndex === 0 ? "disabled" : ""}>↑ 上移</button><button class="catalog-mini-btn" type="button" data-move-category="1" title="下移分類" ${categoryIndex === catalog.length - 1 ? "disabled" : ""}>↓ 下移</button></span><label class="catalog-toggle"><input type="checkbox" data-category-toggle ${category.enabled !== false ? "checked" : ""}> 開放前台</label><button class="catalog-mini-btn" type="button" data-edit-category>編輯</button><button class="catalog-mini-btn" type="button" data-add-group>＋ 新增區塊</button><button class="catalog-mini-btn danger" type="button" data-delete-category>刪除分類</button></div></div>${category.groups.map((group, groupIndex) => `<div class="catalog-group-card" data-group="${esc(group.id)}"><div class="catalog-group-head"><div><h5>${esc(group.title)}</h5><span class="catalog-kind">${group.kind === "addon" ? "ADD-ON 加購" : "SERVICE 一般服務"}</span></div><div class="catalog-group-actions"><span class="catalog-order-actions" aria-label="區塊排序"><button class="catalog-mini-btn" type="button" data-move-group="-1" title="上移區塊" ${groupIndex === 0 ? "disabled" : ""}>↑ 上移</button><button class="catalog-mini-btn" type="button" data-move-group="1" title="下移區塊" ${groupIndex === category.groups.length - 1 ? "disabled" : ""}>↓ 下移</button></span><button class="catalog-mini-btn" type="button" data-add-item>＋ ${group.kind === "addon" ? "新增加購項目" : "新增服務項目"}</button><button class="catalog-mini-btn danger" type="button" data-delete-group>刪除區塊</button></div></div><div class="catalog-item-list">${group.items.length ? group.items.map((item, itemIndex) => `<div class="catalog-item-row" data-item="${esc(item.id)}"><div><b>${esc(item.name)}</b><small>${esc(item.description || "尚未填寫服務說明")}</small></div><div><b>${esc(item.durationLabel)}</b><small>${esc(item.durationMinutes)} 分鐘</small></div><div class="price">${esc(item.priceLabel || "尚未設定價格")}</div><div class="catalog-item-actions"><span class="catalog-order-actions" aria-label="項目排序"><button class="catalog-mini-btn" type="button" data-move-item="-1" title="上移項目" ${itemIndex === 0 ? "disabled" : ""}>↑</button><button class="catalog-mini-btn" type="button" data-move-item="1" title="下移項目" ${itemIndex === group.items.length - 1 ? "disabled" : ""}>↓</button></span><label class="catalog-toggle"><input type="checkbox" data-item-toggle ${item.enabled !== false ? "checked" : ""}> 開放</label><button class="catalog-mini-btn" type="button" data-edit-item>編輯</button><button class="catalog-mini-btn danger" type="button" data-delete-item>刪除</button></div></div>`).join("") : `<div class="catalog-admin-empty">這個區塊目前沒有項目。</div>`}</div></div>`).join("")}</section>`).join("")}</div>`;
 }
 
 function pricingMarkup() {
@@ -167,6 +177,12 @@ async function handleClick(event) {
   const currentCategory = categoryAt(key);
   if (!currentCategory) return;
 
+  if (button.matches("[data-move-category]")) {
+    const direction = Number(button.dataset.moveCategory);
+    if (![-1, 1].includes(direction)) return;
+    return commitChange((next) => moveEntry(next, (category) => category.key === key, direction), direction < 0 ? "正在上移服務分類…" : "正在下移服務分類…");
+  }
+
   if (button.matches("[data-edit-category]")) {
     const values = await openForm({ title: `編輯 ${currentCategory.name}`, fields: [
       { name: "name", label: "分類名稱", value: currentCategory.name, required: true },
@@ -204,6 +220,18 @@ async function handleClick(event) {
   if (!groupId) return;
   const currentGroup = groupAt(currentCategory, groupId);
   if (!currentGroup) return;
+
+  if (button.matches("[data-move-group]")) {
+    const direction = Number(button.dataset.moveGroup);
+    if (![-1, 1].includes(direction)) return;
+    return commitChange((next) => moveEntry(categoryAt(key, next).groups, (group) => group.id === groupId, direction), direction < 0 ? "正在上移服務區塊…" : "正在下移服務區塊…");
+  }
+
+  if (button.matches("[data-move-item]")) {
+    const direction = Number(button.dataset.moveItem);
+    if (!itemId || ![-1, 1].includes(direction)) return;
+    return commitChange((next) => moveEntry(groupAt(categoryAt(key, next), groupId).items, (item) => item.id === itemId, direction), direction < 0 ? "正在上移服務項目…" : "正在下移服務項目…");
+  }
 
   if (button.matches("[data-delete-group]")) {
     if (!confirm(`確定刪除「${currentGroup.title}」以及裡面的 ${currentGroup.items.length} 個項目？`)) return;
