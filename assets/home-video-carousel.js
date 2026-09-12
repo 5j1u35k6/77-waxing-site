@@ -1,21 +1,21 @@
 (()=>{
   const POSTS=[
-    ['DUGhMGBE8sE','https://www.instagram.com/p/DUGhMGBE8sE/'],
-    ['DUuGt-Rk3pz','https://www.instagram.com/p/DUuGt-Rk3pz/'],
-    ['DTlAcQUE61G','https://www.instagram.com/p/DTlAcQUE61G/'],
-    ['DRKZWu4E-Hw','https://www.instagram.com/p/DRKZWu4E-Hw/'],
-    ['DQIhm6Wk_yM','https://www.instagram.com/p/DQIhm6Wk_yM/'],
-    ['DCWqB-SOrI1','https://www.instagram.com/p/DCWqB-SOrI1/'],
-    ['DLQ0lbzS-rv','https://www.instagram.com/p/DLQ0lbzS-rv/'],
-    ['DR95-4vE6o-','https://www.instagram.com/p/DR95-4vE6o-/'],
-    ['DQfzi4mCuJq','https://www.instagram.com/p/DQfzi4mCuJq/'],
-    ['DPOe_Akk4NT','https://www.instagram.com/p/DPOe_Akk4NT/'],
-    ['DKEnFFgSYsV','https://www.instagram.com/p/DKEnFFgSYsV/'],
-    ['DH0JFjtzA4P','https://www.instagram.com/p/DH0JFjtzA4P/'],
-    ['DHlXkunTxvL','https://www.instagram.com/p/DHlXkunTxvL/'],
-    ['DDTsBunzhMW','https://www.instagram.com/p/DDTsBunzhMW/'],
-    ['DGmOSY_TaJ1','https://www.instagram.com/p/DGmOSY_TaJ1/'],
-    ['DGNabU8zg-R','https://www.instagram.com/p/DGNabU8zg-R/']
+    ['DUuGt-Rk3pz','https://www.instagram.com/reel/DUuGt-Rk3pz/'],
+    ['DUGhMGBE8sE','https://www.instagram.com/reel/DUGhMGBE8sE/'],
+    ['DTlAcQUE61G','https://www.instagram.com/reel/DTlAcQUE61G/'],
+    ['DR95-4vE6o-','https://www.instagram.com/reel/DR95-4vE6o-/'],
+    ['DRKZWu4E-Hw','https://www.instagram.com/reel/DRKZWu4E-Hw/'],
+    ['DQfzi4mCuJq','https://www.instagram.com/reel/DQfzi4mCuJq/'],
+    ['DQIhm6Wk_yM','https://www.instagram.com/reel/DQIhm6Wk_yM/'],
+    ['DPOe_Akk4NT','https://www.instagram.com/reel/DPOe_Akk4NT/'],
+    ['DLQ0lbzS-rv','https://www.instagram.com/reel/DLQ0lbzS-rv/'],
+    ['DKfIfq6yHbU','https://www.instagram.com/reel/DKfIfq6yHbU/'],
+    ['DKEnFFgSYsV','https://www.instagram.com/reel/DKEnFFgSYsV/'],
+    ['DH0JFjtzA4P','https://www.instagram.com/reel/DH0JFjtzA4P/'],
+    ['DHlXkunTxvL','https://www.instagram.com/reel/DHlXkunTxvL/'],
+    ['DGmOSY_TaJ1','https://www.instagram.com/reel/DGmOSY_TaJ1/'],
+    ['DGNabU8zg-R','https://www.instagram.com/reel/DGNabU8zg-R/'],
+    ['DDTsBunzhMW','https://www.instagram.com/reel/DDTsBunzhMW/']
   ].map(([code,url],index)=>({code,url,index}));
 
   const GROUPS=[
@@ -123,7 +123,7 @@
       const isActive=delta===0;
       return `<article class="home-video-card ${isActive?'is-active':''}" data-offset="${delta}" data-video-index="${postIndex}" aria-hidden="${isActive?'false':'true'}">
         <div class="home-video-embed-wrap">
-          <iframe src="https://www.instagram.com/p/${post.code}/embed/" loading="lazy" allowfullscreen title="77waxing Instagram 影片 ${pad(postIndex+1)}"></iframe>
+          <iframe src="https://www.instagram.com/reel/${post.code}/embed/" loading="lazy" allowfullscreen title="77waxing Instagram 影片 ${pad(postIndex+1)}"></iframe>
           ${isActive?'':`<button type="button" class="home-video-card-select" data-select-video="${postIndex}" aria-label="切換到第 ${postIndex+1} 支影片"></button>`}
         </div>
       </article>`;
