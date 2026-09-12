@@ -29,7 +29,6 @@
   let category='all';
   let active=0;
   let startX=null;
-  let dragged=false;
   let ignoreCardClick=false;
 
   const section=()=>document.querySelector('.home-video-section');
@@ -86,11 +85,6 @@
 
     root.querySelector('[data-video-stage]').addEventListener('pointerdown',event=>{
       startX=event.clientX;
-      dragged=false;
-    });
-    root.querySelector('[data-video-stage]').addEventListener('pointermove',event=>{
-      if(startX===null)return;
-      if(Math.abs(event.clientX-startX)>8)dragged=true;
     });
     root.querySelector('[data-video-stage]').addEventListener('pointerup',event=>{
       if(startX===null)return;
@@ -103,11 +97,10 @@
     });
     root.querySelector('[data-video-stage]').addEventListener('pointercancel',()=>{
       startX=null;
-      dragged=false;
     });
 
     root.querySelectorAll('[data-select-video]').forEach(button=>button.addEventListener('click',event=>{
-      if(ignoreCardClick||dragged){event.preventDefault();return}
+      if(ignoreCardClick){event.preventDefault();return}
       const next=Number(button.dataset.selectVideo);
       if(!Number.isInteger(next))return;
       active=next;
