@@ -1,0 +1,202 @@
+name: Fix public/admin Firebase auth isolation once
+
+on:
+  push:
+    paths:
+      - '.github/workflows/fix-public-admin-auth-isolation-once.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Isolate public anonymous auth from admin session
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          VERSION = '20260912-1330'
+
+          # Shared public Firebase app. The distinct app name gives anonymous
+          # public auth its own persisted auth namespace instead of [DEFAULT].
+          Path('assets/public-firebase.js').write_text('''import { getApps, initializeApp } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";\nimport { getAuth } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";\nimport { getFirestore } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";\nimport { firebaseConfig, firebaseConfigured } from "./firebase-config.js";\n\nexport const PUBLIC_FIREBASE_APP_NAME = "77waxing-public";\n\nexport function getPublicFirebase() {\n  if (!firebaseConfigured) throw new Error("FIREBASE_NOT_READY");\n  let app = getApps().find((candidate) => candidate.name === PUBLIC_FIREBASE_APP_NAME);\n  if (!app) app = initializeApp(firebaseConfig, PUBLIC_FIREBASE_APP_NAME);\n  return { app, auth: getAuth(app), db: getFirestore(app) };\n}\n''')
+
+          # service-catalog-store: public pages use the named public app; admin
+          # pages must use the non-anonymous [DEFAULT] admin session and must
+          # never silently sign in anonymously.
+          p = Path('assets/service-catalog-store.js')
+          text = p.read_text()
+          text = text.replace(
+              'import { getApp, getApps, initializeApp } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";',
+              'import { getApp, getApps } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";'
+          )
+          text = text.replace(
+              'import { firebaseConfig, firebaseConfigured } from "./firebase-config.js";',
+              f'import {{ firebaseConfigured }} from "./firebase-config.js";\nimport {{ getPublicFirebase }} from "./public-firebase.js?v={VERSION}";'
+          )
+          old = '''let app = null;\nlet auth = null;\nlet db = null;\nfunction ensureFirebase() {\n  if (!firebaseConfigured) throw new Error("FIREBASE_NOT_READY");\n  app = getApps().length ? getApp() : initializeApp(firebaseConfig);\n  auth = getAuth(app);\n  db = getFirestore(app);\n  return { app, auth, db };\n}\n\nasync function ensureSignedIn() {\n  ensureFirebase();\n  if (auth.currentUser) return auth.currentUser;\n  const credential = await signInAnonymously(auth);\n  return credential.user;\n}\n\n'''
+          new = '''let app = null;\nlet auth = null;\nlet db = null;\nconst isAdminContext = () => /\\/admin(?:\\/|$)/.test(location.pathname);\nfunction ensureFirebase() {\n  if (!firebaseConfigured) throw new Error("FIREBASE_NOT_READY");\n  if (isAdminContext()) {\n    const defaultApp = getApps().find((candidate) => candidate.name === "[DEFAULT]");\n    if (!defaultApp) throw new Error("ADMIN_FIREBASE_NOT_READY");\n    app = getApp();\n    auth = getAuth(app);\n    db = getFirestore(app);\n  } else {\n    ({ app, auth, db } = getPublicFirebase());\n  }\n  return { app, auth, db };\n}\n\nasync function ensureSignedIn() {\n  ensureFirebase();\n  if (typeof auth.authStateReady === "function") await auth.authStateReady();\n  if (auth.currentUser) {\n    if (isAdminContext() && auth.currentUser.isAnonymous) throw new Error("ADMIN_AUTH_REQUIRED");\n    return auth.currentUser;\n  }\n  if (isAdminContext()) throw new Error("ADMIN_AUTH_REQUIRED");\n  if (!window.__77_PUBLIC_ANON_AUTH_PROMISE__) {\n    window.__77_PUBLIC_ANON_AUTH_PROMISE__ = signInAnonymously(auth)\n      .then((credential) => credential.user)\n      .finally(() => { window.__77_PUBLIC_ANON_AUTH_PROMISE__ = null; });\n  }\n  return window.__77_PUBLIC_ANON_AUTH_PROMISE__;\n}\n\n'''
+          if old not in text:
+              raise SystemExit('service-catalog-store auth block not found')
+          text = text.replace(old, new, 1)
+          p.write_text(text)
+
+          # booking-core uses the isolated public Firebase app.
+          p = Path('assets/booking-core.js')
+          text = p.read_text()
+          text = text.replace('import { getApp, getApps, initializeApp } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";\n', '')
+          text = text.replace(
+              'import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";',
+              'import { signInAnonymously } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";'
+          )
+          text = text.replace(
+              'import { collection, doc, getDocsFromServer, getFirestore, query, runTransaction, serverTimestamp, where } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";',
+              'import { collection, doc, getDocsFromServer, query, runTransaction, serverTimestamp, where } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";'
+          )
+          text = text.replace(
+              'import { firebaseConfig, firebaseConfigured } from "./firebase-config.js";',
+              f'import {{ firebaseConfigured }} from "./firebase-config.js";\nimport {{ getPublicFirebase }} from "./public-firebase.js?v={VERSION}";'
+          )
+          old = '''let app = null;\nlet auth = null;\nlet db = null;\nif (firebaseConfigured) {\n  app = getApps().length ? getApp() : initializeApp(firebaseConfig);\n  auth = getAuth(app);\n  db = getFirestore(app);\n}\n'''
+          new = '''let app = null;\nlet auth = null;\nlet db = null;\nif (firebaseConfigured) {\n  ({ app, auth, db } = getPublicFirebase());\n}\n'''
+          if old not in text:
+              raise SystemExit('booking-core Firebase block not found')
+          text = text.replace(old, new, 1)
+          text = text.replace('__77_ANON_AUTH_PROMISE__', '__77_PUBLIC_ANON_AUTH_PROMISE__')
+          p.write_text(text)
+
+          # runtime settings must use the public app directly instead of [DEFAULT].
+          p = Path('assets/runtime-settings.js')
+          text = p.read_text()
+          text = text.replace('import { getApp, getApps } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";\n', '')
+          text = text.replace(
+              'import { getAuth, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";',
+              'import { onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";'
+          )
+          text = text.replace(
+              'import { doc, getFirestore, onSnapshot } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";',
+              f'import {{ doc, onSnapshot }} from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";\nimport {{ getPublicFirebase }} from "./public-firebase.js?v={VERSION}";'
+          )
+          text = text.replace('__77_ANON_AUTH_PROMISE__', '__77_PUBLIC_ANON_AUTH_PROMISE__')
+          old = '''async function init(){\n  if(!getApps().length)return;\n  const app=getApp();auth=getAuth(app);db=getFirestore(app);\n  try{await ensureSignedIn()}catch(e){console.error(e);return}\n  onSnapshot(doc(db,'settings','general'),snap=>{settings=snap.exists()?snap.data():{};applyAll()});\n  new MutationObserver(()=>queueMicrotask(applyAll)).observe(document.querySelector('#app')||document.body,{childList:true,subtree:true});\n  applyAll();\n}\nconst timer=setInterval(()=>{if(getApps().length){clearInterval(timer);init()}},100);\nsetTimeout(()=>clearInterval(timer),15000);'''
+          new = '''async function init(){\n  try{\n    const firebase=getPublicFirebase();\n    auth=firebase.auth;db=firebase.db;\n    await ensureSignedIn();\n  }catch(e){console.error(e);return}\n  onSnapshot(doc(db,'settings','general'),snap=>{settings=snap.exists()?snap.data():{};applyAll()});\n  new MutationObserver(()=>queueMicrotask(applyAll)).observe(document.querySelector('#app')||document.body,{childList:true,subtree:true});\n  applyAll();\n}\ninit();'''
+          if old not in text:
+              raise SystemExit('runtime-settings init block not found')
+          text = text.replace(old, new, 1)
+          p.write_text(text)
+
+          # booking slot status follows the same public app.
+          p = Path('assets/booking-slot-status.js')
+          text = p.read_text()
+          text = text.replace('import { getApp, getApps } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";\n', '')
+          text = text.replace(
+              'import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";',
+              'import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";'
+          )
+          text = text.replace(
+              'import { doc, getFirestore, onSnapshot } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";',
+              f'import {{ doc, onSnapshot }} from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";\nimport {{ getPublicFirebase }} from "./public-firebase.js?v={VERSION}";'
+          )
+          old = '''function boot() {\n  if (!getApps().length) return setTimeout(boot, 100);\n  const app = getApp();\n  db = getFirestore(app);\n  const auth = getAuth(app);\n  const ready = (user) => { if (user) start(); };\n  ready(auth.currentUser);\n  onAuthStateChanged(auth, ready);\n}\nboot();'''
+          new = '''function boot() {\n  let firebase;\n  try { firebase = getPublicFirebase(); } catch { return setTimeout(boot, 100); }\n  db = firebase.db;\n  const auth = firebase.auth;\n  const ready = (user) => { if (user) start(); };\n  ready(auth.currentUser);\n  onAuthStateChanged(auth, ready);\n}\nboot();'''
+          if old not in text:
+              raise SystemExit('booking-slot-status boot block not found')
+          text = text.replace(old, new, 1)
+          p.write_text(text)
+
+          # email dispatch is shared by booking and admin; select the appropriate app.
+          p = Path('assets/email-dispatch.js')
+          text = p.read_text()
+          if 'public-firebase.js' not in text:
+              text = text.replace(
+                  'import { collection, doc, getDoc, getDocs, getFirestore, onSnapshot, query, where } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";',
+                  f'import {{ collection, doc, getDoc, getDocs, getFirestore, onSnapshot, query, where }} from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";\nimport {{ getPublicFirebase }} from "./public-firebase.js?v={VERSION}";'
+              )
+          text = re.sub(r"const DISPATCH_VERSION='[^']+';", f"const DISPATCH_VERSION='{VERSION}';", text, count=1)
+          old = 'function appReady(){return getApps().length?getApp():null;}'
+          new = '''const isAdminContext=()=>/\\/admin(?:\\/|$)/.test(location.pathname);\nfunction appReady(){\n  if(isAdminContext())return getApps().some(app=>app.name==='[DEFAULT]')?getApp():null;\n  try{return getPublicFirebase().app}catch{return null}\n}'''
+          if old not in text:
+              raise SystemExit('email-dispatch appReady not found')
+          text = text.replace(old, new, 1)
+          p.write_text(text)
+
+          # Every module importing the catalog store should request the new build.
+          for p in Path('assets').glob('*.js'):
+              text = p.read_text()
+              text = re.sub(r'\./service-catalog-store\.js\?v=[^"\']+', f'./service-catalog-store.js?v={VERSION}', text)
+              p.write_text(text)
+
+          # Cache-bust all entry modules that participate in Firebase public/admin auth.
+          names = [
+              'runtime-settings.js', 'catalog-dynamic.js', 'booking-core.js',
+              'nav-service-catalog-sync.js', 'booking-slot-status.js',
+              'email-dispatch.js', 'admin-service-catalog.js'
+          ]
+          pattern = re.compile(r'((?:/77-waxing-site/|\.\./)assets/(?:' + '|'.join(re.escape(n) for n in names) + r')\?v=)[^"\']+')
+          for file in ['index.html', 'booking/index.html', 'admin/index.html']:
+              p = Path(file)
+              text = p.read_text()
+              text = pattern.sub(lambda m: m.group(1) + VERSION, text)
+              p.write_text(text)
+
+          # Persist the production rule.
+          p = Path('PROJECT_STATE.md')
+          state = p.read_text()
+          anchor = '- Firebase Authentication + Cloud Firestore 是正式資料層。\n'
+          addition = (
+              '- 公開前台匿名 Firebase Auth 固定使用獨立命名 app `77waxing-public`；不得與管理後台 `[DEFAULT]` 的管理員登入共用 Auth persistence，避免公開頁面匿名登入覆蓋後台 session。\n'
+              '- 管理後台讀寫 `services/catalog-main` 時只能使用 `[DEFAULT]` 的非匿名管理員 Auth；admin context 不得自動執行匿名登入。\n'
+          )
+          if addition not in state:
+              if anchor not in state:
+                  raise SystemExit('PROJECT_STATE Firebase anchor not found')
+              state = state.replace(anchor, anchor + addition, 1)
+          p.write_text(state)
+
+          # Add CI regression checks for auth isolation.
+          p = Path('.github/workflows/static-check.yml')
+          text = p.read_text()
+          anchor = '      - name: Check static asset references\n'
+          block = '''      - name: Check public and admin Firebase auth isolation\n        shell: bash\n        run: |\n          set -euo pipefail\n          grep -q 'PUBLIC_FIREBASE_APP_NAME = "77waxing-public"' assets/public-firebase.js\n          grep -q 'ADMIN_AUTH_REQUIRED' assets/service-catalog-store.js\n          grep -q 'getPublicFirebase' assets/booking-core.js\n          grep -q 'getPublicFirebase' assets/runtime-settings.js\n          grep -q 'getPublicFirebase' assets/booking-slot-status.js\n          grep -q 'isAdminContext' assets/email-dispatch.js\n          ! grep -q 'initializeApp(firebaseConfig);' assets/booking-core.js\n'''
+          if block not in text:
+              if anchor not in text:
+                  raise SystemExit('static-check insertion anchor not found')
+              text = text.replace(anchor, block + anchor, 1)
+          p.write_text(text)
+          PY
+
+      - name: Validate repair
+        shell: bash
+        run: |
+          set -euo pipefail
+          for file in assets/public-firebase.js assets/service-catalog-store.js assets/booking-core.js assets/runtime-settings.js assets/booking-slot-status.js assets/email-dispatch.js; do
+            cp "$file" "/tmp/$(basename "${file%.js}").mjs"
+            node --check "/tmp/$(basename "${file%.js}").mjs"
+          done
+          grep -q '77waxing-public' assets/public-firebase.js
+          grep -q 'ADMIN_AUTH_REQUIRED' assets/service-catalog-store.js
+          grep -q 'public-firebase.js?v=20260912-1330' assets/booking-core.js
+          grep -q 'admin-service-catalog.js?v=20260912-1330' admin/index.html
+          grep -q 'booking-core.js?v=20260912-1330' booking/index.html
+          grep -q 'runtime-settings.js?v=20260912-1330' index.html
+          grep -q '不得與管理後台' PROJECT_STATE.md
+
+      - name: Commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add assets/public-firebase.js assets/service-catalog-store.js assets/booking-core.js assets/runtime-settings.js assets/booking-slot-status.js assets/email-dispatch.js assets/*.js index.html booking/index.html admin/index.html PROJECT_STATE.md .github/workflows/static-check.yml
+          git commit -m 'fix: isolate public anonymous auth from admin session'
+          git push origin main
