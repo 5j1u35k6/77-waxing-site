@@ -16,7 +16,7 @@
   <link rel="stylesheet" href="./product-detail-polish.css?v=20260913-detail7">
   <link rel="stylesheet" href="./product-card-format.css?v=20260913-card3">
   <link rel="stylesheet" href="./variant-choice-format.css?v=20260913-variant1">
-  <link rel="stylesheet" href="./quantity-checkout-polish.css?v=20260913-qty1">
+  <link rel="stylesheet" href="./quantity-checkout-polish.css?v=20260913-qty2">
 </head>
 <body>
   <header class="shop-nav">
@@ -105,28 +105,47 @@
   <div id="checkout-wrap" class="hidden">
     <button id="checkout-backdrop" class="modal-backdrop" type="button" aria-label="關閉結帳"></button>
     <section class="modal" role="dialog" aria-modal="true" aria-label="訂購資料">
-      <div class="modal-head"><div><b>填寫訂購資料</b><div class="order-date">送出後由 77select 確認庫存與最終金額。</div></div><button id="checkout-close" class="icon-btn" type="button">關閉</button></div>
-      <form id="checkout-form">
-        <div class="modal-body">
-          <div class="form-grid">
-            <div class="field"><label for="checkout-name">收件人姓名 *</label><input id="checkout-name" autocomplete="name" maxlength="80" required></div>
-            <div class="field"><label for="checkout-phone">聯絡電話 *</label><input id="checkout-phone" type="tel" autocomplete="tel" maxlength="30" required></div>
-            <div class="field wide"><label for="checkout-email">Email *</label><input id="checkout-email" type="email" autocomplete="email" maxlength="160" required></div>
-            <div class="field"><label>交付方式 *</label><div id="delivery-options"></div></div>
-            <div class="field"><label>付款方式 *</label><div id="payment-options"></div></div>
-            <div id="store-fields" class="wide hidden">
-              <div class="form-grid">
-                <div class="field"><label for="checkout-store-name">超商門市名稱 *</label><input id="checkout-store-name" maxlength="80"></div>
-                <div class="field"><label for="checkout-store-id">門市店號 *</label><input id="checkout-store-id" maxlength="40"></div>
+      <div class="modal-head checkout-modal-head"><div><b>填寫訂購資料</b><div class="order-date">分成收件資料、配送付款、訂單確認三區，送出後由 77select 確認庫存與最終金額。</div></div><button id="checkout-close" class="icon-btn" type="button">關閉</button></div>
+      <form id="checkout-form" class="checkout-form-v2">
+        <div class="modal-body checkout-body-v2">
+          <div class="checkout-layout-v2">
+            <section class="checkout-section checkout-customer-section">
+              <div class="checkout-section-head"><span>1</span><div><h3>收件資料</h3><p>請填寫可以聯絡與收件的資料。</p></div></div>
+              <div class="form-grid checkout-customer-grid">
+                <div class="field"><label for="checkout-name">收件人姓名 *</label><input id="checkout-name" autocomplete="name" maxlength="80" required></div>
+                <div class="field"><label for="checkout-phone">聯絡電話 *</label><input id="checkout-phone" type="tel" autocomplete="tel" maxlength="30" required></div>
+                <div class="field wide"><label for="checkout-email">Email *</label><input id="checkout-email" type="email" autocomplete="email" maxlength="160" required></div>
               </div>
-            </div>
-            <div class="field wide"><label for="checkout-note">備註</label><textarea id="checkout-note" rows="3" maxlength="1000"></textarea></div>
+            </section>
+
+            <section class="checkout-section checkout-delivery-section">
+              <div class="checkout-section-head"><span>2</span><div><h3>配送與付款</h3><p>先選交付方式，再選可用付款方式。</p></div></div>
+              <div class="form-grid checkout-method-grid">
+                <div class="field"><label>交付方式 *</label><div id="delivery-options"></div></div>
+                <div class="field"><label>付款方式 *</label><div id="payment-options"></div></div>
+                <div id="store-fields" class="wide hidden">
+                  <div class="form-grid checkout-store-grid">
+                    <div class="field"><label for="checkout-store-name">超商門市名稱 *</label><input id="checkout-store-name" maxlength="80"></div>
+                    <div class="field"><label for="checkout-store-id">門市店號 *</label><input id="checkout-store-id" maxlength="40"></div>
+                  </div>
+                </div>
+              </div>
+              <p id="delivery-note" class="order-date checkout-delivery-note"></p>
+            </section>
+
+            <section class="checkout-section checkout-note-section">
+              <div class="checkout-section-head"><span>3</span><div><h3>備註</h3><p>有特殊需求再填，沒有可以留空。</p></div></div>
+              <div class="field"><label for="checkout-note">備註</label><textarea id="checkout-note" rows="3" maxlength="1000" placeholder="例如：希望聯絡時段、取貨提醒、其他訂購需求"></textarea></div>
+            </section>
+
+            <aside class="checkout-section checkout-summary-card" aria-label="訂單確認">
+              <div class="checkout-section-head checkout-summary-head"><span>✓</span><div><h3>訂單確認</h3><p>請確認商品、運費與預估總計。</p></div></div>
+              <div id="checkout-summary" class="checkout-total"></div>
+              <label class="check-line checkout-terms-line"><input id="checkout-terms" type="checkbox" required><span>我已閱讀並同意 <a href="./policies.html" target="_blank" rel="noopener"><u>訂購、退換貨與隱私說明</u></a>。本站不會要求在網頁中輸入信用卡卡號。</span></label>
+            </aside>
           </div>
-          <p id="delivery-note" class="order-date"></p>
-          <div id="checkout-summary" class="checkout-total"></div>
-          <label class="check-line" style="margin-top:18px"><input id="checkout-terms" type="checkbox" required><span>我已閱讀並同意 <a href="./policies.html" target="_blank" rel="noopener"><u>訂購、退換貨與隱私說明</u></a>。本站不會要求在網頁中輸入信用卡卡號。</span></label>
         </div>
-        <div class="modal-foot"><span></span><button id="checkout-submit" class="primary-btn" type="submit">送出訂單</button></div>
+        <div class="modal-foot checkout-foot-v2"><span>確認資料無誤後送出訂單</span><button id="checkout-submit" class="primary-btn" type="submit">送出訂單</button></div>
       </form>
     </section>
   </div>
