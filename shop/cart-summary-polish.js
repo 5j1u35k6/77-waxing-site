@@ -22,8 +22,22 @@ function money(value, currency) {
   return `NT$${amount.toLocaleString("zh-TW")}`;
 }
 
-function line(label, operator, value, currency, extraClass = "") {
+function esc(value) {
+  return String(value ?? "").replace(/[&<>"']/g, (char) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;",
+  }[char]));
+}
+
+function cartMathRow(label, operator, value, currency, extraClass = "") {
   return `<div class="cart-math-row ${extraClass}"><span class="cart-math-label">${label}</span><span class="cart-math-op">${operator}</span><b class="cart-math-value">${money(value, currency)}</b></div>`;
+}
+
+function discountToggleRow(value, currency, open) {
+  return `<button class="cart-math-row discount cart-math-discount-toggle" type="button" data-cart-discount-toggle aria-expanded="${open ? "true" : "false"}" aria-controls="cart-discount-detail"><span class="cart-math-label">活動折扣</span><span class="cart-math-op">−</span><b class="cart-math-value">${money(value, currency)}</b></button>`;
 }
 
 function cartRowSubtotal(row) {
@@ -32,13 +46,42 @@ function cartRowSubtotal(row) {
   return parseMoney(priceText) * Math.max(1, Math.round(Number(qtyText) || 1));
 }
 
+function cartRowLabel(row) {
+  const title = row.querySelector("h4")?.textContent?.trim() || "商品";
+  const variant = row.querySelector(".cart-variant")?.textContent?.trim() || "";
+  const qty = row.querySelector(".qty b")?.textContent?.trim() || row.querySelector("p")?.textContent?.match(/×\s*(\d+)/)?.[1] || "1";
+  const price = row.querySelector("p b")?.textContent?.trim() || "";
+  return `${title}${variant ? `｜${variant}` : ""} × ${qty}${price ? `（單件 ${price}）` : ""}`;
+}
+
 function noteDiscountTotal() {
-  return $$("#cart-items .promo-bridge-note").reduce((sum, node) => {
-    const text = node.textContent || "";
-    if (!/-\s*(NT\$|HK\$)/.test(text)) return sum;
-    const match = text.match(/-\s*((?:NT\$|HK\$)\s*[0-9,]+)/);
+  return $$("#cart-items .promo-bridge-note, #checkout-summary .promo-bridge-line").reduce((sum, node) => {
+    const text = node.dataset.originalPromoText || node.textContent || "";
+    if (!/[-−]\s*(NT\$|HK\$)/.test(text)) return sum;
+    const match = text.match(/[-−]\s*((?:NT\$|HK\$)\s*[0-9,]+)/);
     return sum + parseMoney(match?.[1] || "0");
   }, 0);
+}
+
+function promotionNotes() {
+  const notes = [];
+  $$("#cart-items .promo-bridge-note, #checkout-summary .promo-bridge-line").forEach((node) => {
+    const text = (node.dataset.originalPromoText || node.textContent || "").trim();
+    if (text && !notes.includes(text)) notes.push(text);
+  });
+  return notes;
+}
+
+function discountDetailHtml(subtotalBeforeDiscount, discount, currency, open) {
+  const promoRows = promotionNotes().map((text) => `<li>${esc(text.replace(/^已套用\s*/u, "").replace(/^促銷優惠[｜\s]*/u, ""))}</li>`).join("") || "<li>折扣明細正在同步，請稍候。</li>";
+  const itemRows = $$("#cart-items .regional-cart-row,#cart-items .cart-row").map((row) => `<li>${esc(cartRowLabel(row))}</li>`).join("") || "<li>購物車目前沒有商品。</li>";
+  return `<div id="cart-discount-detail" class="cart-discount-detail" ${open ? "" : "hidden"}>
+    <h4>活動折扣明細</h4>
+    <p>折扣前小計 ${money(subtotalBeforeDiscount, currency)}，本次活動折扣 ${money(discount, currency)}。</p>
+    <ul>${promoRows}</ul>
+    <h4>套用商品</h4>
+    <ul>${itemRows}</ul>
+  </div>`;
 }
 
 function syncCartMath() {
@@ -67,10 +110,12 @@ function syncCartMath() {
     }
 
     const shippingEstimate = 0;
+    const wasOpen = existing?.querySelector("#cart-discount-detail")?.hidden === false;
     const html = [
-      line("小計", "", subtotalBeforeDiscount, currency),
-      line("活動折扣", "−", discount, currency, "discount"),
-      line("運費", "+", shippingEstimate, currency),
+      cartMathRow("小計", "", subtotalBeforeDiscount, currency),
+      discountToggleRow(discount, currency, wasOpen),
+      discountDetailHtml(subtotalBeforeDiscount, discount, currency, wasOpen),
+      cartMathRow("運費", "+", shippingEstimate, currency),
     ].join("");
 
     if (existing) {
@@ -81,17 +126,72 @@ function syncCartMath() {
       box.innerHTML = html;
       foot.insertBefore(box, totalLine);
     }
-    if (label) label.textContent = "折扣後小計";
+    if (label) label.textContent = "總計";
   } finally {
     applying = false;
   }
 }
 
+function enhanceCheckoutDiscounts() {
+  $$("#checkout-summary .promo-bridge-line").forEach((line, index) => {
+    const rawText = line.dataset.originalPromoText || line.textContent.trim();
+    line.dataset.originalPromoText = rawText;
+    const amount = Math.abs(parseMoney(line.querySelector("b")?.textContent || rawText));
+    const detailId = `checkout-promo-detail-${index + 1}`;
+    const wasOpen = line.getAttribute("aria-expanded") === "true" && document.getElementById(detailId)?.hidden === false;
+    line.setAttribute("role", "button");
+    line.setAttribute("tabindex", "0");
+    line.setAttribute("aria-expanded", String(wasOpen));
+    line.setAttribute("aria-controls", detailId);
+    line.innerHTML = `<span>活動折扣</span><em>−</em><b>${money(amount, currencyOf(rawText))}</b>`;
+    const next = line.nextElementSibling;
+    const detailHtml = `<div id="${detailId}" class="checkout-discount-detail" ${wasOpen ? "" : "hidden"}><h4>活動折扣明細</h4><ul><li>${esc(rawText.replace(/^促銷優惠[｜\s]*/u, ""))}</li></ul></div>`;
+    if (next?.classList?.contains("checkout-discount-detail")) {
+      if (next.outerHTML !== detailHtml) next.outerHTML = detailHtml;
+    } else {
+      line.insertAdjacentHTML("afterend", detailHtml);
+    }
+  });
+
+  $$("#checkout-summary .totals-line").forEach((line) => {
+    const label = line.querySelector("span")?.textContent || "";
+    if (!/運費|處理費/.test(label)) return;
+    line.classList.add("checkout-math-line");
+    if (!line.querySelector("em")) {
+      line.querySelector("b")?.insertAdjacentHTML("beforebegin", "<em>＋</em>");
+    }
+  });
+}
+
+function syncAll() {
+  syncCartMath();
+  enhanceCheckoutDiscounts();
+}
+
 function scheduleSync() {
   if (scheduled) return;
   scheduled = true;
-  requestAnimationFrame(syncCartMath);
+  requestAnimationFrame(syncAll);
 }
+
+document.addEventListener("click", (event) => {
+  const button = event.target.closest?.("[data-cart-discount-toggle], #checkout-summary .promo-bridge-line[role='button']");
+  if (!button) return;
+  const detail = document.getElementById(button.getAttribute("aria-controls") || "");
+  if (!detail) return;
+  event.preventDefault();
+  const open = detail.hidden;
+  detail.hidden = !open;
+  button.setAttribute("aria-expanded", String(open));
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key !== "Enter" && event.key !== " ") return;
+  const button = event.target.closest?.("#checkout-summary .promo-bridge-line[role='button']");
+  if (!button) return;
+  event.preventDefault();
+  button.click();
+});
 
 new MutationObserver(scheduleSync).observe(document.documentElement, {
   childList: true,
