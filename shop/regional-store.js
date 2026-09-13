@@ -1,9 +1,9 @@
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
-import { collection, doc, getDocs, onSnapshot, query, serverTimestamp, setDoc, where } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
+import { collection, doc, getDoc, getDocs, onSnapshot, query, serverTimestamp, setDoc, where } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
 import { getPublicFirebase } from "../assets/public-firebase.js?v=20260913-shop2";
 
 const { auth, db } = getPublicFirebase();
-const CART_KEY = "77select_cart_v3";
+const CART_KEY = "77select_cart_v4";
 const MARKET_CACHE_KEY = "77select_market_v1";
 const DEFAULT_EMAIL_URL = "https://script.google.com/macros/s/AKfycbx6iC26KXbHWYte5XhLGNRMmG16Yydx2vPHDxYpmp4rmWn3plk__6Qwwr7Y09hLptTW/exec";
 
@@ -21,6 +21,8 @@ let currentUser = null;
 let ownOrders = [];
 let settings = {};
 let renderingOrders = false;
+let renderingCart = false;
+let renderingProducts = false;
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -66,6 +68,9 @@ function normalizeVariants(product = {}) {
       priceTWD: int(variant.priceTWD ?? variant.priceTW ?? variant.price ?? product.price ?? 0),
       priceHKD: int(variant.priceHKD ?? variant.priceHK ?? product.priceHKD ?? 0),
       stock: int(variant.stock ?? product.stock ?? 0),
+      bulkMinQty: int(variant.bulkMinQty ?? variant.quantityDiscountMin ?? 0),
+      bulkPriceTWD: int(variant.bulkPriceTWD ?? variant.quantityDiscountTWD ?? 0),
+      bulkPriceHKD: int(variant.bulkPriceHKD ?? variant.quantityDiscountHKD ?? 0),
     }));
   }
   return [{
@@ -75,26 +80,74 @@ function normalizeVariants(product = {}) {
     priceTWD: int(product.price || 0),
     priceHKD: int(product.priceHKD || product.price || 0),
     stock: int(product.stock || 0),
+    bulkMinQty: 0,
+    bulkPriceTWD: 0,
+    bulkPriceHKD: 0,
   }];
 }
 
-function priceFor(variant) {
+function basePriceFor(variant) {
   return market.code === "HK" ? int(variant.priceHKD) : int(variant.priceTWD);
+}
+
+function bulkPriceFor(variant) {
+  return market.code === "HK" ? int(variant.bulkPriceHKD) : int(variant.bulkPriceTWD);
+}
+
+function bulkEnabled(variant) {
+  const bulk = bulkPriceFor(variant);
+  return int(variant.bulkMinQty) >= 2 && bulk > 0 && bulk <= basePriceFor(variant);
+}
+
+function unitPriceFor(variant, qty = 1) {
+  if (bulkEnabled(variant) && int(qty) >= int(variant.bulkMinQty)) return bulkPriceFor(variant);
+  return basePriceFor(variant);
 }
 
 function variantLabel(variant) {
   return [variant.name, variant.capacity].filter(Boolean).join("｜");
 }
 
+function discountText(variant) {
+  if (!bulkEnabled(variant)) return "";
+  return `滿 ${variant.bulkMinQty} 件，單件 ${money(bulkPriceFor(variant))}`;
+}
+
 function productMinPrice(product) {
   const available = normalizeVariants(product).filter((variant) => variant.stock > 0);
   const source = available.length ? available : normalizeVariants(product);
-  const prices = source.map(priceFor);
+  const prices = source.map(basePriceFor);
   return prices.length ? Math.min(...prices) : 0;
 }
 
 function totalStock(product) {
   return normalizeVariants(product).reduce((sum, variant) => sum + int(variant.stock), 0);
+}
+
+function normalizeMedia(product = {}) {
+  const source = Array.isArray(product.media) ? product.media : [];
+  const rows = source.map((row, index) => ({
+    id: String(row?.id || `image-${index + 1}`),
+    url: String(row?.url || row?.dataUrl || row?.imageUrl || ""),
+    variantId: String(row?.variantId || ""),
+    sortOrder: Number.isFinite(Number(row?.sortOrder)) ? Number(row.sortOrder) : index,
+  })).filter((row) => row.url).sort((a, b) => a.sortOrder - b.sortOrder);
+  if (!rows.length && product.imageUrl) rows.push({ id: "legacy-main", url: String(product.imageUrl), variantId: "", sortOrder: 0 });
+  return rows;
+}
+
+function mediaForVariant(product, variantId = "") {
+  const all = normalizeMedia(product);
+  if (!all.length) return [];
+  const shared = all.filter((row) => !row.variantId);
+  if (!variantId) return shared.length ? shared : all;
+  const specific = all.filter((row) => row.variantId === variantId);
+  const result = [...shared, ...specific];
+  return result.length ? result : all;
+}
+
+function primaryImage(product, variantId = "") {
+  return mediaForVariant(product, variantId)[0]?.url || "";
 }
 
 async function detectMarket() {
@@ -141,18 +194,31 @@ function ensureMarketBadge() {
   document.documentElement.dataset.market = market.code;
 }
 
-function mediaMarkup(product) {
-  if (!product.imageUrl) return `<div class="product-media">77select</div>`;
-  return `<div class="product-media"><img src="${esc(product.imageUrl)}" alt="${esc(product.name)}" loading="lazy"></div>`;
+function cardMediaMarkup(product) {
+  const image = primaryImage(product);
+  if (!image) return `<div class="product-media store-product-media">77select</div>`;
+  return `<div class="product-media store-product-media"><img src="${esc(image)}" alt="${esc(product.name)}" loading="lazy"></div>`;
+}
+
+function galleryMarkup(product, variantId) {
+  const media = mediaForVariant(product, variantId);
+  if (!media.length) return `<div class="product-gallery"><div class="product-gallery-main product-media">77select</div></div>`;
+  const first = media[0];
+  return `<div class="product-gallery">
+    <div class="product-gallery-main"><img data-gallery-main src="${esc(first.url)}" alt="${esc(product.name)}"></div>
+    ${media.length > 1 ? `<div class="product-gallery-thumbs">${media.map((row, index) => `<button type="button" class="gallery-thumb${index === 0 ? " on" : ""}" data-gallery-thumb="${esc(row.id)}" data-gallery-url="${esc(row.url)}" aria-label="查看商品圖片 ${index + 1}"><img src="${esc(row.url)}" alt=""></button>`).join("")}</div>` : ""}
+  </div>`;
 }
 
 function renderProducts() {
   const grid = $("#product-grid");
   if (!grid) return;
+  renderingProducts = true;
   const activeCategory = $("#category-filters .filter-btn.on")?.dataset.category || "全部商品";
   const visible = activeCategory === "全部商品" ? products : products.filter((p) => (p.category || "其他") === activeCategory);
   if (!visible.length) {
     grid.innerHTML = `<div class="empty-state">目前沒有可訂購商品。</div>`;
+    renderingProducts = false;
     return;
   }
 
@@ -161,17 +227,20 @@ function renderProducts() {
     const stock = totalStock(product);
     const minPrice = productMinPrice(product);
     const priceText = variants.length > 1 ? `${money(minPrice)} 起` : money(minPrice);
+    const hasBulk = variants.some(bulkEnabled);
     return `<article class="product-card regional-product-card">
-      ${mediaMarkup(product)}
+      ${cardMediaMarkup(product)}
       <div class="product-body">
         <div class="product-top"><h3 class="product-title">${esc(product.name)}</h3><div class="product-price">${priceText}</div></div>
         <div class="market-inline">${esc(market.label)}專屬售價</div>
+        ${hasBulk ? `<div class="bulk-badge">多件優惠</div>` : ""}
         <p class="product-desc">${esc(product.description || "")}</p>
         <div class="product-meta"><span>${esc(product.category || "其他")}</span><span>${variants.length} 種規格${stock > 0 ? `｜共 ${stock} 件` : "｜目前售完"}</span></div>
-        <div class="product-actions"><button class="primary-btn" data-regional-buy="${esc(product.id)}" ${stock <= 0 ? "disabled" : ""}>${stock <= 0 ? "售完" : variants.length > 1 ? "選擇規格" : "加入購物車"}</button><button class="secondary-btn" data-regional-detail="${esc(product.id)}">詳情</button></div>
+        <div class="product-actions"><button class="primary-btn" data-regional-buy="${esc(product.id)}" ${stock <= 0 ? "disabled" : ""}>${stock <= 0 ? "售完" : variants.length > 1 || hasBulk ? "選擇規格" : "加入購物車"}</button><button class="secondary-btn" data-regional-detail="${esc(product.id)}">詳情</button></div>
       </div>
     </article>`;
   }).join("");
+  renderingProducts = false;
 }
 
 function renderFilters() {
@@ -183,6 +252,38 @@ function renderFilters() {
   host.innerHTML = categories.map((name) => `<button class="filter-btn${name === chosen ? " on" : ""}" type="button" data-regional-category="${esc(name)}" data-category="${esc(name)}">${esc(name)}</button>`).join("");
 }
 
+function renderProductDetail() {
+  if (!selectedProduct) return;
+  const variants = normalizeVariants(selectedProduct);
+  const selectedVariant = variants.find((row) => row.id === selectedVariantId) || variants[0];
+  selectedVariantId = selectedVariant?.id || null;
+  const body = $("#product-detail-body");
+  if (!body) return;
+
+  body.innerHTML = `<div class="product-detail regional-product-detail">
+    ${galleryMarkup(selectedProduct, selectedVariantId)}
+    <div class="product-detail-copy">
+      <span class="eyebrow">${esc(selectedProduct.category || "PRODUCT")}</span>
+      <h2>${esc(selectedProduct.name)}</h2>
+      <div class="market-inline strong">${esc(market.label)}｜${esc(market.currency)} 專屬價格</div>
+      <p>${esc(selectedProduct.description || "")}</p>
+      <div class="variant-picker" role="radiogroup" aria-label="選擇商品規格">
+        ${variants.map((variant) => {
+          const disabled = variant.stock <= 0;
+          const discount = discountText(variant);
+          return `<button type="button" class="variant-choice${variant.id === selectedVariantId ? " on" : ""}" data-regional-variant="${esc(variant.id)}" ${disabled ? "disabled" : ""}>
+            <span><b>${esc(variant.name)}</b>${variant.capacity ? `<small>${esc(variant.capacity)}</small>` : ""}${discount ? `<small class="bulk-copy">${esc(discount)}</small>` : ""}</span>
+            <span class="variant-choice-price">${money(basePriceFor(variant))}${disabled ? `<small>售完</small>` : `<small>庫存 ${variant.stock}</small>`}</span>
+          </button>`;
+        }).join("")}
+      </div>
+      ${selectedVariant && discountText(selectedVariant) ? `<div class="bulk-notice">數量優惠｜${esc(discountText(selectedVariant))}</div>` : ""}
+      ${selectedProduct.spec ? `<div class="spec">${esc(selectedProduct.spec)}</div>` : ""}
+    </div>
+  </div>`;
+  updateDetailAddButton();
+}
+
 function openProduct(productId) {
   const product = products.find((row) => row.id === productId);
   if (!product) return;
@@ -190,29 +291,7 @@ function openProduct(productId) {
   const variants = normalizeVariants(product);
   const firstAvailable = variants.find((variant) => variant.stock > 0) || variants[0];
   selectedVariantId = firstAvailable?.id || null;
-
-  const body = $("#product-detail-body");
-  if (!body) return;
-  body.innerHTML = `<div class="product-detail regional-product-detail">
-    ${mediaMarkup(product)}
-    <div class="product-detail-copy">
-      <span class="eyebrow">${esc(product.category || "PRODUCT")}</span>
-      <h2>${esc(product.name)}</h2>
-      <div class="market-inline strong">${esc(market.label)}｜${esc(market.currency)} 專屬價格</div>
-      <p>${esc(product.description || "")}</p>
-      <div class="variant-picker" role="radiogroup" aria-label="選擇商品規格">
-        ${variants.map((variant) => {
-          const disabled = variant.stock <= 0;
-          return `<button type="button" class="variant-choice${variant.id === selectedVariantId ? " on" : ""}" data-regional-variant="${esc(variant.id)}" ${disabled ? "disabled" : ""}>
-            <span><b>${esc(variant.name)}</b>${variant.capacity ? `<small>${esc(variant.capacity)}</small>` : ""}</span>
-            <span class="variant-choice-price">${money(priceFor(variant))}${disabled ? `<small>售完</small>` : `<small>庫存 ${variant.stock}</small>`}</span>
-          </button>`;
-        }).join("")}
-      </div>
-      ${product.spec ? `<div class="spec">${esc(product.spec)}</div>` : ""}
-    </div>
-  </div>`;
-  updateDetailAddButton();
+  renderProductDetail();
   $("#product-modal-wrap")?.classList.remove("hidden");
   document.body.style.overflow = "hidden";
 }
@@ -222,7 +301,7 @@ function updateDetailAddButton() {
   if (!button || !selectedProduct) return;
   const variant = normalizeVariants(selectedProduct).find((row) => row.id === selectedVariantId);
   button.disabled = !variant || variant.stock <= 0;
-  button.textContent = variant && variant.stock > 0 ? `加入購物車｜${money(priceFor(variant))}` : "目前售完";
+  button.textContent = variant && variant.stock > 0 ? `加入購物車｜${money(basePriceFor(variant))}` : "目前售完";
 }
 
 function addVariantToCart(productId, variantId) {
@@ -234,21 +313,31 @@ function addVariantToCart(productId, variantId) {
   const existing = cart.find((row) => row.key === key);
   const nextQty = int(existing?.qty) + 1;
   if (nextQty > variant.stock) return toast("購物車數量已達此規格目前庫存。", "error");
+  const price = unitPriceFor(variant, nextQty);
 
-  if (existing) existing.qty = nextQty;
-  else cart.push({
-    key,
-    productId: product.id,
-    variantId: variant.id,
-    name: product.name,
-    variantName: variant.name,
-    capacity: variant.capacity,
-    region: market.code,
-    currency: market.currency,
-    price: priceFor(variant),
-    imageUrl: product.imageUrl || "",
-    qty: 1,
-  });
+  if (existing) {
+    existing.qty = nextQty;
+    existing.price = price;
+    existing.listPrice = basePriceFor(variant);
+    existing.discountApplied = price < existing.listPrice;
+  } else {
+    cart.push({
+      key,
+      productId: product.id,
+      variantId: variant.id,
+      name: product.name,
+      variantName: variant.name,
+      capacity: variant.capacity,
+      region: market.code,
+      currency: market.currency,
+      price,
+      listPrice: basePriceFor(variant),
+      bulkMinQty: variant.bulkMinQty,
+      discountApplied: price < basePriceFor(variant),
+      imageUrl: primaryImage(product, variant.id),
+      qty: 1,
+    });
+  }
   saveCart();
   toast(`已加入 ${product.name}｜${variantLabel(variant)}`);
 }
@@ -262,8 +351,10 @@ function reconcileCart() {
     const variant = normalizeVariants(product).find((item) => item.id === row.variantId);
     if (!variant) { changed = true; return false; }
     const qty = Math.min(int(row.qty), variant.stock);
-    const price = priceFor(variant);
-    if (qty !== int(row.qty) || row.price !== price || row.name !== product.name || row.variantName !== variant.name || row.capacity !== variant.capacity) changed = true;
+    const listPrice = basePriceFor(variant);
+    const price = unitPriceFor(variant, qty);
+    const nextImage = primaryImage(product, variant.id);
+    if (qty !== int(row.qty) || row.price !== price || row.listPrice !== listPrice || row.name !== product.name || row.variantName !== variant.name || row.capacity !== variant.capacity || row.imageUrl !== nextImage) changed = true;
     Object.assign(row, {
       key: cartKey(product.id, variant.id),
       productId: product.id,
@@ -274,7 +365,10 @@ function reconcileCart() {
       region: market.code,
       currency: market.currency,
       price,
-      imageUrl: product.imageUrl || "",
+      listPrice,
+      bulkMinQty: variant.bulkMinQty,
+      discountApplied: price < listPrice,
+      imageUrl: nextImage,
       qty,
     });
     return qty > 0;
@@ -290,18 +384,24 @@ function changeQty(key, delta) {
   if (!variant) return;
   row.qty = Math.min(variant.stock, Math.max(0, int(row.qty) + Number(delta || 0)));
   if (!row.qty) cart = cart.filter((item) => item.key !== key);
+  else {
+    row.listPrice = basePriceFor(variant);
+    row.price = unitPriceFor(variant, row.qty);
+    row.discountApplied = row.price < row.listPrice;
+  }
   saveCart();
 }
 
 function renderCart() {
   const container = $("#cart-items");
   if (!container) return;
+  renderingCart = true;
   if (!cart.length) {
-    container.innerHTML = `<div class="empty-state">購物車目前是空的。</div>`;
+    container.innerHTML = `<div class="empty-state" data-regional-cart>購物車目前是空的。</div>`;
   } else {
-    container.innerHTML = cart.map((row) => `<div class="cart-row regional-cart-row">
+    container.innerHTML = cart.map((row) => `<div class="cart-row regional-cart-row" data-regional-cart>
       <div class="product-media">${row.imageUrl ? `<img src="${esc(row.imageUrl)}" alt="">` : "77"}</div>
-      <div><h4>${esc(row.name)}</h4><div class="cart-variant">${esc([row.variantName, row.capacity].filter(Boolean).join("｜"))}</div><p>${money(row.price, row.currency)} × ${int(row.qty)}</p><div class="qty"><button type="button" data-regional-qty="${esc(row.key)}" data-delta="-1">−</button><b>${int(row.qty)}</b><button type="button" data-regional-qty="${esc(row.key)}" data-delta="1">＋</button></div></div>
+      <div><h4>${esc(row.name)}</h4><div class="cart-variant">${esc([row.variantName, row.capacity].filter(Boolean).join("｜"))}</div><p>${row.discountApplied ? `<span class="cart-list-price">${money(row.listPrice, row.currency)}</span> ` : ""}<b>${money(row.price, row.currency)}</b> × ${int(row.qty)}</p>${row.discountApplied ? `<div class="cart-discount-note">已套用 ${int(row.bulkMinQty)} 件以上優惠</div>` : ""}<div class="qty"><button type="button" data-regional-qty="${esc(row.key)}" data-delta="-1">−</button><b>${int(row.qty)}</b><button type="button" data-regional-qty="${esc(row.key)}" data-delta="1">＋</button></div></div>
       <button class="icon-btn" type="button" data-regional-remove="${esc(row.key)}" aria-label="移除">×</button>
     </div>`).join("");
   }
@@ -325,6 +425,7 @@ function renderCart() {
   } else {
     note?.remove();
   }
+  renderingCart = false;
 }
 
 function deliveryOptions() {
@@ -362,7 +463,7 @@ function updateCheckoutOptions() {
   $("#store-fields")?.classList.toggle("hidden", delivery.id === "pickup");
   if ($("#delivery-note")) $("#delivery-note").textContent = delivery.id === "pickup" ? String(settings.pickupNote || "") : "請填寫取貨門市名稱與店號；訂單確認後再依店家通知完成付款與交付。";
   const subtotal = cart.reduce((sum, row) => sum + Number(row.price || 0) * int(row.qty), 0);
-  $("#checkout-summary").innerHTML = `${cart.map((row) => `<div class="totals-line"><span>${esc(row.name)}｜${esc([row.variantName, row.capacity].filter(Boolean).join("｜"))} × ${int(row.qty)}</span><b>${money(Number(row.price || 0) * int(row.qty))}</b></div>`).join("")}<div class="totals-line"><span>運費／處理費</span><b>${money(delivery.fee)}</b></div><div class="totals-line total"><span>預估總計</span><b>${money(subtotal + delivery.fee)}</b></div>`;
+  $("#checkout-summary").innerHTML = `${cart.map((row) => `<div class="totals-line"><span>${esc(row.name)}｜${esc([row.variantName, row.capacity].filter(Boolean).join("｜"))} × ${int(row.qty)}${row.discountApplied ? "（多件優惠）" : ""}</span><b>${money(Number(row.price || 0) * int(row.qty))}</b></div>`).join("")}<div class="totals-line"><span>運費／處理費</span><b>${money(delivery.fee)}</b></div><div class="totals-line total"><span>預估總計</span><b>${money(subtotal + delivery.fee)}</b></div>`;
 }
 
 function validEmail(value) {
@@ -418,7 +519,10 @@ async function submitOrder(event) {
       region: market.code,
       currency: market.currency,
       quantity: int(row.qty),
+      listUnitPrice: Number(row.listPrice || row.price || 0),
       unitPrice: Number(row.price || 0),
+      discountApplied: Boolean(row.discountApplied),
+      bulkMinQty: int(row.bulkMinQty || 0),
       imageUrl: row.imageUrl || "",
     }));
     const subtotal = items.reduce((sum, row) => sum + row.unitPrice * row.quantity, 0);
@@ -503,24 +607,26 @@ function renderOrders() {
       const currency = orderCurrency(order);
       const statusClass = order.status === "cancelled" ? "cancelled" : order.status === "pending" ? "pending" : "";
       const deliveryText = order.deliveryMethod === "pickup" ? "工作室自取" : order.deliveryMethod === "7-11" ? "7-11" : order.deliveryMethod === "family" ? "全家" : order.deliveryMethod || "—";
-      return `<article class="order-card"><div class="order-head"><div><div class="order-no">${esc(order.orderNo || order.id)}</div></div><span class="status ${statusClass}">${esc(STATUS[order.status] || order.status || "處理中")}</span></div><div class="order-items">${(order.items || []).map((item) => `<div class="order-line"><span>${esc(item.name)}${item.variantName || item.capacity ? `｜${esc([item.variantName, item.capacity].filter(Boolean).join("｜"))}` : ""} × ${int(item.quantity)}</span><b>${money(Number(item.unitPrice || 0) * int(item.quantity), item.currency || currency)}</b></div>`).join("")}</div><div class="order-line"><span>交付方式</span><span>${esc(deliveryText)}${order.storeInfo ? `｜${esc(order.storeInfo)}` : ""}</span></div>${order.trackingNumber ? `<div class="order-line"><span>物流編號</span><b>${esc(order.trackingNumber)}</b></div>` : ""}<div class="totals-line total"><span>總計</span><b>${money(order.total, currency)}</b></div></article>`;
+      return `<article class="order-card"><div class="order-head"><div><div class="order-no">${esc(order.orderNo || order.id)}</div></div><span class="status ${statusClass}">${esc(STATUS[order.status] || order.status || "處理中")}</span></div><div class="order-items">${(order.items || []).map((item) => `<div class="order-line"><span>${esc(item.name)}${item.variantName || item.capacity ? `｜${esc([item.variantName, item.capacity].filter(Boolean).join("｜"))}` : ""} × ${int(item.quantity)}${item.discountApplied ? "（多件優惠）" : ""}</span><b>${money(Number(item.unitPrice || 0) * int(item.quantity), item.currency || currency)}</b></div>`).join("")}</div><div class="order-line"><span>交付方式</span><span>${esc(deliveryText)}${order.storeInfo ? `｜${esc(order.storeInfo)}` : ""}</span></div>${order.trackingNumber ? `<div class="order-line"><span>物流編號</span><b>${esc(order.trackingNumber)}</b></div>` : ""}<div class="totals-line total"><span>總計</span><b>${money(order.total, currency)}</b></div></article>`;
     }).join("");
   }
-  queueMicrotask(() => { renderingOrders = false; });
+  renderingOrders = false;
+}
+
+async function loadSettings() {
+  const snap = await getDoc(doc(db, "shopSettings", "public")).catch(() => null);
+  settings = snap?.exists() ? snap.data() : {};
 }
 
 async function loadProducts() {
   const snap = await getDocs(query(collection(db, "shopProducts"), where("active", "==", true)));
-  products = snap.docs.map((row) => ({ id: row.id, ...row.data() })).sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0) || String(a.name || "").localeCompare(String(b.name || ""), "zh-Hant"));
+  products = snap.docs.map((row) => ({ id: row.id, ...row.data() }))
+    .sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0) || String(a.name || "").localeCompare(String(b.name || ""), "zh-Hant"));
   renderFilters();
   renderProducts();
   reconcileCart();
-}
-
-async function loadSettings() {
-  const snap = await getDocs(query(collection(db, "shopSettings"))).catch(() => null);
-  const row = snap?.docs?.find((item) => item.id === "public");
-  settings = row?.data?.() || {};
+  const connection = $("#connection-state");
+  if (connection) connection.textContent = `${market.label}｜${market.currency} 專屬售價`;
 }
 
 function bindCaptureHandlers() {
@@ -540,7 +646,7 @@ function bindCaptureHandlers() {
       event.stopImmediatePropagation();
       const product = products.find((row) => row.id === buy.dataset.regionalBuy);
       const variants = product ? normalizeVariants(product) : [];
-      if (variants.length === 1 && variants[0].stock > 0) addVariantToCart(product.id, variants[0].id);
+      if (variants.length === 1 && variants[0].stock > 0 && !bulkEnabled(variants[0])) addVariantToCart(product.id, variants[0].id);
       else openProduct(buy.dataset.regionalBuy);
       return;
     }
@@ -558,8 +664,17 @@ function bindCaptureHandlers() {
       event.preventDefault();
       event.stopImmediatePropagation();
       selectedVariantId = variantButton.dataset.regionalVariant;
-      $$("[data-regional-variant]").forEach((button) => button.classList.toggle("on", button === variantButton));
-      updateDetailAddButton();
+      renderProductDetail();
+      return;
+    }
+
+    const thumb = event.target.closest?.("[data-gallery-thumb]");
+    if (thumb) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      const main = $("[data-gallery-main]");
+      if (main) main.src = thumb.dataset.galleryUrl || "";
+      $$("[data-gallery-thumb]").forEach((button) => button.classList.toggle("on", button === thumb));
       return;
     }
 
@@ -604,14 +719,20 @@ function keepRegionalViewsAuthoritative() {
   const grid = $("#product-grid");
   if (grid) {
     new MutationObserver(() => {
-      if (!grid.querySelector("[data-regional-buy]") && products.length) queueMicrotask(renderProducts);
+      if (!renderingProducts && products.length && !grid.querySelector("[data-regional-buy]")) queueMicrotask(renderProducts);
     }).observe(grid, { childList: true, subtree: true });
   }
   const orders = $("#orders-list");
   if (orders) {
     new MutationObserver(() => {
-      if (!renderingOrders && ownOrders.length) queueMicrotask(renderOrders);
+      if (!renderingOrders && ownOrders.length && !orders.querySelector(".order-card")) queueMicrotask(renderOrders);
     }).observe(orders, { childList: true, subtree: true });
+  }
+  const cartHost = $("#cart-items");
+  if (cartHost) {
+    new MutationObserver(() => {
+      if (!renderingCart && !cartHost.querySelector("[data-regional-cart]") && (cart.length || cartHost.children.length)) queueMicrotask(renderCart);
+    }).observe(cartHost, { childList: true, subtree: true });
   }
 }
 
