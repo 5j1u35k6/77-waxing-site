@@ -51,7 +51,6 @@ function forceDetailLayout(detail) {
   const gallery = detail.querySelector(".product-gallery");
   const main = gallery?.querySelector(".product-gallery-main");
   const image = main?.querySelector("img");
-  const modal = detail.closest(".modal");
 
   if (!gallery || gallery.hidden || detail.classList.contains("detail-gallery-empty")) {
     detail.style.setProperty("display", "grid", "important");
@@ -59,24 +58,27 @@ function forceDetailLayout(detail) {
     return;
   }
 
-  const modalWidth = modal?.getBoundingClientRect().width || window.innerWidth;
-  const sideBySide = modalWidth >= 560;
+  // Match the visual breakpoint used by product-detail-polish.css. Using the
+  // modal's own width here caused half-screen desktop windows to be treated as
+  // mobile and forced the gallery above the product copy.
+  const sideBySide = window.innerWidth >= 480;
 
   detail.style.setProperty("display", "grid", "important");
   detail.style.setProperty("align-items", "start", "important");
-  detail.style.setProperty("gap", sideBySide ? "24px" : "18px", "important");
+  detail.style.setProperty("gap", sideBySide ? "18px" : "18px", "important");
   detail.style.setProperty(
     "grid-template-columns",
-    sideBySide ? "minmax(220px, 320px) minmax(0, 1fr)" : "1fr",
+    sideBySide ? "minmax(180px, 42%) minmax(0, 1fr)" : "1fr",
     "important"
   );
+  detail.dataset.detailLayout = sideBySide ? "split" : "stack";
 
   gallery.style.setProperty("width", "100%", "important");
   gallery.style.setProperty("min-width", "0", "important");
 
   if (main) {
     main.style.setProperty("width", "100%", "important");
-    main.style.setProperty("height", sideBySide ? "445px" : "min(92vw, 420px)", "important");
+    main.style.setProperty("height", sideBySide ? "clamp(300px, 52dvh, 445px)" : "min(92vw, 420px)", "important");
     main.style.setProperty("aspect-ratio", "auto", "important");
     main.style.setProperty("overflow", "hidden", "important");
   }
