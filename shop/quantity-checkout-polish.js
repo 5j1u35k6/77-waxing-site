@@ -9,7 +9,6 @@ const int = (value) => Math.max(0, Math.round(Number(value) || 0));
 let detailQty = 1;
 let lastSignature = "";
 let modalWasOpen = false;
-let passThroughDetailAdd = false;
 let scheduled = false;
 
 function closest(target, selector) {
@@ -30,6 +29,18 @@ function selectedSignature() {
   const product = $("#product-detail-body h2")?.textContent?.trim() || "";
   const variant = selectedVariantButton()?.dataset?.regionalVariant || selectedVariantButton()?.textContent?.trim() || "";
   return `${product}::${variant}`;
+}
+
+function selectedDetailMeta() {
+  const variant = selectedVariantButton();
+  const labels = [
+    variant?.querySelector(".variant-layout-capacity")?.textContent?.trim(),
+    variant?.querySelector(".variant-layout-pill")?.textContent?.trim(),
+  ].filter((value) => value && value !== "商品規格");
+  return {
+    title: $("#product-detail-body h2")?.textContent?.trim() || "",
+    labels,
+  };
 }
 
 function selectedMaxQty() {
@@ -107,6 +118,39 @@ function ensureDetailQtyControl() {
   addButton.textContent = detailQty > 1 ? `${base} × ${detailQty}` : base;
 }
 
+function currentCartCount() {
+  return int($("#cart-count")?.textContent || 0);
+}
+
+function cartRowMatches(row, meta) {
+  const title = row.querySelector("h4")?.textContent?.trim() || "";
+  if (meta.title && title !== meta.title) return false;
+  const variantText = row.querySelector(".cart-variant")?.textContent?.trim() || "";
+  return !meta.labels.length || meta.labels.every((label) => variantText.includes(label));
+}
+
+function findCartRow(meta) {
+  const rows = $$("#cart-items .regional-cart-row,#cart-items .cart-row");
+  return rows.find((row) => cartRowMatches(row, meta)) || [...rows].reverse().find((row) => row.querySelector("h4")?.textContent?.trim() === meta.title) || rows.at(-1) || null;
+}
+
+function clickAdditionalCartQty(meta, remaining) {
+  if (remaining <= 0) return;
+  const row = findCartRow(meta);
+  const plus = row?.querySelector("[data-regional-qty][data-delta='1'],[data-delta='1']");
+  if (!plus || plus.disabled) return;
+  plus.click();
+  setTimeout(() => clickAdditionalCartQty(meta, remaining - 1), 45);
+}
+
+function scheduleDetailQtyCartSync(meta, requestedCount, beforeCount) {
+  setTimeout(() => {
+    const addedByOriginalButton = Math.max(0, currentCartCount() - beforeCount);
+    const remaining = Math.max(0, requestedCount - Math.max(1, addedByOriginalButton));
+    clickAdditionalCartQty(meta, remaining);
+  }, 90);
+}
+
 function resetCheckoutScroll() {
   const wrap = $("#checkout-wrap");
   if (!wrap || wrap.classList.contains("hidden")) return;
@@ -147,23 +191,18 @@ window.addEventListener("click", (event) => {
   if (checkoutOpen) setTimeout(resetCheckoutScroll, 80);
 
   const addButton = closest(event.target, "#product-detail-add");
-  if (!addButton || passThroughDetailAdd || addButton.disabled) return;
+  if (!addButton || addButton.disabled) return;
   ensureDetailQtyControl();
   const count = Math.max(1, int(detailQty));
-  if (count <= 1) return;
+  const meta = selectedDetailMeta();
+  const beforeCount = currentCartCount();
 
-  event.preventDefault();
-  event.stopPropagation();
-  event.stopImmediatePropagation?.();
-
-  passThroughDetailAdd = true;
-  try {
-    for (let i = 0; i < count; i += 1) addButton.click();
-  } finally {
-    passThroughDetailAdd = false;
-    detailQty = 1;
-    scheduleSync();
-  }
+  // Let regional-store.js handle the real add-to-cart click first. For quantity
+  // greater than 1, add the remaining units through the existing cart + buttons.
+  // This avoids rewriting the cart data model and keeps promotion/cart logic intact.
+  if (count > 1) scheduleDetailQtyCartSync(meta, count, beforeCount);
+  detailQty = 1;
+  scheduleSync();
 }, true);
 
 new MutationObserver(scheduleSync).observe(document.documentElement, {
