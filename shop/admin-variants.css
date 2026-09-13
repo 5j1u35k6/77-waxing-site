@@ -36,12 +36,12 @@
 .product-media-list{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;align-items:start}
 .product-media-empty{grid-column:1/-1;display:grid;place-items:center;min-height:150px;border:1px dashed #d7c7ad;border-radius:16px;background:#fbf8f3;color:#918577;font-size:13px}
 .product-media-card{min-width:0;border:1px solid #eadfce;border-radius:16px;background:#fff;overflow:hidden}
-.product-media-thumb{position:relative;aspect-ratio:4/3;background:#f5f1eb;overflow:hidden}
-.product-media-thumb img{width:100%;height:100%;object-fit:contain;display:block;background:#fff;transition:transform .12s ease}
-.product-media-thumb img[data-crop-active="1"]{object-fit:cover!important}
+.product-media-thumb{position:relative;display:flex;align-items:center;justify-content:center;min-height:150px;background:#fff;overflow:hidden}
+.product-media-thumb img{display:block;width:100%;height:auto;max-height:240px;object-fit:contain;background:#fff}
 .product-media-thumb span{position:absolute;left:8px;top:8px;z-index:2;padding:4px 7px;border-radius:999px;background:rgba(47,45,43,.82);color:#fff;font-size:10px;font-weight:700}
 .product-media-card-body{display:grid;gap:9px;padding:11px}
 .product-media-card-body>label{font-size:11px;font-weight:700;color:#6d6862}
+.product-media-card-body>small{display:block;color:#8b8176;font-size:10px;line-height:1.45}
 .product-media-card-body select{width:100%;min-height:40px;border:1px solid #ded4c4;border-radius:10px;background:#fff;padding:7px 9px;color:#3a3836}
 .product-media-card-actions{display:flex;gap:6px;flex-wrap:wrap}
 .product-media-card-actions .mini-btn{flex:1;min-width:max-content}
@@ -50,24 +50,6 @@
 .product-image-upload-status.error{color:#a64b43}
 .product-image-upload-progress{height:6px;border-radius:999px;background:rgba(118,93,67,.12);overflow:hidden}
 .product-image-upload-progress>i{display:block;height:100%;width:0;background:#8b7355;transition:width .18s ease}
-
-/* Per-image crop / focal-area editor. */
-.product-crop-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;padding-top:2px}
-.product-crop-heading b{display:block;font-size:12px;color:#4e4943}
-.product-crop-heading small{display:block;margin-top:2px;color:#8b8176;font-size:10px;line-height:1.45}
-.product-crop-heading .mini-btn{flex:0 0 auto;padding:5px 8px}
-.product-crop-editor{position:relative;width:100%;overflow:hidden;border:1px solid #e4dacb;border-radius:12px;background:#eee9e1;cursor:crosshair;touch-action:none;user-select:none}
-.product-crop-editor>img{display:block;width:100%;height:auto;max-width:100%;pointer-events:none;-webkit-user-drag:none}
-.product-crop-box{position:absolute;z-index:2;border:2px solid #fff;border-radius:8px;box-shadow:0 0 0 1px rgba(58,56,54,.82),0 0 0 9999px rgba(36,33,30,.38);display:grid;place-items:center;pointer-events:none;transition:width .06s ease,height .06s ease}
-.product-crop-box::before,.product-crop-box::after{content:"";position:absolute;background:rgba(255,255,255,.58)}
-.product-crop-box::before{left:33.333%;right:33.333%;top:0;bottom:0;border-left:1px solid rgba(255,255,255,.55);border-right:1px solid rgba(255,255,255,.55);background:transparent}
-.product-crop-box::after{top:33.333%;bottom:33.333%;left:0;right:0;border-top:1px solid rgba(255,255,255,.55);border-bottom:1px solid rgba(255,255,255,.55);background:transparent}
-.product-crop-box span{position:relative;z-index:2;padding:4px 7px;border-radius:999px;background:rgba(47,45,43,.74);color:#fff;font-size:9px;font-weight:700;white-space:nowrap}
-.product-crop-control{display:grid;gap:5px;padding:9px 10px;border-radius:11px;background:#faf6ef}
-.product-crop-control label{display:flex;align-items:center;justify-content:space-between;gap:8px;color:#6d6862;font-size:11px;font-weight:700}
-.product-crop-control label b{color:#8b6b43;font-size:11px}
-.product-crop-control input[type="range"]{width:100%;height:auto!important;min-height:0!important;padding:0!important;accent-color:#8b7355}
-.product-crop-control small{color:#93897d;font-size:9px;line-height:1.45}
 
 @media(max-width:1180px){
   .variant-row-head{grid-template-columns:38px repeat(2,minmax(0,1fr))}
