@@ -19,13 +19,13 @@
   grid-template-columns:1fr!important;
 }
 
-/* Keep every desktop detail image in the same left-side frame, regardless of the
-   source file's aspect ratio. Landscape files are contained inside this frame
-   instead of turning the whole dialog into a large image-first layout. */
-@media(min-width:761px){
+/* Keep detail images beside product information on desktop and narrow desktop
+   windows. The breakpoint is intentionally low so a resized Mac browser still
+   uses the compact left-image layout instead of the large image-first layout. */
+@media(min-width:480px){
   #product-modal-wrap .regional-product-detail:not(.detail-gallery-empty){
-    grid-template-columns:minmax(270px,320px) minmax(0,1fr)!important;
-    gap:26px!important;
+    grid-template-columns:minmax(180px,42%) minmax(0,58%)!important;
+    gap:18px!important;
     align-items:start!important;
   }
   #product-modal-wrap .regional-product-detail .product-gallery{
@@ -34,7 +34,7 @@
   }
   #product-modal-wrap .regional-product-detail .product-gallery-main{
     width:100%!important;
-    height:445px!important;
+    height:clamp(300px,52dvh,445px)!important;
     aspect-ratio:auto!important;
     border-radius:16px!important;
     overflow:hidden!important;
@@ -52,6 +52,13 @@
   }
   #product-modal-wrap .regional-product-detail .product-detail-copy{
     min-width:0;
+  }
+}
+
+@media(min-width:820px){
+  #product-modal-wrap .regional-product-detail:not(.detail-gallery-empty){
+    grid-template-columns:minmax(270px,320px) minmax(0,1fr)!important;
+    gap:26px!important;
   }
 }
 
@@ -76,7 +83,7 @@
   align-self:center;
 }
 
-@media(max-width:760px){
+@media(max-width:479px){
   #product-modal-wrap .regional-product-detail{
     grid-template-columns:1fr!important;
   }
