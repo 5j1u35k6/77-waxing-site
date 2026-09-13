@@ -65,70 +65,63 @@ function priceRange(product, code) {
   return highest === lowest ? money(highest, code) : `${money(highest, code)} – ${money(lowest, code)}`;
 }
 
-function makeRule() {
-  const rule = document.createElement("div");
-  rule.className = "card-format-rule";
-  rule.setAttribute("aria-hidden", "true");
-  return rule;
-}
-
-function installDetailFallback(detailButton, productId) {
-  if (!detailButton || detailButton.dataset.detailFallbackBound === "1") return;
-  detailButton.dataset.detailFallbackBound = "1";
-
-  detailButton.addEventListener("click", () => {
-    queueMicrotask(() => {
-      const modal = document.querySelector("#product-modal-wrap");
-      if (!modal || !modal.classList.contains("hidden")) return;
-
-      // The regional storefront normally handles data-regional-detail at the
-      // document capture phase. If another renderer intercepted the visible
-      // button, retry once through a clean proxy control so the authoritative
-      // regional handler still opens the real product modal and owns all state.
-      const proxy = document.createElement("button");
-      proxy.type = "button";
-      proxy.hidden = true;
-      proxy.dataset.regionalDetail = productId;
-      document.body.appendChild(proxy);
-      proxy.click();
-      proxy.remove();
-    });
-  });
+function generatedNode(className, tag = "div") {
+  const node = document.createElement(tag);
+  node.className = `${className} card-format-generated`;
+  return node;
 }
 
 function formatCard(card) {
   const detailButton = card.querySelector("[data-regional-detail]");
   const buyButton = card.querySelector("[data-regional-buy]");
   const body = card.querySelector(".product-body");
-  if (!detailButton || !body) return;
+  const actions = card.querySelector(".product-actions");
+  if (!detailButton || !body || !actions) return;
 
   const id = String(detailButton.dataset.regionalDetail || "");
   const product = products.get(id);
   if (!product) return;
-
-  installDetailFallback(detailButton, id);
 
   const code = marketCode();
   const range = priceRange(product, code);
   const bulk = hasBulkDiscount(product, code);
   const category = String(product.category || "其他").trim() || "其他";
   const signature = `${code}|${range}|${category}|${bulk ? 1 : 0}`;
-  if (card.dataset.cardFormatSignature === signature) return;
 
+  /* Keep the regional storefront's original controls in place. Moving/replacing
+     the detail button made interaction fragile because multiple storefront layers
+     observe the card DOM. We only restyle the existing control now. */
+  detailButton.type = "button";
   detailButton.textContent = "詳情";
   detailButton.classList.remove("secondary-btn");
   detailButton.classList.add("primary-btn", "product-detail-only");
+  actions.classList.add("single-detail-action", "card-format-actions");
 
-  const title = document.createElement("h3");
-  title.className = "card-format-title";
+  if (buyButton) {
+    buyButton.hidden = true;
+    buyButton.tabIndex = -1;
+    buyButton.setAttribute("aria-hidden", "true");
+    buyButton.classList.add("card-format-buy-sentinel");
+  }
+
+  body.classList.add("card-format-v2");
+  if (card.dataset.cardFormatSignature === signature && body.querySelector(".card-format-generated")) return;
+
+  body.querySelectorAll(".card-format-generated").forEach((node) => node.remove());
+
+  const title = generatedNode("card-format-title", "h3");
   title.textContent = String(product.name || "商品");
 
-  const price = document.createElement("div");
-  price.className = "card-format-price";
+  const rule1 = generatedNode("card-format-rule");
+  rule1.setAttribute("aria-hidden", "true");
+
+  const price = generatedNode("card-format-price");
   price.innerHTML = `<span>售價</span><strong>${range}</strong>`;
 
-  const pills = document.createElement("div");
-  pills.className = "card-format-pills";
+  const rule2 = generatedNode("card-format-rule");
+  rule2.setAttribute("aria-hidden", "true");
+
+  const pills = generatedNode("card-format-pills");
   const categoryPill = document.createElement("span");
   categoryPill.className = "card-format-pill category";
   categoryPill.textContent = category;
@@ -140,23 +133,12 @@ function formatCard(card) {
     pills.appendChild(bulkPill);
   }
 
-  const actions = document.createElement("div");
-  actions.className = "product-actions single-detail-action card-format-actions";
-  actions.appendChild(detailButton);
+  const rule3 = generatedNode("card-format-rule");
+  rule3.setAttribute("aria-hidden", "true");
 
-  // regional-store.js watches for the presence of a data-regional-buy control.
-  // Keep the original control hidden as a sentinel so its observer does not
-  // immediately rebuild the legacy product-card markup after we reformat it.
-  if (buyButton) {
-    buyButton.hidden = true;
-    buyButton.tabIndex = -1;
-    buyButton.setAttribute("aria-hidden", "true");
-    buyButton.classList.add("card-format-buy-sentinel");
-    actions.appendChild(buyButton);
-  }
-
-  body.classList.add("card-format-v2");
-  body.replaceChildren(title, makeRule(), price, makeRule(), pills, makeRule(), actions);
+  const fragment = document.createDocumentFragment();
+  fragment.append(title, rule1, price, rule2, pills, rule3);
+  body.insertBefore(fragment, actions);
   card.dataset.cardFormatSignature = signature;
 }
 
