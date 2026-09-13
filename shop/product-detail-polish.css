@@ -118,3 +118,43 @@
     padding-bottom:max(16px,env(safe-area-inset-bottom))!important;
   }
 }
+
+/* Final image rule: keep uploaded images in their own original ratio on the
+   storefront. The catalog card must not crop, and the detail image may stay in
+   the left column but must grow vertically instead of clipping the bottom. */
+.regional-product-card .store-product-media{
+  display:block!important;
+  width:100%!important;
+  height:auto!important;
+  min-height:0!important;
+  aspect-ratio:auto!important;
+  overflow:visible!important;
+  background:#fff!important;
+}
+.regional-product-card .store-product-media img{
+  display:block!important;
+  width:100%!important;
+  height:auto!important;
+  min-height:0!important;
+  object-fit:contain!important;
+  object-position:center!important;
+  background:#fff!important;
+}
+#product-modal-wrap .regional-product-detail-v2 .product-gallery-main{
+  display:block!important;
+  height:auto!important;
+  min-height:0!important;
+  max-height:none!important;
+  aspect-ratio:auto!important;
+  overflow:visible!important;
+  background:#fff!important;
+}
+#product-modal-wrap .regional-product-detail-v2 .product-gallery-main img{
+  display:block!important;
+  width:100%!important;
+  height:auto!important;
+  min-height:0!important;
+  max-height:none!important;
+  object-fit:contain!important;
+  object-position:center!important;
+}
