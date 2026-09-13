@@ -8,6 +8,8 @@ const MAX_DATA_URL_LENGTH = 210000;
 const MAX_MEDIA_TOTAL_LENGTH = 780000;
 const MAX_IMAGE_DIMENSION = 640;
 const MAX_IMAGES = 6;
+const MIN_CROP_ZOOM = 1;
+const MAX_CROP_ZOOM = 5;
 
 let activeEditId = null;
 let mediaState = [];
@@ -17,6 +19,10 @@ let activeFormToken = null;
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const $ = (selector, root = document) => root.querySelector(selector);
 const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const ranged = (value, min, max, fallback) => {
+  const parsed = Number(value);
+  return Math.min(max, Math.max(min, Number.isFinite(parsed) ? parsed : fallback));
+};
 
 async function waitForAdminApp() {
   for (let i = 0; i < 160; i += 1) {
@@ -60,6 +66,14 @@ function mediaId() {
   return `img-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+function normalizeCrop(row = {}) {
+  return {
+    focusX: ranged(row.focusX, 0, 100, 50),
+    focusY: ranged(row.focusY, 0, 100, 50),
+    cropZoom: ranged(row.cropZoom, MIN_CROP_ZOOM, MAX_CROP_ZOOM, 1),
+  };
+}
+
 function normalizeMedia(product = {}) {
   const source = Array.isArray(product.media) ? product.media : [];
   const rows = source
@@ -68,13 +82,14 @@ function normalizeMedia(product = {}) {
       url: String(row?.url || row?.dataUrl || row?.imageUrl || ""),
       variantId: String(row?.variantId || ""),
       sortOrder: Number.isFinite(Number(row?.sortOrder)) ? Number(row.sortOrder) : index,
+      ...normalizeCrop(row),
     }))
     .filter((row) => row.url)
     .sort((a, b) => a.sortOrder - b.sortOrder)
     .slice(0, MAX_IMAGES);
 
   if (!rows.length && product.imageUrl) {
-    rows.push({ id: mediaId(), url: String(product.imageUrl), variantId: "", sortOrder: 0 });
+    rows.push({ id: mediaId(), url: String(product.imageUrl), variantId: "", sortOrder: 0, focusX: 50, focusY: 50, cropZoom: 1 });
   }
   return rows;
 }
@@ -146,7 +161,7 @@ function syncHidden() {
   if (!activeField) return;
   const mediaInput = activeField.querySelector("#p-media-json");
   const legacyInput = activeField.querySelector("#p-image");
-  mediaState = mediaState.map((row, index) => ({ ...row, sortOrder: index }));
+  mediaState = mediaState.map((row, index) => ({ ...row, ...normalizeCrop(row), sortOrder: index }));
   if (mediaInput) mediaInput.value = JSON.stringify(mediaState);
   if (legacyInput) legacyInput.value = mediaState[0]?.url || "";
 }
@@ -157,6 +172,98 @@ function setStatus(message, error = false) {
   if (!status) return;
   status.classList.toggle("error", error);
   status.textContent = message;
+}
+
+function cropWindowSize(row) {
+  return 100 / ranged(row.cropZoom, MIN_CROP_ZOOM, MAX_CROP_ZOOM, 1);
+}
+
+function clampCropCenter(row) {
+  const size = cropWindowSize(row);
+  const half = size / 2;
+  row.focusX = ranged(row.focusX, half, 100 - half, 50);
+  row.focusY = ranged(row.focusY, half, 100 - half, 50);
+}
+
+function applyCropVisual(card, row) {
+  if (!card || !row) return;
+  clampCropCenter(row);
+  const size = cropWindowSize(row);
+  const box = card.querySelector("[data-crop-box]");
+  const preview = card.querySelector("[data-crop-preview]");
+  const range = card.querySelector("[data-crop-zoom]");
+  const label = card.querySelector("[data-crop-size-label]");
+  const custom = row.cropZoom > 1.001;
+
+  if (box) {
+    box.style.width = `${size}%`;
+    box.style.height = `${size}%`;
+    box.style.left = `${row.focusX - size / 2}%`;
+    box.style.top = `${row.focusY - size / 2}%`;
+  }
+  if (range) range.value = String(row.cropZoom);
+  if (label) label.textContent = `${Math.round(size)}% × ${Math.round(size)}%`;
+  if (preview) {
+    preview.dataset.cropActive = custom ? "1" : "0";
+    preview.style.objectPosition = `${row.focusX}% ${row.focusY}%`;
+    preview.style.transformOrigin = `${row.focusX}% ${row.focusY}%`;
+    preview.style.transform = custom ? `scale(${row.cropZoom})` : "none";
+  }
+}
+
+function bindCropEditor(card, row) {
+  const editor = card.querySelector("[data-crop-editor]");
+  const range = card.querySelector("[data-crop-zoom]");
+  const reset = card.querySelector("[data-crop-reset]");
+  if (!editor || !range) return;
+
+  let dragging = false;
+  const setFromPointer = (event) => {
+    const rect = editor.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+    const size = cropWindowSize(row);
+    const half = size / 2;
+    row.focusX = ranged(((event.clientX - rect.left) / rect.width) * 100, half, 100 - half, 50);
+    row.focusY = ranged(((event.clientY - rect.top) / rect.height) * 100, half, 100 - half, 50);
+    applyCropVisual(card, row);
+    syncHidden();
+  };
+
+  editor.addEventListener("pointerdown", (event) => {
+    if (event.button !== undefined && event.button !== 0) return;
+    dragging = true;
+    editor.setPointerCapture?.(event.pointerId);
+    setFromPointer(event);
+    event.preventDefault();
+  });
+  editor.addEventListener("pointermove", (event) => {
+    if (!dragging) return;
+    setFromPointer(event);
+    event.preventDefault();
+  });
+  const endDrag = (event) => {
+    dragging = false;
+    if (event?.pointerId !== undefined && editor.hasPointerCapture?.(event.pointerId)) editor.releasePointerCapture(event.pointerId);
+  };
+  editor.addEventListener("pointerup", endDrag);
+  editor.addEventListener("pointercancel", endDrag);
+
+  range.addEventListener("input", () => {
+    row.cropZoom = ranged(range.value, MIN_CROP_ZOOM, MAX_CROP_ZOOM, 1);
+    clampCropCenter(row);
+    applyCropVisual(card, row);
+    syncHidden();
+  });
+
+  reset?.addEventListener("click", () => {
+    row.focusX = 50;
+    row.focusY = 50;
+    row.cropZoom = 1;
+    applyCropVisual(card, row);
+    syncHidden();
+  });
+
+  applyCropVisual(card, row);
 }
 
 function renderGalleryCards() {
@@ -174,8 +281,18 @@ function renderGalleryCards() {
   }
 
   host.innerHTML = mediaState.map((row, index) => `<article class="product-media-card" data-media-id="${esc(row.id)}">
-    <div class="product-media-thumb"><img src="${esc(row.url)}" alt="商品圖片 ${index + 1}"><span>${index === 0 ? "主圖" : String(index + 1).padStart(2, "0")}</span></div>
+    <div class="product-media-thumb"><img data-crop-preview src="${esc(row.url)}" alt="商品圖片 ${index + 1}"><span>${index === 0 ? "主圖預覽" : `圖片 ${String(index + 1).padStart(2, "0")}`}</span></div>
     <div class="product-media-card-body">
+      <div class="product-crop-heading"><div><b>顧客顯示區塊</b><small>拖曳框線到想呈現的位置；滑桿可縮小顯示範圍。</small></div><button class="mini-btn" type="button" data-crop-reset>重設</button></div>
+      <div class="product-crop-editor" data-crop-editor>
+        <img src="${esc(row.url)}" alt="裁切來源圖片 ${index + 1}" draggable="false">
+        <div class="product-crop-box" data-crop-box><span>顯示範圍</span></div>
+      </div>
+      <div class="product-crop-control">
+        <label>顯示範圍 <b data-crop-size-label></b></label>
+        <input data-crop-zoom type="range" min="${MIN_CROP_ZOOM}" max="${MAX_CROP_ZOOM}" step="0.1" value="${ranged(row.cropZoom, MIN_CROP_ZOOM, MAX_CROP_ZOOM, 1)}" aria-label="調整圖片顯示範圍">
+        <small>100% = 顯示完整圖片；20% = 放大到約 5 倍，只呈現你框選的局部。</small>
+      </div>
       <label>顯示於</label>
       <select data-media-variant>
         <option value="" ${!row.variantId ? "selected" : ""}>所有規格共用</option>
@@ -188,6 +305,11 @@ function renderGalleryCards() {
       </div>
     </div>
   </article>`).join("");
+
+  host.querySelectorAll("[data-media-id]").forEach((card) => {
+    const row = mediaState.find((item) => item.id === card.dataset.mediaId);
+    if (row) bindCropEditor(card, row);
+  });
 
   host.querySelectorAll("[data-media-variant]").forEach((select) => {
     select.onchange = () => {
@@ -244,7 +366,7 @@ async function enhanceImageField(db) {
   const product = await loadProduct(db, activeEditId);
   mediaState = normalizeMedia(product);
   const legacyValue = original.value.trim();
-  if (!mediaState.length && legacyValue) mediaState = [{ id: mediaId(), url: legacyValue, variantId: "", sortOrder: 0 }];
+  if (!mediaState.length && legacyValue) mediaState = [{ id: mediaId(), url: legacyValue, variantId: "", sortOrder: 0, focusX: 50, focusY: 50, cropZoom: 1 }];
 
   field.classList.add("product-image-upload", "wide");
   field.innerHTML = `
@@ -252,12 +374,12 @@ async function enhanceImageField(db) {
     <input id="p-image" type="hidden" value="${esc(mediaState[0]?.url || "")}" data-gallery-enhanced="1">
     <input id="p-media-json" type="hidden" value="">
     <div class="product-media-upload-head">
-      <div><b>商品圖庫</b><p>可上傳多張圖片，並指定為「所有規格共用」或只顯示於某一規格。第一張會作為商品主圖。</p></div>
+      <div><b>商品圖庫</b><p>每張圖都可以指定顧客看到的局部區域：直接拖曳顯示框，再用滑桿調整放大程度。第一張仍會作為商品主圖。</p></div>
       <label class="product-image-upload-button">＋ 選擇圖片<input id="p-image-file" type="file" multiple accept="image/jpeg,image/png,image/webp,image/avif"></label>
     </div>
     <div class="product-media-list" data-media-list></div>
     <div class="product-image-upload-progress" aria-hidden="true"><i data-image-progress></i></div>
-    <div class="product-image-upload-status" data-image-status>圖片會在瀏覽器壓縮後存入 Firestore，不需要 Firebase Storage。最多 ${MAX_IMAGES} 張。</div>`;
+    <div class="product-image-upload-status" data-image-status>圖片會在瀏覽器壓縮後存入 Firestore；每張圖的顯示位置與放大比例也會一起儲存。最多 ${MAX_IMAGES} 張。</div>`;
 
   const input = field.querySelector("#p-image-file");
   const progress = field.querySelector("[data-image-progress]");
@@ -289,7 +411,7 @@ async function enhanceImageField(db) {
           setStatus("商品圖片總量已接近 Firestore 單筆文件上限，請移除一張或改用較小圖片。", true);
           break;
         }
-        mediaState.push({ id: mediaId(), url: dataUrl, variantId: "", sortOrder: mediaState.length });
+        mediaState.push({ id: mediaId(), url: dataUrl, variantId: "", sortOrder: mediaState.length, focusX: 50, focusY: 50, cropZoom: 1 });
         completed += 1;
         progress.style.width = `${Math.round((completed / files.length) * 100)}%`;
         renderGalleryCards();
@@ -304,7 +426,7 @@ async function enhanceImageField(db) {
     input.value = "";
     if (completed) {
       syncHidden();
-      setStatus(`已加入 ${completed} 張。現在共 ${mediaState.length} 張，約 ${Math.round(totalMediaLength() / 1024)} KB；儲存商品後生效。`);
+      setStatus(`已加入 ${completed} 張。現在共 ${mediaState.length} 張，約 ${Math.round(totalMediaLength() / 1024)} KB；調整顯示區塊後，儲存商品即可生效。`);
       setTimeout(() => { if (progress) progress.style.width = "0%"; }, 700);
     }
   });
