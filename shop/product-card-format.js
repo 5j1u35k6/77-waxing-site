@@ -74,6 +74,7 @@ function makeRule() {
 
 function formatCard(card) {
   const detailButton = card.querySelector("[data-regional-detail]");
+  const buyButton = card.querySelector("[data-regional-buy]");
   const body = card.querySelector(".product-body");
   if (!detailButton || !body) return;
 
@@ -116,6 +117,17 @@ function formatCard(card) {
   const actions = document.createElement("div");
   actions.className = "product-actions single-detail-action card-format-actions";
   actions.appendChild(detailButton);
+
+  // regional-store.js watches for the presence of a data-regional-buy control.
+  // Keep the original control hidden as a sentinel so its observer does not
+  // immediately rebuild the legacy product-card markup after we reformat it.
+  if (buyButton) {
+    buyButton.hidden = true;
+    buyButton.tabIndex = -1;
+    buyButton.setAttribute("aria-hidden", "true");
+    buyButton.classList.add("card-format-buy-sentinel");
+    actions.appendChild(buyButton);
+  }
 
   body.classList.add("card-format-v2");
   body.replaceChildren(title, makeRule(), price, makeRule(), pills, makeRule(), actions);
