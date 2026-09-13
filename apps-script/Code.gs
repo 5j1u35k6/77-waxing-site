@@ -1,8 +1,9 @@
 const PROJECT_ID = 'waxing-86909';
 const FIRESTORE_BASE = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
 const STORE_EMAIL = '77waxing.mail@gmail.com';
-const SCRIPT_VERSION = '2026-09-11-email-v25';
+const SCRIPT_VERSION = '2026-09-13-email-shop-v26';
 const WEBSITE_URL = 'https://5j1u35k6.github.io/77-waxing-site/';
+const SHOP_URL = 'https://5j1u35k6.github.io/77-waxing-site/shop/';
 const EMAIL_FOOTER_IMAGE = 'https://5j1u35k6.github.io/77-waxing-site/assets/email-footer-77waxing-v25.jpg?v=20260911-0035';
 
 function senderStatus_() {
@@ -82,27 +83,52 @@ function debugFooterAsset() {
 function doPost(e) {
   try {
     const payload = JSON.parse((e && e.postData && e.postData.contents) || '{}');
-    const bookingId = String(payload.bookingId || '').trim();
-    const idToken = String(payload.idToken || '').trim();
-    console.log(JSON.stringify({ event: 'email_request', bookingId, hasToken: Boolean(idToken), version: SCRIPT_VERSION }));
-    if (!bookingId || !idToken) return json_({ ok:false, error:'missing_data', version:SCRIPT_VERSION });
-
-    const booking = fetchDoc_(`bookings/${encodeURIComponent(bookingId)}`, idToken, false);
-    const settings = fetchDoc_('settings/general', idToken, true) || {};
-    if (!booking) return json_({ ok:false, error:'booking_not_found', version:SCRIPT_VERSION });
-
-    const key = dispatchKey_(bookingId, booking.status);
-    const props = PropertiesService.getScriptProperties();
-    if (props.getProperty(key) === '1') return json_({ ok:true, duplicate:true, version:SCRIPT_VERSION });
-
-    const sent = sendForStatus_(booking, settings);
-    if (sent) props.setProperty(key, '1');
-    console.log(JSON.stringify({ event: 'email_result', bookingId, status: booking.status, sent }));
-    return json_({ ok:true, sent, status:booking.status, version:SCRIPT_VERSION });
+    if (String(payload.kind || '').trim() === 'shop_order') return handleShopOrderPost_(payload);
+    return handleBookingPost_(payload);
   } catch (err) {
     console.error(err && err.stack ? err.stack : String(err));
     return json_({ ok:false, error:String(err && err.message || err), version:SCRIPT_VERSION });
   }
+}
+
+function handleBookingPost_(payload) {
+  const bookingId = String(payload.bookingId || '').trim();
+  const idToken = String(payload.idToken || '').trim();
+  console.log(JSON.stringify({ event: 'email_request', bookingId, hasToken: Boolean(idToken), version: SCRIPT_VERSION }));
+  if (!bookingId || !idToken) return json_({ ok:false, error:'missing_data', version:SCRIPT_VERSION });
+
+  const booking = fetchDoc_(`bookings/${encodeURIComponent(bookingId)}`, idToken, false);
+  const settings = fetchDoc_('settings/general', idToken, true) || {};
+  if (!booking) return json_({ ok:false, error:'booking_not_found', version:SCRIPT_VERSION });
+
+  const key = dispatchKey_(bookingId, booking.status);
+  const props = PropertiesService.getScriptProperties();
+  if (props.getProperty(key) === '1') return json_({ ok:true, duplicate:true, version:SCRIPT_VERSION });
+
+  const sent = sendForStatus_(booking, settings);
+  if (sent) props.setProperty(key, '1');
+  console.log(JSON.stringify({ event: 'email_result', bookingId, status: booking.status, sent }));
+  return json_({ ok:true, sent, status:booking.status, version:SCRIPT_VERSION });
+}
+
+function handleShopOrderPost_(payload) {
+  const orderId = String(payload.orderId || '').trim();
+  const idToken = String(payload.idToken || '').trim();
+  console.log(JSON.stringify({ event:'shop_email_request', orderId, hasToken:Boolean(idToken), version:SCRIPT_VERSION }));
+  if (!orderId || !idToken) return json_({ ok:false, error:'missing_shop_data', version:SCRIPT_VERSION });
+
+  const order = fetchDoc_(`shopOrders/${encodeURIComponent(orderId)}`, idToken, false);
+  const settings = fetchDoc_('shopSettings/public', idToken, true) || {};
+  if (!order) return json_({ ok:false, error:'shop_order_not_found', version:SCRIPT_VERSION });
+
+  const key = shopDispatchKey_(orderId, order.status);
+  const props = PropertiesService.getScriptProperties();
+  if (props.getProperty(key) === '1') return json_({ ok:true, duplicate:true, kind:'shop_order', version:SCRIPT_VERSION });
+
+  const sent = sendShopOrderForStatus_(order, settings);
+  if (sent) props.setProperty(key, '1');
+  console.log(JSON.stringify({ event:'shop_email_result', orderId, status:order.status, sent }));
+  return json_({ ok:true, sent, kind:'shop_order', status:order.status, version:SCRIPT_VERSION });
 }
 
 function dispatchKey_(bookingId, status) {
@@ -111,6 +137,10 @@ function dispatchKey_(bookingId, status) {
   if (status === 'confirmed') return `sent:${bookingId}:confirmed`;
   if (status === 'cancelled') return `sent:${bookingId}:cancelled`;
   return `sent:${bookingId}:${status || 'unknown'}`;
+}
+
+function shopDispatchKey_(orderId, status) {
+  return `shop-sent:${orderId}:${status || 'unknown'}`;
 }
 
 function sendForStatus_(b, s) {
@@ -171,6 +201,88 @@ function sendForStatus_(b, s) {
   }
 
   return false;
+}
+
+function sendShopOrderForStatus_(o, s) {
+  const customerEmail = String(o.email || '').trim();
+  const storeEmail = String(s.storeEmail || STORE_EMAIL).trim() || STORE_EMAIL;
+  const customerName = String(o.customerName || '顧客').trim() || '顧客';
+  const orderNo = String(o.orderNo || '').trim() || '未編號訂單';
+  const status = String(o.status || 'pending');
+  let sent = false;
+
+  if (status === 'pending') {
+    if (customerEmail) {
+      send_(customerEmail, `77waxing｜已收到產品訂單 ${orderNo}`, shell_(`您好 ${customerName}，已收到你的訂單`, `<p>你的產品訂單已送出，目前正在等待 77waxing 確認庫存與內容。</p>${shopOrderInfo_(o)}<p>確認完成後，我們會再寄一封 Email 通知你；在確認前不需要先提供信用卡資料。</p>`));
+      sent = true;
+    }
+    if (storeEmail) {
+      const contact = `<table style="border-collapse:collapse;margin:16px 0">${line_('姓名', customerName)}${line_('手機', o.phone || '—')}${line_('Email', customerEmail || '—')}${o.note ? line_('備註', o.note) : ''}</table>`;
+      send_(storeEmail, `新產品訂單待確認｜${orderNo}｜${customerName}`, shell_('有新的產品訂單', `${shopOrderInfo_(o)}${contact}<p>請至產品訂購管理後台確認庫存與訂單。</p>`));
+      sent = true;
+    }
+    return sent;
+  }
+
+  if (!customerEmail) return false;
+
+  if (status === 'confirmed') {
+    send_(customerEmail, `77waxing｜產品訂單已確認 ${orderNo}`, shell_(`您好 ${customerName}，訂單已確認`, `<p>77waxing 已確認商品與庫存，接下來會依訂單的付款與交付方式處理。</p>${shopOrderInfo_(o)}${o.paymentMethod === 'transfer' ? '<p>若本單使用銀行轉帳，請依 77waxing 正式通知提供的資訊付款。</p>' : ''}`));
+    return true;
+  }
+  if (status === 'packing') {
+    send_(customerEmail, `77waxing｜產品訂單備貨中 ${orderNo}`, shell_(`您好 ${customerName}，商品正在準備中`, `<p>你的訂單已進入備貨階段。</p>${shopOrderInfo_(o)}`));
+    return true;
+  }
+  if (status === 'ready') {
+    send_(customerEmail, `77waxing｜產品訂單可自取 ${orderNo}`, shell_(`您好 ${customerName}，訂單已準備完成`, `<p>你的商品已準備完成，請依 77waxing 與你確認的時間前往自取。</p>${shopOrderInfo_(o)}`));
+    return true;
+  }
+  if (status === 'shipped') {
+    const tracking = o.trackingNumber ? `<p><b>物流編號：${esc_(o.trackingNumber)}</b></p>` : '';
+    send_(customerEmail, `77waxing｜產品訂單已出貨 ${orderNo}`, shell_(`您好 ${customerName}，訂單已出貨`, `<p>你的商品已交付物流處理。</p>${shopOrderInfo_(o)}${tracking}`));
+    return true;
+  }
+  if (status === 'completed') {
+    send_(customerEmail, `77waxing｜產品訂單已完成 ${orderNo}`, shell_(`您好 ${customerName}，訂單已完成`, `<p>這筆產品訂單已完成，謝謝你的訂購。</p>${shopOrderInfo_(o)}<p><a href="${SHOP_URL}" style="color:#8b7355">回到 77waxing 產品訂購</a></p>`));
+    return true;
+  }
+  if (status === 'cancelled') {
+    send_(customerEmail, `77waxing｜產品訂單取消通知 ${orderNo}`, shell_(`您好 ${customerName}，訂單已取消`, `<p>這筆訂單目前已取消。如需確認原因或重新訂購，請直接與 77waxing 聯繫。</p>${shopOrderInfo_(o)}`));
+    return true;
+  }
+  return false;
+}
+
+function shopOrderInfo_(o) {
+  const items = Array.isArray(o.items) ? o.items : [];
+  const itemRows = items.map(item => {
+    const qty = Number(item.quantity || 0);
+    const price = Number(item.unitPrice || 0);
+    return `<tr><td style="padding:7px 12px 7px 0;border-bottom:1px solid #eee">${esc_(item.name || '商品')} × ${qty}</td><td style="padding:7px 0;border-bottom:1px solid #eee;text-align:right">NT$${esc_(price * qty)}</td></tr>`;
+  }).join('');
+  return `<div style="margin:22px 0;padding:18px 20px;background:#f9f6f0;border-radius:14px">
+    <div style="font-size:13px;font-weight:700;letter-spacing:.08em;margin-bottom:12px">訂單資訊</div>
+    ${infoLine_('訂單', o.orderNo || '—')}
+    ${infoLine_('交付', shopDeliveryText_(o.deliveryMethod))}
+    ${o.storeInfo ? infoLine_('門市', o.storeInfo) : ''}
+    ${infoLine_('付款', shopPaymentText_(o.paymentMethod))}
+    <table style="width:100%;border-collapse:collapse;margin:14px 0">${itemRows || '<tr><td>—</td></tr>'}</table>
+    <div style="text-align:right;font-size:17px;font-weight:700">總計 NT$${esc_(Number(o.total || 0))}</div>
+  </div>`;
+}
+
+function shopDeliveryText_(value) {
+  if (value === 'pickup') return '工作室自取';
+  if (value === '7-11') return '7-11 店到店';
+  if (value === 'family') return '全家店到店';
+  return value || '—';
+}
+
+function shopPaymentText_(value) {
+  if (value === 'pickup_cash') return '自取付款';
+  if (value === 'transfer') return '銀行轉帳';
+  return value || '—';
 }
 
 function fetchDoc_(path, idToken, allowMissing) {
