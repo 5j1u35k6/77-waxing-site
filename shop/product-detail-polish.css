@@ -7,69 +7,72 @@
   min-height:46px;
 }
 
-/* Keep regional pricing implicit inside product details. The page header already
-   shows the detected country, so the extra "台灣｜TWD 專屬價格" badge is redundant. */
-#product-modal-wrap .regional-product-detail .market-inline.strong{
-  display:none!important;
-}
-
-/* The first catalog image is the storefront cover only. If a product has no
-   remaining detail images, collapse the dialog to a single information column. */
-#product-modal-wrap .regional-product-detail.detail-gallery-empty{
-  grid-template-columns:1fr!important;
-}
-
-/* Keep detail images beside product information on desktop and narrow desktop
-   windows. The breakpoint is intentionally low so a resized Mac browser still
-   uses the compact left-image layout instead of the large image-first layout. */
-@media(min-width:480px){
-  #product-modal-wrap .regional-product-detail:not(.detail-gallery-empty){
-    grid-template-columns:minmax(180px,42%) minmax(0,58%)!important;
-    gap:18px!important;
-    align-items:start!important;
-  }
-  #product-modal-wrap .regional-product-detail .product-gallery{
-    width:100%;
-    min-width:0;
-  }
-  #product-modal-wrap .regional-product-detail .product-gallery-main{
-    width:100%!important;
-    height:clamp(300px,52dvh,445px)!important;
-    aspect-ratio:auto!important;
-    border-radius:16px!important;
-    overflow:hidden!important;
-    background:#f8f5f0!important;
-  }
-  #product-modal-wrap .regional-product-detail .product-gallery-main img{
-    width:100%!important;
-    height:100%!important;
-    object-fit:contain!important;
-    object-position:center!important;
-    background:#fff!important;
-  }
-  #product-modal-wrap .regional-product-detail .product-gallery-thumbs{
-    grid-template-columns:repeat(4,minmax(0,1fr))!important;
-  }
-  #product-modal-wrap .regional-product-detail .product-detail-copy{
-    min-width:0;
-  }
-}
-
-@media(min-width:820px){
-  #product-modal-wrap .regional-product-detail:not(.detail-gallery-empty){
-    grid-template-columns:minmax(270px,320px) minmax(0,1fr)!important;
-    gap:26px!important;
-  }
-}
-
-/* Give the product dialog a little more vertical breathing room on desktop. */
+/* Product detail is now rendered in its final structure by regional-store.js.
+   No post-render gallery/layout script is required. */
 #product-modal-wrap .modal{
+  width:min(860px,calc(100% - 28px))!important;
   max-height:min(92dvh,960px)!important;
 }
 #product-modal-wrap .modal-body{
   max-height:calc(92dvh - 148px)!important;
+  padding:20px!important;
   padding-bottom:30px!important;
 }
+#product-modal-wrap .regional-product-detail-v2{
+  display:grid!important;
+  grid-template-columns:minmax(270px,320px) minmax(0,1fr)!important;
+  gap:26px!important;
+  align-items:start!important;
+  width:100%!important;
+  min-width:0;
+}
+#product-modal-wrap .regional-product-detail-v2.detail-gallery-empty{
+  grid-template-columns:1fr!important;
+}
+#product-modal-wrap .regional-product-detail-v2 .product-detail-media-column,
+#product-modal-wrap .regional-product-detail-v2 .product-detail-info-column{
+  min-width:0;
+  width:100%;
+}
+#product-modal-wrap .regional-product-detail-v2 .product-detail-info-column{
+  align-self:start;
+}
+#product-modal-wrap .regional-product-detail-v2 .product-detail-info-column h2{
+  margin:10px 0 10px;
+}
+#product-modal-wrap .regional-product-detail-v2 .product-detail-info-column>p{
+  margin:0 0 12px;
+  color:#6f6962;
+}
+#product-modal-wrap .regional-product-detail-v2 .product-gallery{
+  display:grid!important;
+  gap:10px!important;
+}
+#product-modal-wrap .regional-product-detail-v2 .product-gallery-main{
+  width:100%!important;
+  height:clamp(300px,48dvh,430px)!important;
+  aspect-ratio:auto!important;
+  display:grid!important;
+  place-items:center!important;
+  overflow:hidden!important;
+  border:1px solid #eee6db!important;
+  border-radius:16px!important;
+  background:#f8f5f0!important;
+}
+#product-modal-wrap .regional-product-detail-v2 .product-gallery-main img{
+  display:block!important;
+  width:100%!important;
+  height:100%!important;
+  object-fit:contain!important;
+  object-position:center!important;
+  background:#fff!important;
+}
+#product-modal-wrap .regional-product-detail-v2 .product-gallery-thumbs{
+  display:grid!important;
+  grid-template-columns:repeat(4,minmax(0,1fr))!important;
+  gap:8px!important;
+}
+
 #product-modal-wrap .modal-foot{
   position:relative;
   z-index:2;
@@ -83,22 +86,32 @@
   align-self:center;
 }
 
-@media(max-width:479px){
-  #product-modal-wrap .regional-product-detail{
-    grid-template-columns:1fr!important;
+@media(min-width:480px) and (max-width:819px){
+  #product-modal-wrap .regional-product-detail-v2:not(.detail-gallery-empty){
+    grid-template-columns:minmax(190px,42%) minmax(0,1fr)!important;
+    gap:20px!important;
   }
-  #product-modal-wrap .regional-product-detail .product-gallery-main{
-    height:min(92vw,420px)!important;
+  #product-modal-wrap .regional-product-detail-v2 .product-gallery-main{
+    height:clamp(300px,50dvh,410px)!important;
   }
 }
 
-@media(max-width:560px){
+@media(max-width:479px){
   #product-modal-wrap .modal{
+    width:calc(100% - 20px)!important;
     max-height:94dvh!important;
   }
   #product-modal-wrap .modal-body{
     max-height:calc(94dvh - 148px)!important;
+    padding:16px!important;
     padding-bottom:24px!important;
+  }
+  #product-modal-wrap .regional-product-detail-v2{
+    grid-template-columns:1fr!important;
+    gap:18px!important;
+  }
+  #product-modal-wrap .regional-product-detail-v2 .product-gallery-main{
+    height:min(92vw,420px)!important;
   }
   #product-modal-wrap .modal-foot{
     min-height:72px;
