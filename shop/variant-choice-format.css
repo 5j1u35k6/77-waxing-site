@@ -1,0 +1,78 @@
+/* 77select product-detail variant option hierarchy */
+#product-detail-body .variant-choice.variant-layout-v2{
+  display:grid!important;
+  grid-template-columns:1fr!important;
+  align-items:stretch!important;
+  gap:9px!important;
+  padding:13px 14px!important;
+}
+
+.variant-layout-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:14px;
+  min-width:0;
+}
+
+.variant-layout-capacity{
+  color:#3a3836;
+  font-size:17px;
+  line-height:1.2;
+  font-weight:800;
+  letter-spacing:-.01em;
+}
+
+.variant-layout-price{
+  color:#8b6b43;
+  font-size:17px;
+  line-height:1.2;
+  font-weight:800;
+  white-space:nowrap;
+}
+
+.variant-layout-pill{
+  display:inline-flex;
+  align-items:center;
+  width:max-content;
+  max-width:70%;
+  min-height:25px;
+  padding:5px 9px;
+  border-radius:999px;
+  background:#f3eadc;
+  color:#765d43;
+  font-size:11px;
+  line-height:1;
+  font-weight:700;
+}
+
+.variant-layout-stock{
+  color:#7b7772;
+  font-size:11px;
+  line-height:1.2;
+  white-space:nowrap;
+}
+
+.variant-layout-discount{
+  padding-top:8px;
+  border-top:1px solid #eee5d9;
+  color:#9a6f41;
+  font-size:11px;
+  line-height:1.4;
+  font-weight:700;
+}
+
+#product-detail-body .variant-choice.on .variant-layout-pill{
+  background:#ead9bd;
+  color:#6f5538;
+}
+
+#product-detail-body .variant-choice:disabled .variant-layout-stock{
+  color:#9a958f;
+}
+
+@media(max-width:560px){
+  #product-detail-body .variant-choice.variant-layout-v2{padding:12px!important}
+  .variant-layout-capacity,.variant-layout-price{font-size:16px}
+  .variant-layout-pill{max-width:66%}
+}
