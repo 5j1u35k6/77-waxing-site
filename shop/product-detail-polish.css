@@ -7,6 +7,12 @@
   min-height:46px;
 }
 
+/* Keep regional pricing implicit inside product details. The page header already
+   shows the detected country, so the extra "台灣｜TWD 專屬價格" badge is redundant. */
+#product-modal-wrap .regional-product-detail .market-inline.strong{
+  display:none!important;
+}
+
 /* Give the product dialog a little more vertical breathing room on desktop. */
 #product-modal-wrap .modal{
   max-height:min(92dvh,960px)!important;
