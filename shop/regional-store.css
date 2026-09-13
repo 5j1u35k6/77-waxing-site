@@ -36,9 +36,10 @@
 .hk-checkout-note{margin:10px 0 0;padding:10px 12px;border-radius:11px;background:#f6eddf;color:#8a6540;font-size:12px;line-height:1.6}
 html[data-market="HK"] #checkout-open:disabled{opacity:.72;background:#8b7355;color:#fff}
 
+/* Do not force product detail into one column here. The dedicated detail stylesheet
+   keeps images on the left down to phone widths, then switches to one column. */
 @media(max-width:920px){
   .market-badge{order:2;margin-left:auto}
-  .regional-product-detail{grid-template-columns:1fr!important}
   .product-gallery-main{height:min(64vw,500px)}
 }
 
