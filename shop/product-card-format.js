@@ -72,6 +72,30 @@ function makeRule() {
   return rule;
 }
 
+function installDetailFallback(detailButton, productId) {
+  if (!detailButton || detailButton.dataset.detailFallbackBound === "1") return;
+  detailButton.dataset.detailFallbackBound = "1";
+
+  detailButton.addEventListener("click", () => {
+    queueMicrotask(() => {
+      const modal = document.querySelector("#product-modal-wrap");
+      if (!modal || !modal.classList.contains("hidden")) return;
+
+      // The regional storefront normally handles data-regional-detail at the
+      // document capture phase. If another renderer intercepted the visible
+      // button, retry once through a clean proxy control so the authoritative
+      // regional handler still opens the real product modal and owns all state.
+      const proxy = document.createElement("button");
+      proxy.type = "button";
+      proxy.hidden = true;
+      proxy.dataset.regionalDetail = productId;
+      document.body.appendChild(proxy);
+      proxy.click();
+      proxy.remove();
+    });
+  });
+}
+
 function formatCard(card) {
   const detailButton = card.querySelector("[data-regional-detail]");
   const buyButton = card.querySelector("[data-regional-buy]");
@@ -81,6 +105,8 @@ function formatCard(card) {
   const id = String(detailButton.dataset.regionalDetail || "");
   const product = products.get(id);
   if (!product) return;
+
+  installDetailFallback(detailButton, id);
 
   const code = marketCode();
   const range = priceRange(product, code);
