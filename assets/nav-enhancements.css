@@ -8,6 +8,13 @@
 .header nav .about-flyout a span{font-size:15.5px;font-weight:600;letter-spacing:.025em}
 .header nav .about-flyout a small{font:600 8.5px/1 Inter,"Helvetica Neue",Arial,sans-serif;letter-spacing:.2em;text-transform:uppercase;color:#b79a76;white-space:nowrap}
 .header nav .about-flyout a:not(:first-child) small{color:#9b9b88}
+
+/* Booking and Product Order are standalone CTA buttons. The sliding nav cursor must never travel onto them. */
+.header nav:has(>a.book:hover) .nav-cursor,
+.header nav:has(>a.book:focus-visible) .nav-cursor,
+.header nav:has(>a.product-order:hover) .nav-cursor,
+.header nav:has(>a.product-order:focus-visible) .nav-cursor{opacity:0!important}
+
 @media (max-width:850px){
   /* Keep every mobile-nav row in a deterministic order. This prevents dynamically injected flyouts from jumping above Home. */
   .header nav>a[href="/77-waxing-site/"]{order:10!important}
@@ -19,6 +26,7 @@
   .header nav>a[href$="/space/"]{order:50!important}
   .header nav>a[href$="/courses/"]{order:60!important}
   .header nav>a[href$="/booking/"]{order:70!important}
+  .header nav>.product-order{order:80!important}
   .header nav .service-flyout.on{max-height:420px!important;}
   .about-flyout{position:static!important;width:100%;padding:0 4px;margin:-4px 0 5px;border:0;border-radius:0;background:transparent;box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none;opacity:0;visibility:hidden;pointer-events:none;transform:none!important;max-height:0;overflow:hidden;transition:max-height .24s ease,opacity .18s ease,visibility 0s linear .24s}
   .about-flyout::before{display:none}
@@ -35,5 +43,6 @@
   .header nav>.about-flyout,.header nav>.service-flyout{margin:0!important}
   .header nav>.about-flyout.on,.header nav>.service-flyout.on{margin:-4px 0 5px!important}
   .header nav>.book{margin-top:8px!important;margin-bottom:0!important}
+  .header nav>.product-order{margin-top:10px!important;margin-bottom:0!important}
 }
 @media(prefers-reduced-motion:reduce){.about-flyout{transition:none}}
