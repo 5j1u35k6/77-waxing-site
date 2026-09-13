@@ -3,8 +3,17 @@ function normalizeProductCardActions() {
     const detail = actions.querySelector("[data-regional-detail]");
     if (!detail) return;
 
+    // Keep the original buy control in the DOM as a hidden sentinel.
+    // regional-store.js watches for data-regional-buy; removing it causes the
+    // legacy card renderer to rebuild the card repeatedly and can make the
+    // visible detail button appear unresponsive.
     const buyButtons = actions.querySelectorAll("[data-regional-buy]");
-    buyButtons.forEach((button) => button.remove());
+    buyButtons.forEach((button) => {
+      button.hidden = true;
+      button.tabIndex = -1;
+      button.setAttribute("aria-hidden", "true");
+      button.classList.add("card-format-buy-sentinel");
+    });
 
     if (detail.textContent.trim() !== "詳情") detail.textContent = "詳情";
     if (detail.classList.contains("secondary-btn")) detail.classList.remove("secondary-btn");
@@ -12,6 +21,17 @@ function normalizeProductCardActions() {
     if (!detail.classList.contains("product-detail-only")) detail.classList.add("product-detail-only");
     if (!actions.classList.contains("single-detail-action")) actions.classList.add("single-detail-action");
   });
+}
+
+function normalizeMarketBadge() {
+  const badge = document.querySelector("#market-badge");
+  if (!badge) return;
+  const raw = badge.querySelector("b")?.textContent?.trim() || badge.textContent.trim();
+  const label = raw.includes("香港") ? "香港" : raw.includes("台灣") ? "台灣" : "";
+  if (!label) return;
+  if (badge.children.length === 0 && badge.textContent.trim() === label) return;
+  badge.textContent = label;
+  badge.setAttribute("aria-label", `目前地區：${label}`);
 }
 
 function apply77selectBranding() {
@@ -27,6 +47,7 @@ function apply77selectBranding() {
     heroDescription.textContent = heroDescription.textContent.replace("77waxing 後台", "77select 後台");
   }
 
+  normalizeMarketBadge();
   normalizeProductCardActions();
 }
 
