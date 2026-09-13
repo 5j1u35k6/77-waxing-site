@@ -16,19 +16,35 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 24
-      - name: Check JavaScript syntax
+      - name: Check asset JavaScript syntax
         shell: bash
         run: |
           set -euo pipefail
-          for file in assets/*.js shop/*.js; do
+          for file in assets/*.js; do
             if grep -Eq '^[[:space:]]*(import|export)[[:space:]]' "$file"; then
-              temp="/tmp/$(basename "${file%.js}")-$(echo "$file" | tr '/' '-').mjs"
+              temp="/tmp/$(basename "${file%.js}")-asset.mjs"
               cp "$file" "$temp"
               node --check "$temp"
             else
               node --check "$file"
             fi
           done
+      - name: Check shop frontend syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp shop/app.js /tmp/77waxing-shop-app.mjs
+          node --check /tmp/77waxing-shop-app.mjs
+      - name: Check shop admin syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp shop/admin.js /tmp/77waxing-shop-admin.mjs
+          node --check /tmp/77waxing-shop-admin.mjs
+      - name: Check Apps Script syntax
+        shell: bash
+        run: |
+          set -euo pipefail
           cp apps-script/Code.gs /tmp/apps-script-code.js
           node --check /tmp/apps-script-code.js
       - name: Check admin Firebase bootstrap
@@ -83,9 +99,9 @@ jobs:
           grep -q 'shopMessages' firebase/firestore.rules
           grep -q 'shopSettings' firebase/firestore.rules
           grep -q 'shopAuditLogs' firebase/firestore.rules
-          grep -q "kind: \"shop_order\"" shop/app.js
-          grep -q "kind: \"shop_order\"" shop/admin.js
-          grep -q "handleShopOrderPost_" apps-script/Code.gs
+          grep -q 'kind: "shop_order"' shop/app.js
+          grep -q 'kind: "shop_order"' shop/admin.js
+          grep -q 'handleShopOrderPost_' apps-script/Code.gs
           ! grep -Rni -E 'zizhen-sweets|zizhen-desserts|子珍甜點|Zizhen Sweets' shop --include='*.html' --include='*.js' --include='*.css' || exit 1
       - name: Check static asset references
         shell: bash
