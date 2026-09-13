@@ -13,13 +13,10 @@
   display:none!important;
 }
 
-/* Product images are catalog-only. The detail dialog focuses on product info,
-   variants, pricing, stock and the add-to-cart action. */
-#product-modal-wrap .regional-product-detail{
+/* The first catalog image is the storefront cover only. If a product has no
+   remaining detail images, collapse the dialog to a single information column. */
+#product-modal-wrap .regional-product-detail.detail-gallery-empty{
   grid-template-columns:1fr!important;
-}
-#product-modal-wrap .regional-product-detail .product-gallery{
-  display:none!important;
 }
 
 /* Give the product dialog a little more vertical breathing room on desktop. */
