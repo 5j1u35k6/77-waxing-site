@@ -131,6 +131,10 @@ async function encodeImagePreservingDimensions(file) {
   throw new Error("IMAGE_TOO_LARGE_WITH_ORIGINAL_DIMENSIONS");
 }
 
+async function resizeAndConvertToBase64(file) {
+  return encodeImagePreservingDimensions(file);
+}
+
 function variantChoices() {
   return [...document.querySelectorAll("[data-variant-row]")].map((row, index) => {
     const id = String(row.dataset.variantId || "");
@@ -297,7 +301,7 @@ async function enhanceImageField(db) {
 
       try {
         setStatus(`正在處理 ${file.name}…`);
-        const image = await encodeImagePreservingDimensions(file);
+        const image = await resizeAndConvertToBase64(file);
         if (totalMediaLength() + image.url.length > MAX_MEDIA_TOTAL_LENGTH) {
           setStatus("商品圖片總量已接近 Firestore 單筆文件上限，請移除一張或改用較小圖片。", true);
           break;
