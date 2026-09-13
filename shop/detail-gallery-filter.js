@@ -24,7 +24,10 @@ function filterDetailGallery(detail) {
   const isCoverThumb = (thumb) => normalizeUrl(thumb.dataset.galleryUrl || thumb.querySelector("img")?.src || "") === coverUrl;
   const remaining = thumbs.filter((thumb) => !isCoverThumb(thumb));
 
-  thumbs.filter(isCoverThumb).forEach((thumb) => { thumb.hidden = true; thumb.classList.remove("on"); });
+  thumbs.filter(isCoverThumb).forEach((thumb) => {
+    thumb.hidden = true;
+    thumb.classList.remove("on");
+  });
 
   if (normalizeUrl(main.currentSrc || main.src) === coverUrl) {
     if (remaining.length) {
@@ -44,16 +47,77 @@ function filterDetailGallery(detail) {
   if (thumbHost) thumbHost.hidden = remaining.length <= 1;
 }
 
+function forceDetailLayout(detail) {
+  const gallery = detail.querySelector(".product-gallery");
+  const main = gallery?.querySelector(".product-gallery-main");
+  const image = main?.querySelector("img");
+  const modal = detail.closest(".modal");
+
+  if (!gallery || gallery.hidden || detail.classList.contains("detail-gallery-empty")) {
+    detail.style.setProperty("display", "grid", "important");
+    detail.style.setProperty("grid-template-columns", "1fr", "important");
+    return;
+  }
+
+  const modalWidth = modal?.getBoundingClientRect().width || window.innerWidth;
+  const sideBySide = modalWidth >= 560;
+
+  detail.style.setProperty("display", "grid", "important");
+  detail.style.setProperty("align-items", "start", "important");
+  detail.style.setProperty("gap", sideBySide ? "24px" : "18px", "important");
+  detail.style.setProperty(
+    "grid-template-columns",
+    sideBySide ? "minmax(220px, 320px) minmax(0, 1fr)" : "1fr",
+    "important"
+  );
+
+  gallery.style.setProperty("width", "100%", "important");
+  gallery.style.setProperty("min-width", "0", "important");
+
+  if (main) {
+    main.style.setProperty("width", "100%", "important");
+    main.style.setProperty("height", sideBySide ? "445px" : "min(92vw, 420px)", "important");
+    main.style.setProperty("aspect-ratio", "auto", "important");
+    main.style.setProperty("overflow", "hidden", "important");
+  }
+
+  if (image) {
+    image.style.setProperty("width", "100%", "important");
+    image.style.setProperty("height", "100%", "important");
+    image.style.setProperty("object-fit", "contain", "important");
+    image.style.setProperty("object-position", "center", "important");
+  }
+}
+
 let scheduled = false;
 function applyDetailGalleryFilter() {
   scheduled = false;
-  document.querySelectorAll(".regional-product-detail").forEach(filterDetailGallery);
+  document.querySelectorAll(".regional-product-detail").forEach((detail) => {
+    filterDetailGallery(detail);
+    forceDetailLayout(detail);
+  });
 }
+
 function scheduleDetailGalleryFilter() {
   if (scheduled) return;
   scheduled = true;
-  requestAnimationFrame(applyDetailGalleryFilter);
+  requestAnimationFrame(() => {
+    requestAnimationFrame(applyDetailGalleryFilter);
+  });
 }
 
-new MutationObserver(scheduleDetailGalleryFilter).observe(document.documentElement, { childList: true, subtree: true });
+new MutationObserver(scheduleDetailGalleryFilter).observe(document.documentElement, {
+  childList: true,
+  subtree: true,
+});
+
+const modalWrap = document.querySelector("#product-modal-wrap");
+if (modalWrap) {
+  new MutationObserver(scheduleDetailGalleryFilter).observe(modalWrap, {
+    attributes: true,
+    attributeFilter: ["class"],
+  });
+}
+
+window.addEventListener("resize", scheduleDetailGalleryFilter, { passive: true });
 scheduleDetailGalleryFilter();
