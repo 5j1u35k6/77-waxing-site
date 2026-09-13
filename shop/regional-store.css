@@ -10,8 +10,8 @@
 /* Keep sparse product grids from stretching one product across the whole screen. */
 .product-grid{grid-template-columns:repeat(auto-fill,minmax(245px,300px))!important;justify-content:start!important;align-items:start}
 .regional-product-card{width:100%;max-width:300px}
-.regional-product-card .store-product-media{height:280px!important;min-height:0!important;aspect-ratio:auto!important;padding:16px;background:#f7f4ef}
-.regional-product-card .store-product-media img{width:100%;height:100%;object-fit:contain!important;border-radius:12px;background:#fff}
+.regional-product-card .store-product-media{height:auto!important;min-height:0!important;aspect-ratio:auto!important;padding:0!important;background:#f7f4ef;overflow:hidden}
+.regional-product-card .store-product-media img{display:block;width:100%;height:auto!important;max-height:none!important;object-fit:contain!important;border-radius:12px;background:#fff}
 .regional-product-card .product-top{gap:18px}.regional-product-card .product-price{font-size:18px}
 
 /* Product cards always use one clear action: 詳情. Buying happens inside the detail modal. */
@@ -48,7 +48,7 @@ html[data-market="HK"] #checkout-open:disabled{opacity:.72;background:#8b7355;co
   .market-badge{grid-column:auto!important;order:initial;margin:0;padding:6px 9px}.market-badge span{display:none}
   .product-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:14px!important}
   .regional-product-card{max-width:none}
-  .regional-product-card .store-product-media{height:auto!important;aspect-ratio:1/1!important;padding:10px}
+  .regional-product-card .store-product-media{height:auto!important;aspect-ratio:auto!important;padding:0!important}
   .regional-product-card .product-price{font-size:16px}
 }
 
@@ -56,7 +56,6 @@ html[data-market="HK"] #checkout-open:disabled{opacity:.72;background:#8b7355;co
   .market-badge{padding:6px 8px}.market-badge b{font-size:11px}
   .product-grid{grid-template-columns:1fr!important}
   .regional-product-card{max-width:420px;margin-inline:auto}
-  .regional-product-card .store-product-media{max-height:360px}
   .variant-choice{padding:11px 12px}.regional-product-card .product-top{display:grid;grid-template-columns:1fr}.regional-product-card .product-price{justify-self:start}
   .product-gallery-main{height:min(92vw,420px)}
   .product-gallery-thumbs{grid-template-columns:repeat(4,minmax(0,1fr))}
