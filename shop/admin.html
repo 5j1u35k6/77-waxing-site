@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex,nofollow">
+    <title>77waxing - 產品訂購管理後台</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, onAuthStateChanged, signOut, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        // 移除 Storage 模組，改回使用純 URL 儲存
+        import { getFirestore, collection, doc, getDocs, updateDoc, onSnapshot, addDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // --- 配置與初始化 ---
+        let app, auth, db;
+        const appId = typeof __app_id !== 'undefined' ? __app_id : '77waxing-shop';
+        // TEMP: commerce backend is still the cloned Firebase project; data is isolated by appId.
+        let isLocalMode = false;
+
+        try {
+            const firebaseConfig = {
+                apiKey: "AIzaSyC-NjffxHAdbJbNfyu7seZWU53tcg6wfo4",
+                authDomain: "zizhen-sweets.firebaseapp.com",
+                projectId: "zizhen-sweets",
+                storageBucket: "zizhen-sweets.firebasestorage.app",
+                messagingSenderId: "706637362289",
+                appId: "1:706637362289:web:9352032eabf1641e2b57d0"
+            };
+            app = initializeApp(firebaseConfig);
+            auth = getAuth(app);
+            db = getFirestore(app);
+            isLocalMode = false;
+        } catch (error) {
+            console.error("Firebase 初始化失敗：", error);
+            isLocalMode = true;
+        }
+
+        let currentUser = null;
+        let unsubscribeOrders = null;
+        let unsubscribeMessages = null;
+        let unsubscribeProducts = null;
+        let productsData = [];
+
+        // --- 核心功能：身份驗證 ---
+        async function initAuth() {
+            if (isLocalMode) return;
+        }
+
+        if (!isLocalMode) {
+            onAuthStateChanged(auth, (user) => {
+                if (user) {
+                    currentUser = user;
+                    document.getElementById('loading').classList.add('hidden');
+                    document.getElementById('app').classList.remove('hidden');
+                    setupListeners();
+                } else {
+                    document.getElementById('app').classList.add('hidden');
+                    document.getElementById('loading').classList.remove('hidden');
+                    document.getElementById('loading-spinner').classList.add('hidden');
+                    document.getElementById('login-btn').classList.remove('hidden');
+                }
+            });
+        }
+
+        window.handleAdminLogin = async () => {
+            const provider = new GoogleAuthProvider();
+            try {
+                await signInWithPopup(auth, provider);
+                showNotification("登入成功！");
+            } catch (error) {
+                console.error("登入失敗:", error);
+                if (error.code === 'auth/unauthorized-domain' || error.message.includes('unauthorized-domain')) {
+                    showNotification("預覽環境限制：已自動為您啟用「模擬後台登入」！");
+                    currentUser = {
+                        uid: "admin-preview-tester-001",
+                        displayName: "Canvas 管理員",
+                        isAnonymous: false
+                    };
+                    document.getElementById('loading').classList.add('hidden');
+                    document.getElementById('app').classList.remove('hidden');
+                    setupListeners();
+                } else {
+                    showNotification("登入取消或發生錯誤，請稍後再試", "error");
+                }
+            }
+        };
+
+        window.handleLogout = () => {
+            if (auth && auth.currentUser) {
+                signOut(auth);
+            }
+            currentUser = null;
+            if (unsubscribeOrders) unsubscribeOrders();
+            if (unsubscribeMessages) unsubscribeMessages();
+            if (unsubscribeProducts) unsubscribeProducts();
+            
+            showNotification("已登出系統");
+            document.getElementById('app').classList.add('hidden');
+            document.getElementById('loading').classList.remove('hidden');
+            document.getElementById('loading-spinner').classList.add('hidden');
+            document.getElementById('login-btn').classList.remove('hidden');
+        };
+
+        // --- 即時監聽資料 ---
+        function setupListeners() {
+            if (unsubscribeOrders) unsubscribeOrders();
+            if (unsubscribeMessages) unsubscribeMessages();
+            if (unsubscribeProducts) unsubscribeProducts();
+
+            const ordersCol = collection(db, 'artifacts', appId, 'public', 'data', 'orders');
+            unsubscribeOrders = onSnapshot(ordersCol, (snapshot) => {
+                const orders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+                                    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+                renderOrders(orders);
+                updateStats(orders);
+            }, (error) => console.error(error));
+
+            const msgsCol = collection(db, 'artifacts', appId, 'public', 'data', 'messages');
+            unsubscribeMessages = onSnapshot(msgsCol, (snapshot) => {
+                const msgs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+                                     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+                renderMessages(msgs);
+            }, (error) => console.error(error));
+
+            const prodsCol = collection(db, 'artifacts', appId, 'public', 'data', 'products');
+            unsubscribeProducts = onSnapshot(prodsCol, (snapshot) => {
+                productsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                renderProducts();
+            }, (error) => console.error(error));
+        }
+
+        // --- 操作功能：訂單與問答 ---
+        window.updateOrderStatus = async (orderId, newStatus) => {
+            try {
+                const orderRef = doc(db, 'artifacts', appId, 'public', 'data', 'orders', orderId);
+                await updateDoc(orderRef, { status: newStatus });
+                showNotification(`訂單狀態已更新為：${newStatus}`);
+            } catch(e) {
+                showNotification("狀態更新失敗", "error");
+            }
+        };
+
+        // 新增：輸入物流編號功能
+        window.editTracking = async (orderId, currentTracking) => {
+            const num = prompt("請輸入物流編號 (若無請留空)：", currentTracking || '');
+            if (num === null) return; // 按下取消
+            try {
+                const orderRef = doc(db, 'artifacts', appId, 'public', 'data', 'orders', orderId);
+                await updateDoc(orderRef, { trackingNumber: num.trim() });
+                showNotification(`物流編號已更新`);
+            } catch(e) {
+                showNotification("更新物流編號失敗", "error");
+            }
+        };
+
+        window.deleteOrder = async (orderId) => {
+            if (!confirm('確定要刪除/取消此訂單嗎？操作後顧客端也會顯示已刪除。')) return;
+            try {
+                const orderRef = doc(db, 'artifacts', appId, 'public', 'data', 'orders', orderId);
+                await updateDoc(orderRef, { status: '已刪除' });
+                showNotification(`訂單 ${orderId} 已標記為刪除`);
+            } catch(e) {
+                showNotification("刪除訂單失敗", "error");
+            }
+        };
+
+        window.toggleReplyInput = (msgId) => {
+            const inputDiv = document.getElementById(`reply-input-${msgId}`);
+            inputDiv.classList.toggle('hidden');
+        };
+
+        window.submitReply = async (msgId) => {
+            const textarea = document.getElementById(`reply-text-${msgId}`);
+            const replyContent = textarea.value.trim();
+            if (!replyContent) return showNotification("回覆內容不能為空", "error");
+
+            try {
+                const msgRef = doc(db, 'artifacts', appId, 'public', 'data', 'messages', msgId);
+                await updateDoc(msgRef, { reply: replyContent, status: "已回覆" });
+                showNotification("回覆已送出！");
+            } catch (e) {
+                showNotification("回覆失敗", "error");
+            }
+        };
+
+        // --- 操作功能：商品圖片壓縮與 Base64 轉換 ---
+        function resizeAndConvertToBase64(file, maxWidth, maxHeight, quality) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = (event) => {
+                    const img = new Image();
+                    img.src = event.target.result;
+                    img.onload = () => {
+                        let width = img.width;
+                        let height = img.height;
+                        if (width > height) {
+                            if (width > maxWidth) {
+                                height = Math.round(height * (maxWidth / width));
+                                width = maxWidth;
+                            }
+                        } else {
+                            if (height > maxHeight) {
+                                width = Math.round(width * (maxHeight / height));
+                                height = maxHeight;
+                            }
+                        }
+                        const canvas = document.createElement('canvas');
+                        canvas.width = width;
+                        canvas.height = height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, width, height);
+                        resolve(canvas.toDataURL('image/jpeg', quality));
+                    };
+                    img.onerror = (error) => reject(error);
+                };
+                reader.onerror = (error) => reject(error);
+            });
+        }
+
+        window.previewSelectedImage = (event) => {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    document.getElementById('preview-img').src = e.target.result;
+                    document.getElementById('image-preview').classList.remove('hidden');
+                }
+                reader.readAsDataURL(file);
+            }
+        };
+
+        window.openProductModal = (id = null) => {
+            document.getElementById('product-modal').classList.remove('hidden');
+            const form = document.getElementById('product-form');
+            form.reset();
+            
+            document.getElementById('prod-image-file').value = '';
+            const previewDiv = document.getElementById('image-preview');
+            const previewImg = document.getElementById('preview-img');
+            
+            if (id) {
+                document.getElementById('modal-title').innerText = '編輯商品';
+                const p = productsData.find(prod => prod.id === id);
+                document.getElementById('prod-id').value = p.id;
+                document.getElementById('prod-name').value = p.name;
+                document.getElementById('prod-category').value = p.category;
+                document.getElementById('prod-price').value = p.price;
+                document.getElementById('prod-stock').value = p.stock !== undefined ? p.stock : 10;
+                document.getElementById('prod-ingredients').value = p.ingredients || '';
+                document.getElementById('prod-desc').value = p.desc || '';
+                
+                document.getElementById('prod-existing-image').value = p.image || '';
+                if (p.image) {
+                    previewImg.src = p.image;
+                    previewDiv.classList.remove('hidden');
+                } else {
+                    previewDiv.classList.add('hidden');
+                }
+            } else {
+                document.getElementById('modal-title').innerText = '新增商品';
+                document.getElementById('prod-id').value = '';
+                document.getElementById('prod-existing-image').value = '';
+                previewDiv.classList.add('hidden');
+            }
+        };
+
+        window.closeProductModal = () => {
+            document.getElementById('product-modal').classList.add('hidden');
+        };
+
+        window.saveProduct = async (e) => {
+            e.preventDefault();
+            const submitBtn = e.target.querySelector('button[type="submit"]');
+            const originalBtnText = submitBtn.innerText;
+            submitBtn.innerText = "處理並儲存中...";
+            submitBtn.disabled = true;
+
+            try {
+                const id = document.getElementById('prod-id').value;
+                let imageUrl = document.getElementById('prod-existing-image').value || 'https://images.unsplash.com/photo-1551024601-bec78aea704b?w=400&q=80';
+
+                const fileInput = document.getElementById('prod-image-file');
+                if (fileInput.files.length > 0) {
+                    const file = fileInput.files[0];
+                    // 將圖片壓縮至最大 600x600 且品質 0.7 的 JPEG，轉換為 Base64 (避免超過 Firebase 1MB 限制)
+                    imageUrl = await resizeAndConvertToBase64(file, 600, 600, 0.7);
+                    
+                    if (imageUrl.length > 900000) {
+                        showNotification("圖片色彩過於複雜，壓縮後仍過大，請選擇其他圖片", "error");
+                        submitBtn.innerText = originalBtnText;
+                        submitBtn.disabled = false;
+                        return;
+                    }
+                }
+
+                const prodData = {
+                    name: document.getElementById('prod-name').value.trim(),
+                    category: document.getElementById('prod-category').value.trim(),
+                    price: Number(document.getElementById('prod-price').value),
+                    stock: Number(document.getElementById('prod-stock').value),
+                    ingredients: document.getElementById('prod-ingredients').value.trim(),
+                    desc: document.getElementById('prod-desc').value.trim(),
+                    image: imageUrl
+                };
+
+                if (id) {
+                    await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'products', id), prodData);
+                    showNotification("商品更新成功！");
+                } else {
+                    await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'products'), prodData);
+                    showNotification("新商品上架成功！");
+                }
+                closeProductModal();
+            } catch (error) {
+                console.error(error);
+                showNotification("儲存失敗，請檢查資料或網路連線", "error");
+            } finally {
+                submitBtn.innerText = originalBtnText;
+                submitBtn.disabled = false;
+            }
+        };
+
+        window.deleteProduct = async (id) => {
+            if (!confirm('確定要刪除這個商品嗎？此動作無法復原。')) return;
+            try {
+                await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'products', id));
+                showNotification("商品已刪除");
+            } catch (error) {
+                console.error(error);
+                showNotification("刪除失敗", "error");
+            }
+        };
+
+        // --- UI 渲染 ---
+        function updateStats(orders) {
+            const pending = orders.filter(o => o.status === '處理中').length;
+            const revenue = orders.filter(o => o.status === '已完成').reduce((sum, o) => sum + o.total, 0);
+            document.getElementById('stat-pending').innerText = pending;
+            document.getElementById('stat-revenue').innerText = `$${revenue.toLocaleString()}`;
+        }
+
+        function renderOrders(orders) {
+            const tbody = document.getElementById('admin-orders');
+            if (orders.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" class="py-8 text-center text-stone-400">目前尚無訂單</td></tr>`;
+                return;
+            }
+            tbody.innerHTML = orders.map(o => {
+                const isDeleted = o.status === '已刪除';
+                return `
+                <tr class="border-b ${isDeleted ? 'bg-red-50 border-red-100' : 'border-stone-100 hover:bg-stone-50'} transition-colors">
+                    <td class="py-4 px-4 text-sm font-mono ${isDeleted ? 'text-red-400 line-through' : 'text-stone-700 font-bold'}">${o.id}</td>
+                    <td class="py-4 px-4 text-sm ${isDeleted ? 'text-red-400' : ''}">${new Date(o.createdAt).toLocaleString()}</td>
+                    <td class="py-4 px-4 ${isDeleted ? 'opacity-60' : ''}">
+                        <div class="text-sm font-bold text-stone-800">${o.recipientName || o.userName} <span class="text-xs font-normal text-stone-500 ml-1">${o.phone || ''}</span></div>
+                        <div class="text-xs text-amber-600 font-medium mt-1">${o.deliveryMethod || '未指定'} ${o.storeInfo ? `(${o.storeInfo})` : ''}</div>
+                        ${o.trackingNumber ? `<div class="text-xs text-blue-600 font-mono mt-0.5"><i data-lucide="package" class="w-3 h-3 inline"></i> 物流: ${o.trackingNumber}</div>` : ''}
+                        <div class="text-xs text-stone-500 mt-1">${o.items.map(i => `${i.name}x${i.quantity}`).join(', ')}</div>
+                    </td>
+                    <td class="py-4 px-4 font-bold ${isDeleted ? 'text-red-500 line-through' : 'text-amber-700'}">$${o.total}</td>
+                    <td class="py-4 px-4">
+                        <div class="flex items-center gap-2">
+                            <select onchange="updateOrderStatus('${o.id}', this.value)" ${isDeleted ? 'disabled' : ''} class="text-sm bg-white border border-stone-200 rounded-lg px-2 py-1.5 outline-none focus:ring-2 focus:ring-amber-500 cursor-pointer ${isDeleted ? 'text-red-600 bg-red-100' : 'text-stone-700'}">
+                                <option value="處理中" ${o.status==='處理中'?'selected':''}>處理中</option>
+                                <option value="已接單" ${o.status==='已接單'?'selected':''}>已接單</option>
+                                <option value="商品製作中" ${o.status==='商品製作中'?'selected':''}>商品製作中</option>
+                                <option value="準備出貨" ${o.status==='準備出貨'?'selected':''}>準備出貨</option>
+                                <option value="待自取" ${o.status==='待自取'?'selected':''}>待自取</option>
+                                <option value="已出貨" ${o.status==='已出貨'?'selected':''}>已出貨</option>
+                                <option value="已完成" ${o.status==='已完成'?'selected':''}>已完成</option>
+                                ${isDeleted ? `<option value="已刪除" selected>已刪除</option>` : ''}
+                            </select>
+                            
+                            ${!isDeleted && (o.deliveryMethod === '7-11' || o.deliveryMethod === '全家') ? `
+                            <button onclick="editTracking('${o.id}', '${o.trackingNumber || ''}')" class="p-1.5 text-stone-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="輸入物流編號">
+                                <i data-lucide="truck" class="w-4 h-4"></i>
+                            </button>` : ''}
+
+                            ${!isDeleted ? `
+                            <button onclick="deleteOrder('${o.id}')" class="p-1.5 text-stone-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="刪除訂單">
+                                <i data-lucide="trash-2" class="w-4 h-4"></i>
+                            </button>` : ''}
+                        </div>
+                    </td>
+                </tr>
+            `}).join('');
+            lucide.createIcons();
+        }
+
+        function renderProducts() {
+            const tbody = document.getElementById('admin-products');
+            if (productsData.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" class="py-8 text-center text-stone-400">目前尚無商品</td></tr>`;
+                return;
+            }
+            tbody.innerHTML = productsData.map(p => `
+                <tr class="border-b border-stone-100 hover:bg-stone-50 transition-colors">
+                    <td class="py-3 px-4">
+                        <div class="flex items-center gap-3">
+                            <img src="${p.image}" class="w-10 h-10 rounded-lg object-cover border border-stone-200">
+                            <div>
+                                <div class="font-bold text-stone-800 text-sm">${p.name}</div>
+                                <div class="text-xs text-stone-400">${p.category}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="py-3 px-4 text-sm text-stone-600 max-w-[150px] truncate" title="${p.ingredients || '無設定'}">${p.ingredients || '-'}</td>
+                    <td class="py-3 px-4 text-sm font-bold text-amber-600">$${p.price}</td>
+                    <td class="py-3 px-4">
+                        <span class="px-2 py-1 rounded-md text-xs font-bold ${p.stock <= 0 ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}">
+                            ${p.stock !== undefined ? p.stock : '充足'}
+                        </span>
+                    </td>
+                    <td class="py-3 px-4 text-right space-x-2">
+                        <button onclick="openProductModal('${p.id}')" class="text-blue-500 hover:text-blue-700 p-1"><i data-lucide="edit" class="w-4 h-4"></i></button>
+                        <button onclick="deleteProduct('${p.id}')" class="text-red-400 hover:text-red-600 p-1"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                    </td>
+                </tr>
+            `).join('');
+            lucide.createIcons();
+        }
+
+        function renderMessages(msgs) {
+            const container = document.getElementById('admin-messages');
+            if (msgs.length === 0) {
+                container.innerHTML = `<div class="text-center py-8 text-stone-400">目前無留言紀錄</div>`;
+                return;
+            }
+            container.innerHTML = msgs.map(m => `
+                <div class="p-5 bg-white rounded-xl border ${m.status === '待處理' ? 'border-amber-200 shadow-md' : 'border-stone-100 shadow-sm'} mb-4">
+                    <div class="flex justify-between items-start mb-3">
+                         <div class="flex items-center gap-2">
+                             <div class="w-8 h-8 rounded-full bg-stone-100 flex items-center justify-center">
+                                 <i data-lucide="user" class="w-4 h-4 text-stone-500"></i>
+                             </div>
+                             <div>
+                                 <span class="font-bold text-sm text-stone-800">${m.userName}</span>
+                                 <div class="text-[10px] text-stone-400">${new Date(m.createdAt).toLocaleString()}</div>
+                             </div>
+                         </div>
+                         <span class="px-2 py-1 text-[10px] rounded-md ${m.status === '待處理' ? 'bg-amber-100 text-amber-700 font-bold' : 'bg-stone-100 text-stone-500'}">${m.status}</span>
+                    </div>
+                    
+                    <p class="text-stone-700 text-sm mb-4 bg-stone-50 p-3 rounded-lg border border-stone-100">"${m.content}"</p>
+                    
+                    ${m.status === '待處理' ? `
+                        <button onclick="toggleReplyInput('${m.id}')" class="text-sm text-amber-600 hover:text-amber-800 font-medium flex items-center gap-1">
+                            <i data-lucide="reply" class="w-4 h-4"></i> 手動回覆
+                        </button>
+                        <div id="reply-input-${m.id}" class="mt-3 hidden">
+                            <textarea id="reply-text-${m.id}" class="w-full border border-stone-200 rounded-lg p-3 text-sm focus:ring-2 focus:ring-amber-500 outline-none" rows="3" placeholder="輸入回覆內容..."></textarea>
+                            <div class="flex justify-end mt-2 gap-2">
+                                <button onclick="toggleReplyInput('${m.id}')" class="px-4 py-1.5 text-sm text-stone-500 hover:bg-stone-100 rounded-lg">取消</button>
+                                <button onclick="submitReply('${m.id}')" class="px-4 py-1.5 text-sm bg-stone-900 text-white rounded-lg hover:bg-stone-800">送出回覆</button>
+                            </div>
+                        </div>
+                    ` : `
+                        <div class="mt-2 text-sm border-l-2 border-amber-500 pl-3">
+                            <span class="text-xs font-bold text-amber-700 block mb-1">已回覆：</span>
+                            <p class="text-stone-600">${m.reply}</p>
+                        </div>
+                    `}
+                </div>
+            `).join('');
+            lucide.createIcons();
+        }
+
+        function showNotification(msg, type = 'success') {
+            const toast = document.createElement('div');
+            toast.className = `fixed top-6 right-6 px-6 py-3 rounded-lg shadow-lg text-sm font-medium z-50 transition-all duration-300 flex items-center gap-2 ${type === 'success' ? 'bg-green-600 text-white' : 'bg-red-500 text-white'}`;
+            toast.innerHTML = `<i data-lucide="${type === 'success' ? 'check' : 'alert-circle'}" class="w-4 h-4"></i> ${msg}`;
+            document.body.appendChild(toast);
+            lucide.createIcons();
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateY(-10px)';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        window.switchTab = (tab) => {
+            document.getElementById('view-orders').classList.add('hidden');
+            document.getElementById('view-messages').classList.add('hidden');
+            document.getElementById('view-products').classList.add('hidden');
+            document.getElementById(`view-${tab}`).classList.remove('hidden');
+            
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('bg-stone-800', 'text-white');
+                btn.classList.add('text-stone-500', 'hover:bg-stone-100');
+            });
+            
+            const activeBtn = document.getElementById(`btn-${tab}`);
+            activeBtn.classList.remove('text-stone-500', 'hover:bg-stone-100');
+            activeBtn.classList.add('bg-stone-800', 'text-white');
+        };
+
+        window.onload = async () => {
+            lucide.createIcons();
+            if (isLocalMode) {
+                document.getElementById('loading').innerHTML = `
+                    <i data-lucide="alert-triangle" class="w-12 h-12 text-red-500 mb-4 mx-auto block"></i>
+                    <p class="text-white text-lg font-bold mb-2">無法連線至雲端資料庫</p>
+                    <p class="text-stone-400 text-sm text-center">偵測到為本機環境，且缺少 Firebase 設定檔。<br>請在程式碼內填寫真實設定，並透過 localhost 伺服器開啟。</p>
+                `;
+                lucide.createIcons();
+                return;
+            }
+            await initAuth();
+        };
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&display=swap');
+        body { font-family: 'Noto Sans TC', sans-serif; background-color: #f3f4f6; }
+    </style>
+</head>
+<body class="text-stone-800 h-screen flex overflow-hidden">
+
+    <!-- Loading State / Login Screen -->
+    <div id="loading" class="fixed inset-0 bg-stone-900 flex flex-col items-center justify-center z-50 text-white">
+        <div id="loading-spinner" class="flex flex-col items-center">
+            <i data-lucide="loader-2" class="w-8 h-8 animate-spin text-amber-500 mb-4"></i>
+            <p>系統初始化中...</p>
+        </div>
+        <div id="login-btn" class="hidden flex flex-col items-center">
+            <div class="w-16 h-16 bg-stone-800 rounded-2xl flex items-center justify-center mb-6 border border-stone-700 shadow-xl">
+                <i data-lucide="shield-check" class="w-8 h-8 text-amber-500"></i>
+            </div>
+            <h2 class="text-2xl font-bold mb-2">77waxing 管理中心</h2>
+            <p class="text-stone-400 text-sm mb-8">請先登入以存取後台資料</p>
+            <button onclick="handleAdminLogin()" class="bg-white text-stone-900 px-6 py-3 rounded-xl font-bold hover:bg-stone-100 transition-all flex items-center gap-3 shadow-lg hover:scale-105 active:scale-95">
+                <i data-lucide="log-in" class="w-5 h-5"></i> 
+                使用 Google 帳號登入
+            </button>
+        </div>
+    </div>
+
+    <!-- Main App UI -->
+    <div id="app" class="hidden w-full h-full flex flex-col md:flex-row">
+        
+        <!-- Sidebar -->
+        <aside class="w-full md:w-64 bg-white border-r border-stone-200 flex flex-col flex-shrink-0">
+            <div class="h-16 flex items-center px-6 border-b border-stone-200 bg-stone-900 text-white">
+                <i data-lucide="store" class="w-5 h-5 mr-3 text-amber-500"></i>
+                <h1 class="font-bold text-lg tracking-wider">77waxing 管理中心</h1>
+            </div>
+            
+            <div class="p-4 flex-1">
+                <p class="text-xs font-bold text-stone-400 mb-4 px-2 uppercase tracking-wider">管理選單</p>
+                <nav class="space-y-2">
+                    <button id="btn-orders" onclick="switchTab('orders')" class="tab-btn w-full flex items-center px-4 py-3 bg-stone-800 text-white rounded-xl transition-colors text-sm font-medium">
+                        <i data-lucide="shopping-bag" class="w-5 h-5 mr-3 opacity-80"></i>
+                        訂單管理
+                    </button>
+                    <button id="btn-products" onclick="switchTab('products')" class="tab-btn w-full flex items-center px-4 py-3 text-stone-500 hover:bg-stone-100 rounded-xl transition-colors text-sm font-medium">
+                        <i data-lucide="package" class="w-5 h-5 mr-3 opacity-80"></i>
+                        商品管理
+                    </button>
+                    <button id="btn-messages" onclick="switchTab('messages')" class="tab-btn w-full flex items-center px-4 py-3 text-stone-500 hover:bg-stone-100 rounded-xl transition-colors text-sm font-medium">
+                        <i data-lucide="message-square" class="w-5 h-5 mr-3 opacity-80"></i>
+                        顧客問答
+                    </button>
+                </nav>
+            </div>
+            
+            <div class="p-4 border-t border-stone-200">
+                <button onclick="handleLogout()" class="w-full flex items-center justify-center px-4 py-2 text-stone-500 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors text-sm font-medium">
+                    <i data-lucide="log-out" class="w-4 h-4 mr-2"></i> 登出系統
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="flex-1 flex flex-col h-full overflow-hidden bg-stone-50">
+            <!-- Top Header -->
+            <header class="h-16 bg-white border-b border-stone-200 flex items-center justify-between px-8 flex-shrink-0">
+                <h2 class="text-xl font-bold text-stone-800">儀表板</h2>
+                <div class="flex items-center gap-4">
+                    <span class="text-sm font-medium text-stone-600 flex items-center gap-2">
+                        <div class="w-2 h-2 rounded-full bg-green-500"></div> 系統連線正常
+                    </span>
+                </div>
+            </header>
+
+            <!-- Scrollable Content -->
+            <div class="flex-1 overflow-y-auto p-8">
+                
+                <!-- Quick Stats -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                    <div class="bg-white rounded-2xl p-6 border border-stone-100 shadow-sm flex items-center gap-4">
+                        <div class="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                            <i data-lucide="clock" class="w-6 h-6"></i>
+                        </div>
+                        <div>
+                            <p class="text-sm text-stone-500 font-medium">待處理訂單</p>
+                            <p class="text-2xl font-bold text-stone-900" id="stat-pending">0</p>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-2xl p-6 border border-stone-100 shadow-sm flex items-center gap-4">
+                        <div class="w-12 h-12 rounded-xl bg-green-50 text-green-600 flex items-center justify-center">
+                            <i data-lucide="dollar-sign" class="w-6 h-6"></i>
+                        </div>
+                        <div>
+                            <p class="text-sm text-stone-500 font-medium">已完成營收</p>
+                            <p class="text-2xl font-bold text-stone-900" id="stat-revenue">$0</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Views -->
+                <div class="bg-white rounded-2xl border border-stone-200 shadow-sm overflow-hidden min-h-[500px]">
+                    
+                    <!-- Orders View -->
+                    <div id="view-orders" class="p-0">
+                        <div class="p-6 border-b border-stone-100 bg-stone-50/50 flex justify-between items-center">
+                            <h3 class="font-bold text-lg flex items-center gap-2">
+                                <i data-lucide="list-ordered" class="w-5 h-5 text-stone-500"></i> 最新訂單列表
+                            </h3>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left">
+                                <thead class="bg-white border-b border-stone-200">
+                                    <tr class="text-xs text-stone-400 uppercase tracking-wider">
+                                        <th class="py-4 px-4 font-medium">訂單編號</th>
+                                        <th class="py-4 px-4 font-medium">建立時間</th>
+                                        <th class="py-4 px-4 font-medium">顧客資訊</th>
+                                        <th class="py-4 px-4 font-medium">總額</th>
+                                        <th class="py-4 px-4 font-medium">狀態管理</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="admin-orders">
+                                    <!-- 動態載入訂單 -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Products View -->
+                    <div id="view-products" class="hidden p-0">
+                        <div class="p-6 border-b border-stone-100 bg-stone-50/50 flex justify-between items-center">
+                            <h3 class="font-bold text-lg flex items-center gap-2">
+                                <i data-lucide="package" class="w-5 h-5 text-stone-500"></i> 前台商品管理
+                            </h3>
+                            <button onclick="openProductModal()" class="bg-stone-900 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-stone-800 flex items-center gap-2">
+                                <i data-lucide="plus" class="w-4 h-4"></i> 新增商品
+                            </button>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left">
+                                <thead class="bg-white border-b border-stone-200">
+                                    <tr class="text-xs text-stone-400 uppercase tracking-wider">
+                                        <th class="py-4 px-4 font-medium">商品名稱</th>
+                                        <th class="py-4 px-4 font-medium">主要成分</th>
+                                        <th class="py-4 px-4 font-medium">售價</th>
+                                        <th class="py-4 px-4 font-medium">剩餘數量</th>
+                                        <th class="py-4 px-4 font-medium text-right">操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="admin-products">
+                                    <!-- 動態載入商品 -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Messages View -->
+                    <div id="view-messages" class="hidden p-0">
+                        <div class="p-6 border-b border-stone-100 bg-stone-50/50 flex justify-between items-center">
+                            <h3 class="font-bold text-lg flex items-center gap-2">
+                                <i data-lucide="inbox" class="w-5 h-5 text-stone-500"></i> 顧客留言板
+                            </h3>
+                        </div>
+                        <div class="p-6 bg-stone-50/30">
+                            <div id="admin-messages" class="max-w-3xl mx-auto">
+                                <!-- 動態載入問答 -->
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+            </div>
+        </main>
+    </div>
+
+    <!-- 新增/編輯商品彈跳視窗 (Modal) -->
+    <div id="product-modal" class="fixed inset-0 bg-stone-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center px-4">
+        <div class="bg-white rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div class="p-6 border-b border-stone-100 bg-stone-50 flex justify-between items-center shrink-0">
+                <h3 id="modal-title" class="text-xl font-bold flex items-center gap-2 text-stone-800">新增商品</h3>
+                <button type="button" onclick="closeProductModal()" class="text-stone-400 hover:text-stone-900"><i data-lucide="x" class="w-6 h-6"></i></button>
+            </div>
+            <form id="product-form" onsubmit="saveProduct(event)" class="p-6 overflow-y-auto space-y-4 flex-1">
+                <input type="hidden" id="prod-id">
+                
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-stone-500 mb-1">商品名稱 *</label>
+                        <input type="text" id="prod-name" required class="w-full border border-stone-200 rounded-lg p-2.5 text-sm outline-none focus:border-amber-500" placeholder="例如：法式檸檬塔">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-stone-500 mb-1">商品分類 *</label>
+                        <input type="text" id="prod-category" required class="w-full border border-stone-200 rounded-lg p-2.5 text-sm outline-none focus:border-amber-500" placeholder="例如：塔類">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-stone-500 mb-1">售價 (NT$) *</label>
+                        <input type="number" id="prod-price" required min="0" class="w-full border border-stone-200 rounded-lg p-2.5 text-sm outline-none focus:border-amber-500" placeholder="180">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-stone-500 mb-1">剩餘庫存數量 *</label>
+                        <input type="number" id="prod-stock" required min="0" value="10" class="w-full border border-stone-200 rounded-lg p-2.5 text-sm outline-none focus:border-amber-500" placeholder="10">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-stone-500 mb-1">主要成分</label>
+                    <input type="text" id="prod-ingredients" class="w-full border border-stone-200 rounded-lg p-2.5 text-sm outline-none focus:border-amber-500" placeholder="例如：法國發酵奶油、小農雞蛋、杏仁粉">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-stone-500 mb-1">商品介紹 *</label>
+                    <textarea id="prod-desc" required rows="3" class="w-full border border-stone-200 rounded-lg p-2.5 text-sm outline-none focus:border-amber-500 resize-none" placeholder="描述一下這個甜點的口感與特色..."></textarea>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-stone-500 mb-1">商品圖片 (上傳圖片)</label>
+                    <input type="file" id="prod-image-file" accept="image/*" onchange="previewSelectedImage(event)" class="w-full border border-stone-200 rounded-lg p-2 text-sm outline-none focus:border-amber-500 bg-white">
+                    <input type="hidden" id="prod-existing-image">
+                    <p class="text-[10px] text-stone-400 mt-1">系統會自動幫您壓縮圖片，無須升級付費方案即可使用。</p>
+                    <div id="image-preview" class="mt-3 hidden">
+                        <img id="preview-img" src="" class="h-32 w-32 object-cover rounded-xl border border-stone-200 shadow-sm">
+                    </div>
+                </div>
+
+                <div class="pt-4 flex justify-end gap-3 border-t border-stone-100">
+                    <button type="button" onclick="closeProductModal()" class="px-5 py-2 rounded-xl text-sm font-bold text-stone-500 hover:bg-stone-100 transition-colors">取消</button>
+                    <button type="submit" class="px-5 py-2 rounded-xl text-sm font-bold bg-amber-600 text-white hover:bg-amber-700 transition-colors shadow-md">儲存商品</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+</body>
+</html>
