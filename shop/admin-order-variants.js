@@ -36,14 +36,43 @@ function normalizeVariants(product = {}) {
       priceTWD: int(variant.priceTWD ?? variant.priceTW ?? variant.price ?? product.price ?? 0),
       priceHKD: int(variant.priceHKD ?? variant.priceHK ?? product.priceHKD ?? 0),
       stock: int(variant.stock ?? 0),
+      bulkMinQty: int(variant.bulkMinQty ?? variant.quantityDiscountMin ?? 0),
+      bulkPriceTWD: int(variant.bulkPriceTWD ?? variant.quantityDiscountTWD ?? 0),
+      bulkPriceHKD: int(variant.bulkPriceHKD ?? variant.quantityDiscountHKD ?? 0),
     }));
   }
   return [];
 }
 
-function itemPrice(variant, item, product) {
+function basePrice(variant, item, product) {
   if (!variant) return int(product.price || item.unitPrice || 0);
   return item.region === "HK" ? int(variant.priceHKD) : int(variant.priceTWD);
+}
+
+function itemPrice(variant, item, product, quantity) {
+  const regular = basePrice(variant, item, product);
+  if (!variant) return regular;
+  const threshold = int(variant.bulkMinQty);
+  const bulk = item.region === "HK" ? int(variant.bulkPriceHKD) : int(variant.bulkPriceTWD);
+  if (threshold >= 2 && int(quantity) >= threshold && bulk > 0 && bulk <= regular) return bulk;
+  return regular;
+}
+
+function productImage(product, variantId = "") {
+  const media = Array.isArray(product.media) ? product.media
+    .map((row, index) => ({
+      url: String(row?.url || row?.dataUrl || row?.imageUrl || ""),
+      variantId: String(row?.variantId || ""),
+      sortOrder: Number.isFinite(Number(row?.sortOrder)) ? Number(row.sortOrder) : index,
+    }))
+    .filter((row) => row.url)
+    .sort((a, b) => a.sortOrder - b.sortOrder) : [];
+  if (media.length) {
+    const shared = media.filter((row) => !row.variantId);
+    const specific = media.filter((row) => row.variantId === variantId);
+    return [...shared, ...specific][0]?.url || media[0].url;
+  }
+  return product.imageUrl || "";
 }
 
 async function audit(db, auth, action, targetId, detail = "") {
@@ -120,7 +149,8 @@ async function confirmVariantOrder(db, orderId) {
         entry.legacyStock -= quantity;
       }
 
-      const unitPrice = itemPrice(variant, item, product);
+      const listUnitPrice = basePrice(variant, item, product);
+      const unitPrice = itemPrice(variant, item, product, quantity);
       subtotal += unitPrice * quantity;
       finalItems.push({
         productId: String(item.productId || ""),
@@ -131,8 +161,11 @@ async function confirmVariantOrder(db, orderId) {
         region: item.region || "TW",
         currency: item.currency || (item.region === "HK" ? "HKD" : "TWD"),
         quantity,
+        listUnitPrice,
         unitPrice,
-        imageUrl: product.imageUrl || item.imageUrl || "",
+        discountApplied: unitPrice < listUnitPrice,
+        bulkMinQty: variant?.bulkMinQty || 0,
+        imageUrl: productImage(product, variant?.id || item.variantId || ""),
       });
     }
 
@@ -222,7 +255,7 @@ document.addEventListener("click", async (event) => {
     else await cancelVariantOrder(db, button.dataset.order);
     await audit(db, auth, `order_${action}_variants`, button.dataset.order);
     await dispatchShopEmail(db, auth, button.dataset.order);
-    flash(action === "confirm" ? "訂單已確認，規格庫存已正確扣減。" : "訂單已取消，規格庫存已回補。");
+    flash(action === "confirm" ? "訂單已確認，規格庫存與數量優惠已重新核對。" : "訂單已取消，規格庫存已回補。");
   } catch (error) {
     console.error("77select variant order action failed", error);
     flash(error?.message || "更新訂單失敗。", "error");
