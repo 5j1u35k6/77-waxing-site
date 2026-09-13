@@ -1,8 +1,10 @@
-import { collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
+import { collection, onSnapshot, query, where } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
 import { getPublicFirebase } from "../assets/public-firebase.js?v=20260913-shop2";
 
 const { db } = getPublicFirebase();
 const cropByUrl = new Map();
+let mediaLayoutSignature = null;
+
 const ranged = (value, min, max, fallback) => {
   const parsed = Number(value);
   return Math.min(max, Math.max(min, Number.isFinite(parsed) ? parsed : fallback));
@@ -55,10 +57,26 @@ function applyAll(root = document) {
   root.querySelectorAll?.(".store-product-media img, .product-gallery-main img, .gallery-thumb img, .cart-row .product-media img").forEach(applyCrop);
 }
 
-async function loadCropSettings() {
-  const snap = await getDocs(query(collection(db, "shopProducts"), where("active", "==", true)));
+function layoutSignature(snapshot) {
+  return JSON.stringify(snapshot.docs.map((docSnap) => {
+    const product = docSnap.data() || {};
+    const media = Array.isArray(product.media) ? product.media : [];
+    return {
+      id: docSnap.id,
+      imageUrl: String(product.imageUrl || ""),
+      media: media.map((row, index) => ({
+        id: String(row?.id || `image-${index + 1}`),
+        url: String(row?.url || row?.dataUrl || row?.imageUrl || ""),
+        variantId: String(row?.variantId || ""),
+        sortOrder: Number.isFinite(Number(row?.sortOrder)) ? Number(row.sortOrder) : index,
+      })),
+    };
+  }).sort((a, b) => a.id.localeCompare(b.id)));
+}
+
+function syncCropSettings(snapshot) {
   cropByUrl.clear();
-  snap.docs.forEach((docSnap) => {
+  snapshot.docs.forEach((docSnap) => {
     const product = docSnap.data() || {};
     const media = Array.isArray(product.media) ? product.media : [];
     media.forEach((row) => {
@@ -68,6 +86,16 @@ async function loadCropSettings() {
     });
   });
   applyAll();
+
+  const nextSignature = layoutSignature(snapshot);
+  if (mediaLayoutSignature === null) {
+    mediaLayoutSignature = nextSignature;
+    return;
+  }
+  if (nextSignature !== mediaLayoutSignature) {
+    mediaLayoutSignature = nextSignature;
+    location.reload();
+  }
 }
 
 const observer = new MutationObserver((records) => {
@@ -88,4 +116,8 @@ observer.observe(document.documentElement, {
   attributeFilter: ["src"],
 });
 
-loadCropSettings().catch((error) => console.warn("77select media crop settings unavailable", error));
+onSnapshot(
+  query(collection(db, "shopProducts"), where("active", "==", true)),
+  syncCropSettings,
+  (error) => console.warn("77select media crop settings unavailable", error),
+);
