@@ -2,135 +2,113 @@ name: Bootstrap 77waxing Shop
 
 on:
   push:
-    branches:
-      - main
-    paths:
-      - .github/workflows/bootstrap-shop.yml
+    branches: [main]
+    paths: ['.github/workflows/bootstrap-shop.yml']
 
 permissions:
   contents: write
 
 jobs:
   bootstrap:
-    if: ${{ github.event.head_commit.message == 'chore: bootstrap 77waxing shop clone' }}
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout 77waxing
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Copy zizhen-sweets storefront and admin
+      - name: Bootstrap shop clone
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p shop
           curl -fsSL https://raw.githubusercontent.com/5j1u35k6/zizhen-sweets/main/index.html -o shop/index.html
           curl -fsSL https://raw.githubusercontent.com/5j1u35k6/zizhen-sweets/main/admin.html -o shop/admin.html
-
-      - name: Rebrand cloned shop and isolate data namespace
-        shell: bash
-        run: |
-          python <<'PY'
-          from pathlib import Path
-
-          storefront = Path('shop/index.html')
-          text = storefront.read_text(encoding='utf-8')
-          text = text.replace('<title>子珍甜點 | Zizhen Sweets</title>', '<title>77waxing｜產品訂購</title>')
-          text = text.replace('<p>© 2026 子珍甜點 Zizhen Sweets  本賣場已登錄食品字號：A-202344317-00000-3</p>', '<p>© 2026 77waxing. All Rights Reserved.</p>')
-          text = text.replace("const appId = typeof __app_id !== 'undefined' ? __app_id : 'zizhen-desserts';", "const appId = typeof __app_id !== 'undefined' ? __app_id : '77waxing-shop';\n        // TEMP: cloned commerce backend remains on the zizhen-sweets Firebase project, but data is isolated by this appId namespace.")
-          text = text.replace("localStorage.getItem('zizhen_cart')", "localStorage.getItem('77waxing_cart')")
-          text = text.replace("localStorage.setItem('zizhen_cart'", "localStorage.setItem('77waxing_cart'")
-          text = text.replace('Google 登入成功！歡迎來到子珍甜點。', 'Google 登入成功！歡迎來到 77waxing。')
-          text = text.replace('子珍甜點', '77waxing')
-          text = text.replace('Zizhen Sweets', '77waxing')
-          storefront.write_text(text, encoding='utf-8')
-
-          admin = Path('shop/admin.html')
-          text = admin.read_text(encoding='utf-8')
-          text = text.replace('<title>子珍甜點 - 管理後台</title>', '<title>77waxing - 產品訂購管理後台</title>')
-          text = text.replace('<meta name="viewport" content="width=device-width, initial-scale=1.0">', '<meta name="viewport" content="width=device-width, initial-scale=1.0">\n    <meta name="robots" content="noindex,nofollow">', 1)
-          text = text.replace("const appId = typeof __app_id !== 'undefined' ? __app_id : 'zizhen-desserts';", "const appId = typeof __app_id !== 'undefined' ? __app_id : '77waxing-shop';\n        // TEMP: cloned commerce backend remains on the zizhen-sweets Firebase project, but data is isolated by this appId namespace.")
-          text = text.replace('子珍管理中心', '77waxing 管理中心')
-          text = text.replace('子珍甜點', '77waxing')
-          text = text.replace('Zizhen Sweets', '77waxing')
-          admin.write_text(text, encoding='utf-8')
-          PY
-
-      - name: Add product-order button to 77waxing headers
-        shell: bash
-        run: |
           python <<'PY'
           from pathlib import Path
           import re
 
+          # Storefront: preserve the cloned functions, but isolate the 77waxing data namespace.
+          p = Path('shop/index.html')
+          s = p.read_text(encoding='utf-8')
+          s = s.replace('<title>子珍甜點 | Zizhen Sweets</title>', '<title>77waxing｜產品訂購</title>')
+          s = s.replace('<p>© 2026 子珍甜點 Zizhen Sweets  本賣場已登錄食品字號：A-202344317-00000-3</p>', '<p>© 2026 77waxing. All Rights Reserved.</p>')
+          s = s.replace("const appId = typeof __app_id !== 'undefined' ? __app_id : 'zizhen-desserts';", "const appId = typeof __app_id !== 'undefined' ? __app_id : '77waxing-shop';\n        // TEMP: commerce backend is still the cloned Firebase project; data is isolated by appId.")
+          s = s.replace("localStorage.getItem('zizhen_cart')", "localStorage.getItem('77waxing_cart')")
+          s = s.replace("localStorage.setItem('zizhen_cart'", "localStorage.setItem('77waxing_cart'")
+          s = s.replace('Google 登入成功！歡迎來到子珍甜點。', 'Google 登入成功！歡迎來到 77waxing。')
+          s = s.replace('子珍甜點', '77waxing').replace('Zizhen Sweets', '77waxing')
+          p.write_text(s, encoding='utf-8')
+
+          # Admin: copy functions, rebrand, noindex, and use the same isolated namespace.
+          p = Path('shop/admin.html')
+          s = p.read_text(encoding='utf-8')
+          s = s.replace('<title>子珍甜點 - 管理後台</title>', '<title>77waxing - 產品訂購管理後台</title>')
+          s = s.replace('<meta name="viewport" content="width=device-width, initial-scale=1.0">', '<meta name="viewport" content="width=device-width, initial-scale=1.0">\n    <meta name="robots" content="noindex,nofollow">', 1)
+          s = s.replace("const appId = typeof __app_id !== 'undefined' ? __app_id : 'zizhen-desserts';", "const appId = typeof __app_id !== 'undefined' ? __app_id : '77waxing-shop';\n        // TEMP: commerce backend is still the cloned Firebase project; data is isolated by appId.")
+          s = s.replace('子珍管理中心', '77waxing 管理中心')
+          s = s.replace('子珍甜點', '77waxing').replace('Zizhen Sweets', '77waxing')
+          p.write_text(s, encoding='utf-8')
+
+          # Add the product-order button after the existing booking button.
           product_link = '<a class="product-order" href="/77-waxing-site/shop/" target="_blank" rel="noopener noreferrer"><strong class="nav-zh">產品訂購</strong><small class="nav-en">SHOP</small></a>'
-
-          for filename in ['index.html', 'booking/index.html']:
-              path = Path(filename)
-              text = path.read_text(encoding='utf-8')
-              if 'class="product-order"' not in text:
-                  booking_pattern = re.compile(r'(<a class="book(?: on)?" href="/77-waxing-site/booking/">.*?</a>)')
-                  text, count = booking_pattern.subn(r'\1' + product_link, text, count=1)
+          for filename in ('index.html', 'booking/index.html'):
+              p = Path(filename)
+              s = p.read_text(encoding='utf-8')
+              if 'class="product-order"' not in s:
+                  pattern = re.compile(r'(<a class="book(?: on)?" href="/77-waxing-site/booking/">.*?</a>)')
+                  s, count = pattern.subn(r'\1' + product_link, s, count=1)
                   if count != 1:
-                      raise SystemExit(f'Could not locate booking button in {filename}')
-              text = re.sub(r'(?:\.\./)?assets/nav\.css\?v=[^"\']+', lambda m: m.group(0).split('?v=')[0] + '?v=20260913-shop', text)
-              path.write_text(text, encoding='utf-8')
-          PY
+                      raise RuntimeError(f'Booking button not found in {filename}')
+              s = re.sub(r'((?:\.\./|/77-waxing-site/)?assets/nav\.css)\?v=[^"\']+', r'\1?v=20260913-shop', s)
+              p.write_text(s, encoding='utf-8')
 
-      - name: Add warm product-order button styling
-        shell: bash
-        run: |
-          cat >> assets/nav.css <<'CSS'
-
-          /* 77waxing product-order entry */
+          # Warm CTA styling, close to the booking button but visually distinct.
+          p = Path('assets/nav.css')
+          s = p.read_text(encoding='utf-8')
+          marker = '/* 77waxing product-order entry */'
+          if marker not in s:
+              s += '''\n\n/* 77waxing product-order entry */
           .header nav .product-order{min-width:102px;padding:10px 17px;background:linear-gradient(135deg,#d8bd95,#c5a070)!important;color:#2f2d2b!important;box-shadow:0 8px 20px rgba(139,106,71,.16);transition:transform .18s ease,box-shadow .18s ease,background .18s ease}
           .header nav .product-order .nav-zh,.header nav .product-order .nav-en{color:#2f2d2b!important}
           .header nav .product-order .nav-en{opacity:.62}
           .header nav .product-order:hover{background:linear-gradient(135deg,#e0c9a7,#c9a676)!important;box-shadow:0 10px 24px rgba(139,106,71,.22);transform:translateY(-1px)}
           .header nav .product-order:active{transform:translateY(0) scale(.98);box-shadow:0 5px 14px rgba(139,106,71,.16)}
           @media(max-width:850px){.header nav .product-order{width:100%;min-width:0;text-align:left;margin-top:4px;justify-items:start}}
-          CSS
+          '''
+          p.write_text(s, encoding='utf-8')
 
-      - name: Record migration follow-up checklist
-        shell: bash
-        run: |
-          cat > SHOP_MIGRATION_TODO.md <<'MD'
-          # 77waxing 產品訂購：複製後待調整清單
+          Path('SHOP_MIGRATION_TODO.md').write_text('''# 77waxing 產品訂購：複製後待調整清單
 
-          目前 `/shop/` 與 `/shop/admin.html` 是由 `5j1u35k6/zizhen-sweets` 複製的第一版基底；品牌文字已改為 77waxing，資料 namespace 已改為 `77waxing-shop`，避免與原本子珍甜點資料路徑混用。
+          `/shop/` 與 `/shop/admin.html` 目前是由 `5j1u35k6/zizhen-sweets` 複製的第一版基底。品牌名稱已改為 77waxing，資料 namespace 改為 `77waxing-shop`，避免與原站資料路徑混用。
 
-          ## 必須優先處理
-          - **Firebase 專案遷移**：目前仍暫時使用 `zizhen-sweets` Firebase 設定，只以 `appId = 77waxing-shop` 隔離資料。後續應切到 77waxing 專用 commerce Firebase 或正式整合 `waxing-86909`。
-          - **Firestore Security Rules**：依產品、訂單、留言與管理員角色重新設計規則，不能只依前端登入畫面視為後台授權。
-          - **後台管理員權限**：建立明確 admin allowlist / role claim；`/shop/admin.html` 不在公開導覽列中，並已加 noindex，但網址本身仍可被知道。
-          - **商品資料**：新 namespace 初始可能沒有商品，需要由後台建立 77waxing 商品或匯入正式資料。
-          - **法務與商業資訊**：原站食品登錄字號已移除，不能沿用子珍甜點資料。需補 77waxing 正確賣家資訊、隱私權、退換貨/取消、付款與配送條款。
+          ## 優先處理
+          - Firebase：目前暫用複製來源的 Firebase project，只用 `77waxing-shop` namespace 隔離；後續移至 77waxing 專用 commerce backend 或整合 `waxing-86909`。
+          - Firestore Security Rules：依 products / orders / questions / admin roles 重做規則。
+          - 後台權限：建立真正的 admin allowlist 或 role claim；`shop/admin.html` 已 noindex，但網址仍可被知道。
+          - 商品資料：新 namespace 起初沒有 77waxing 商品，需要在後台建立或匯入。
+          - 法務資訊：原站食品登錄字號已移除；需補 77waxing 正確賣家資料、隱私權、退換貨/取消、付款與配送條款。
 
-          ## 內容與品牌
-          - 首頁 Hero、文案、圖像目前仍是甜點網站語境，之後需改成 77waxing 實際販售產品。
-          - 「所有甜點／甜點目錄／甜蜜包裹／廚房備料」等字詞仍需改成產品語境。
-          - 商品分類、成分欄位、圖片比例與卡片文案需要依 77waxing 商品類型重新設計。
-          - 色彩目前保留原站 stone/amber，後續可與 77waxing 官網的米色、棕金色系統一。
+          ## 品牌與內容
+          - Hero、圖片與多數內容仍是甜點模板語境，後續換成 77waxing 實際產品。
+          - 「所有甜點／甜點目錄／甜蜜包裹／廚房備料」等詞需改成產品語境。
+          - 商品分類、成分欄位、圖片比例、卡片文案依實際產品重做。
+          - 色彩可再統一到 77waxing 米色／棕金品牌系統。
 
           ## 訂購流程
-          - 目前保留 Google 登入與匿名 fallback；正式上線前需確認是否保留。
-          - 目前配送：自取、7-11、全家；超商處理費固定 60 元。需確認真實物流策略與運費。
-          - 目前付款：取貨付款、轉帳等靜態選項，尚未串金流。
-          - 訂單編號、庫存扣減、物流編號、取消狀態需做併發與資料完整性檢查。
-          - 尚未整合 77waxing 現有 email/通知系統；需決定訂單通知給顧客與管理員的方式。
+          - 確認是否保留 Google 登入與匿名 fallback。
+          - 目前配送選項為自取、7-11、全家且超商費固定 60 元；需改成實際物流規則。
+          - 目前付款是靜態選項，尚未串正式金流。
+          - 檢查訂單編號、庫存扣減、物流編號、取消狀態的併發與資料完整性。
+          - 串接 77waxing 顧客／管理員訂單通知。
 
           ## 後台與營運
-          - 商品圖片目前壓縮後以 Base64 存 Firestore，正式商品數量增加後建議改 Storage/CDN。
-          - 儀表板營收只計算「已完成」訂單；後續可加日期篩選、匯出、退款/取消統計。
-          - 顧客問答、訂單、商品三區功能已複製，但需要 77waxing 實際營運欄位與狀態。
-          - 後續應加入錯誤監控、操作紀錄與基本 SEO/分享 metadata。
-          MD
+          - 商品圖片目前以 Base64 存 Firestore，商品量增加後改 Storage/CDN。
+          - 儀表板補日期篩選、匯出、退款／取消統計。
+          - 商品、訂單、顧客問答功能已複製，但欄位與狀態要依 77waxing 營運調整。
+          - 加入錯誤監控、操作紀錄與 SEO／分享 metadata。
+          ''', encoding='utf-8')
+          PY
 
-      - name: Commit cloned shop
-        shell: bash
-        run: |
-          set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add shop/index.html shop/admin.html index.html booking/index.html assets/nav.css SHOP_MIGRATION_TODO.md
