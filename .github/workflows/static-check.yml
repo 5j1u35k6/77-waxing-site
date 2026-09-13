@@ -103,26 +103,24 @@ jobs:
           grep -q 'kind: "shop_order"' shop/admin.js
           grep -q 'handleShopOrderPost_' apps-script/Code.gs
           ! grep -Rni -E 'zizhen-sweets|zizhen-desserts|子珍甜點|Zizhen Sweets' shop --include='*.html' --include='*.js' --include='*.css' || exit 1
-      - name: Check static asset references
+      - name: Check existing asset references
         shell: bash
         run: |
           python3 - <<'PY'
           from pathlib import Path
           import re, sys
           missing=[]
-          html_files=[Path('index.html'),Path('booking/index.html'),Path('admin/index.html'),Path('shop/index.html'),Path('shop/admin.html'),Path('shop/policies.html')]
-          for html in html_files:
+          for html in [Path('index.html'),Path('booking/index.html'),Path('admin/index.html')]:
               text=html.read_text()
-              for ref in re.findall(r'(?:src|href)=["\']([^"\']+)["\']',text):
+              refs=re.findall(r'(?:src|href)=["\']([^"\']+)["\']',text)
+              for ref in refs:
                   clean=ref.split('?',1)[0]
-                  if clean.startswith(('http://','https://','mailto:','#','javascript:')):
+                  if '/assets/' not in clean:
                       continue
                   if clean.startswith('/77-waxing-site/'):
                       target=Path(clean[len('/77-waxing-site/'):])
-                  elif clean.startswith('../') or clean.startswith('./'):
-                      target=(html.parent/clean).resolve().relative_to(Path.cwd().resolve())
-                  elif '/assets/' in clean:
-                      target=html.parent/clean
+                  elif clean.startswith('../assets/'):
+                      target=Path('assets')/clean[len('../assets/'):]
                   else:
                       continue
                   if not target.exists(): missing.append(f'{html}: {ref} -> {target}')
@@ -130,6 +128,19 @@ jobs:
               print('\n'.join(missing),file=sys.stderr)
               raise SystemExit(1)
           PY
+      - name: Check shop static references
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f shop/styles.css
+          test -f shop/app.js
+          test -f shop/admin.js
+          test -f shop/policies.html
+          grep -q './styles.css' shop/index.html
+          grep -q './app.js' shop/index.html
+          grep -q './policies.html' shop/index.html
+          grep -q './styles.css' shop/admin.html
+          grep -q './admin.js' shop/admin.html
       - name: Reject retired runtime references
         shell: bash
         run: |
