@@ -20,15 +20,17 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for file in assets/*.js; do
+          for file in assets/*.js shop/*.js; do
             if grep -Eq '^[[:space:]]*(import|export)[[:space:]]' "$file"; then
-              temp="/tmp/$(basename "${file%.js}").mjs"
+              temp="/tmp/$(basename "${file%.js}")-$(echo "$file" | tr '/' '-').mjs"
               cp "$file" "$temp"
               node --check "$temp"
             else
               node --check "$file"
             fi
           done
+          cp apps-script/Code.gs /tmp/apps-script-code.js
+          node --check /tmp/apps-script-code.js
       - name: Check admin Firebase bootstrap
         shell: bash
         run: |
@@ -67,6 +69,24 @@ jobs:
           grep -q 'data-price-jump' assets/catalog-dynamic.js
           grep -q 'const services=catalog.filter' assets/nav-service-catalog-sync.js
           grep -q 'const source = publicCatalog(await loadCatalog())' assets/booking-core.js
+      - name: Check shop Firebase migration
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q '"default": "waxing-86909"' .firebaserc
+          grep -q 'getPublicFirebase' shop/app.js
+          grep -q 'firebaseConfig' shop/admin.js
+          grep -q 'admins' shop/admin.js
+          grep -q 'runTransaction' shop/admin.js
+          grep -q 'shopProducts' firebase/firestore.rules
+          grep -q 'shopOrders' firebase/firestore.rules
+          grep -q 'shopMessages' firebase/firestore.rules
+          grep -q 'shopSettings' firebase/firestore.rules
+          grep -q 'shopAuditLogs' firebase/firestore.rules
+          grep -q "kind: \"shop_order\"" shop/app.js
+          grep -q "kind: \"shop_order\"" shop/admin.js
+          grep -q "handleShopOrderPost_" apps-script/Code.gs
+          ! grep -Rni -E 'zizhen-sweets|zizhen-desserts|子珍甜點|Zizhen Sweets' shop --include='*.html' --include='*.js' --include='*.css' || exit 1
       - name: Check static asset references
         shell: bash
         run: |
@@ -74,18 +94,21 @@ jobs:
           from pathlib import Path
           import re, sys
           missing=[]
-          for html in [Path('index.html'),Path('booking/index.html'),Path('admin/index.html')]:
+          html_files=[Path('index.html'),Path('booking/index.html'),Path('admin/index.html'),Path('shop/index.html'),Path('shop/admin.html'),Path('shop/policies.html')]
+          for html in html_files:
               text=html.read_text()
               for ref in re.findall(r'(?:src|href)=["\']([^"\']+)["\']',text):
-                  if '/assets/' not in ref and not ref.startswith('../assets/'):
-                      continue
                   clean=ref.split('?',1)[0]
+                  if clean.startswith(('http://','https://','mailto:','#','javascript:')):
+                      continue
                   if clean.startswith('/77-waxing-site/'):
                       target=Path(clean[len('/77-waxing-site/'):])
-                  elif clean.startswith('../'):
+                  elif clean.startswith('../') or clean.startswith('./'):
                       target=(html.parent/clean).resolve().relative_to(Path.cwd().resolve())
-                  else:
+                  elif '/assets/' in clean:
                       target=html.parent/clean
+                  else:
+                      continue
                   if not target.exists(): missing.append(f'{html}: {ref} -> {target}')
           if missing:
               print('\n'.join(missing),file=sys.stderr)
@@ -95,4 +118,4 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ! grep -R -n -E 'catalog-v1\.js|catalog-copy-v1\.js|admin-ui-fixes\.js|admin-ux\.js|nav-v4\.(js|css)|booking-v3\.(js|css)|admin-v2\.(js|css)|admin-dashboard-v3\.(js|css)|catalog-v1\.css|footer-v1\.css|firebase-pages\.js' index.html booking admin assets --include='*.html' --include='*.js' --include='*.css' || exit 1
+          ! grep -R -n -E 'catalog-v1\.js|catalog-copy-v1\.js|admin-ui-fixes\.js|admin-ux\.js|nav-v4\.(js|css)|booking-v3\.(js|css)|admin-v2\.(js|css)|admin-dashboard-v3\.(js|css)|catalog-v1\.css|footer-v1\.css|firebase-pages\.js' index.html booking admin assets shop --include='*.html' --include='*.js' --include='*.css' || exit 1
