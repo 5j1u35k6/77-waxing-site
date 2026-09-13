@@ -41,6 +41,8 @@ jobs:
           set -euo pipefail
           cp shop/admin.js /tmp/77waxing-shop-admin.mjs
           node --check /tmp/77waxing-shop-admin.mjs
+          cp shop/admin-media.js /tmp/77select-shop-admin-media.mjs
+          node --check /tmp/77select-shop-admin-media.mjs
       - name: Check Apps Script syntax
         shell: bash
         run: |
@@ -99,6 +101,11 @@ jobs:
           grep -q 'shopMessages' firebase/firestore.rules
           grep -q 'shopSettings' firebase/firestore.rules
           grep -q 'shopAuditLogs' firebase/firestore.rules
+          grep -q 'shop-products' firebase/storage.rules
+          grep -q 'firestore.exists' firebase/storage.rules
+          grep -q '"rules": "firebase/storage.rules"' firebase.json
+          grep -q 'getStorage' shop/admin-media.js
+          grep -q 'uploadBytesResumable' shop/admin-media.js
           grep -q 'kind: "shop_order"' shop/app.js
           grep -q 'kind: "shop_order"' shop/admin.js
           grep -q 'handleShopOrderPost_' apps-script/Code.gs
@@ -133,14 +140,21 @@ jobs:
         run: |
           set -euo pipefail
           test -f shop/styles.css
+          test -f shop/ui-overrides.css
           test -f shop/app.js
           test -f shop/admin.js
+          test -f shop/admin-media.js
           test -f shop/policies.html
           grep -q './styles.css' shop/index.html
+          grep -q './ui-overrides.css' shop/index.html
           grep -q './app.js' shop/index.html
           grep -q './policies.html' shop/index.html
           grep -q './styles.css' shop/admin.html
+          grep -q './ui-overrides.css' shop/admin.html
           grep -q './admin.js' shop/admin.html
+          grep -q './admin-media.js' shop/admin.html
+          grep -q '77select' shop/index.html
+          grep -q '77select' shop/admin.html
       - name: Reject retired runtime references
         shell: bash
         run: |
