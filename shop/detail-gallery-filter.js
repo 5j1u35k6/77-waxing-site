@@ -49,38 +49,53 @@ function filterDetailGallery(detail) {
 
 function forceDetailLayout(detail) {
   const gallery = detail.querySelector(".product-gallery");
+  const copy = detail.querySelector(".product-detail-copy");
   const main = gallery?.querySelector(".product-gallery-main");
   const image = main?.querySelector("img");
 
   if (!gallery || gallery.hidden || detail.classList.contains("detail-gallery-empty")) {
-    detail.style.setProperty("display", "grid", "important");
-    detail.style.setProperty("grid-template-columns", "1fr", "important");
+    detail.style.setProperty("display", "block", "important");
+    detail.style.removeProperty("grid-template-columns");
+    detail.style.removeProperty("flex-direction");
+    detail.style.removeProperty("gap");
+    copy?.style.setProperty("width", "100%", "important");
     return;
   }
 
-  // Match the visual breakpoint used by product-detail-polish.css. Using the
-  // modal's own width here caused half-screen desktop windows to be treated as
-  // mobile and forced the gallery above the product copy.
   const sideBySide = window.innerWidth >= 480;
 
-  detail.style.setProperty("display", "grid", "important");
-  detail.style.setProperty("align-items", "start", "important");
-  detail.style.setProperty("gap", sideBySide ? "18px" : "18px", "important");
-  detail.style.setProperty(
-    "grid-template-columns",
-    sideBySide ? "minmax(180px, 42%) minmax(0, 1fr)" : "1fr",
-    "important"
-  );
+  // Use flex instead of grid so older responsive grid rules cannot force the
+  // gallery back above the product information.
+  detail.style.setProperty("display", "flex", "important");
+  detail.style.setProperty("flex-direction", sideBySide ? "row" : "column", "important");
+  detail.style.setProperty("align-items", "flex-start", "important");
+  detail.style.setProperty("gap", sideBySide ? "22px" : "18px", "important");
+  detail.style.setProperty("width", "100%", "important");
   detail.dataset.detailLayout = sideBySide ? "split" : "stack";
 
-  gallery.style.setProperty("width", "100%", "important");
-  gallery.style.setProperty("min-width", "0", "important");
+  if (sideBySide) {
+    gallery.style.setProperty("flex", "0 0 42%", "important");
+    gallery.style.setProperty("width", "42%", "important");
+    gallery.style.setProperty("max-width", "320px", "important");
+    gallery.style.setProperty("min-width", "190px", "important");
+    copy?.style.setProperty("flex", "1 1 0", "important");
+    copy?.style.setProperty("width", "auto", "important");
+    copy?.style.setProperty("min-width", "0", "important");
+  } else {
+    gallery.style.setProperty("flex", "0 0 auto", "important");
+    gallery.style.setProperty("width", "100%", "important");
+    gallery.style.setProperty("max-width", "none", "important");
+    gallery.style.setProperty("min-width", "0", "important");
+    copy?.style.setProperty("width", "100%", "important");
+  }
 
   if (main) {
     main.style.setProperty("width", "100%", "important");
-    main.style.setProperty("height", sideBySide ? "clamp(300px, 52dvh, 445px)" : "min(92vw, 420px)", "important");
+    main.style.setProperty("height", sideBySide ? "430px" : "min(92vw, 420px)", "important");
     main.style.setProperty("aspect-ratio", "auto", "important");
     main.style.setProperty("overflow", "hidden", "important");
+    main.style.setProperty("display", "grid", "important");
+    main.style.setProperty("place-items", "center", "important");
   }
 
   if (image) {
