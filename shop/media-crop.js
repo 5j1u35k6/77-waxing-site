@@ -30,6 +30,7 @@ function clearCrop(image) {
   image.style.removeProperty("object-position");
   image.style.removeProperty("transform");
   image.style.removeProperty("transform-origin");
+  image.style.removeProperty("pointer-events");
   delete image.dataset.mediaCropApplied;
 }
 
@@ -46,6 +47,7 @@ function applyCrop(image) {
   image.style.setProperty("object-position", `${crop.focusX}% ${crop.focusY}%`, "important");
   image.style.setProperty("transform-origin", `${crop.focusX}% ${crop.focusY}%`, "important");
   image.style.setProperty("transform", `scale(${crop.cropZoom})`, "important");
+  image.style.setProperty("pointer-events", "none", "important");
 }
 
 function applyAll(root = document) {
