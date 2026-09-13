@@ -1,0 +1,52 @@
+name: Shop regional check
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'shop/regional-store.js'
+      - 'shop/regional-store.css'
+      - 'shop/admin-order-variants.js'
+      - 'shop/admin-variants.js'
+      - 'shop/admin-variants.css'
+      - 'shop/index.html'
+      - 'shop/admin.html'
+      - '.github/workflows/shop-regional-check.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'shop/regional-store.js'
+      - 'shop/regional-store.css'
+      - 'shop/admin-order-variants.js'
+      - 'shop/admin-variants.js'
+      - 'shop/admin-variants.css'
+      - 'shop/index.html'
+      - 'shop/admin.html'
+      - '.github/workflows/shop-regional-check.yml'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Syntax check regional storefront
+        run: |
+          cp shop/regional-store.js /tmp/regional-store.mjs
+          node --check /tmp/regional-store.mjs
+      - name: Syntax check variant admin modules
+        run: |
+          cp shop/admin-variants.js /tmp/admin-variants.mjs
+          node --check /tmp/admin-variants.mjs
+          cp shop/admin-order-variants.js /tmp/admin-order-variants.mjs
+          node --check /tmp/admin-order-variants.mjs
+      - name: Verify storefront assets are loaded
+        run: |
+          grep -q 'regional-store.css' shop/index.html
+          grep -q 'regional-store.js' shop/index.html
+          grep -q 'admin-order-variants.js' shop/admin.html
+          grep -q 'priceTWD' shop/regional-store.js
+          grep -q 'priceHKD' shop/regional-store.js
+          grep -q 'variantId' shop/admin-order-variants.js
