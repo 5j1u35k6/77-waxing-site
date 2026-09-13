@@ -1,10 +1,11 @@
 import { getApps } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
 import { doc, getDoc, getFirestore, setDoc } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
-import { getDownloadURL, getStorage, ref, uploadBytesResumable } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-storage.js";
 
 const ADMIN_APP_NAME = "77waxing-shop-admin";
-const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
+const MAX_SOURCE_BYTES = 12 * 1024 * 1024;
+const MAX_DATA_URL_LENGTH = 650000;
+const MAX_IMAGE_DIMENSION = 600;
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -24,11 +25,6 @@ function setBrandText() {
     brand.innerHTML = `<b>77</b>select<small>${small}</small>`;
     brand.dataset.selectBrand = "1";
   });
-  document.querySelectorAll("h1,p").forEach((node) => {
-    if (node.childElementCount) return;
-    if (node.textContent?.includes("77waxing 產品訂購後台")) node.textContent = node.textContent.replace("77waxing", "77select");
-    if (node.textContent?.includes("正在連線至 77waxing Firebase")) node.textContent = node.textContent.replace("77waxing", "77select");
-  });
 }
 
 async function migrateBrandSettings(db, user) {
@@ -47,46 +43,87 @@ async function migrateBrandSettings(db, user) {
     patch.heroDescription = "產品內容會由 77select 後台持續更新；價格、庫存與交付方式以訂單確認內容為準。";
   }
 
-  if (Object.keys(patch).length) {
-    await setDoc(settingsRef, patch, { merge: true });
-  }
+  if (Object.keys(patch).length) await setDoc(settingsRef, patch, { merge: true });
 }
 
-function safeFileName(name) {
-  const base = String(name || "product-image")
-    .normalize("NFKD")
-    .replace(/[^a-zA-Z0-9._-]+/g, "-")
-    .replace(/-+/g, "-")
-    .replace(/^-|-$/g, "")
-    .slice(0, 90);
-  return base || "product-image";
+function escapeAttr(value) {
+  return String(value || "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
 }
 
 function previewMarkup(url) {
   return url
-    ? `<img src="${url.replace(/"/g, "&quot;")}" alt="商品圖片預覽">`
-    : `<span>尚未上傳圖片</span>`;
+    ? `<img src="${escapeAttr(url)}" alt="商品圖片預覽">`
+    : `<span>尚未選擇圖片</span>`;
 }
 
-function enhanceImageField(storage, auth) {
+function readImage(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const image = new Image();
+      image.onload = () => resolve(image);
+      image.onerror = reject;
+      image.src = String(reader.result || "");
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+function drawCompressed(image, maxDimension, quality) {
+  let width = image.naturalWidth || image.width;
+  let height = image.naturalHeight || image.height;
+  const scale = Math.min(1, maxDimension / Math.max(width, height));
+  width = Math.max(1, Math.round(width * scale));
+  height = Math.max(1, Math.round(height * scale));
+
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext("2d", { alpha: false });
+  context.fillStyle = "#ffffff";
+  context.fillRect(0, 0, width, height);
+  context.drawImage(image, 0, 0, width, height);
+  return canvas.toDataURL("image/jpeg", quality);
+}
+
+async function resizeAndConvertToBase64(file) {
+  const image = await readImage(file);
+  const attempts = [
+    [600, 0.76],
+    [600, 0.66],
+    [560, 0.60],
+    [520, 0.54],
+    [480, 0.48],
+  ];
+
+  let dataUrl = "";
+  for (const [dimension, quality] of attempts) {
+    dataUrl = drawCompressed(image, dimension, quality);
+    if (dataUrl.length <= MAX_DATA_URL_LENGTH) return dataUrl;
+  }
+  throw new Error("IMAGE_TOO_LARGE_AFTER_COMPRESSION");
+}
+
+function enhanceImageField() {
   const original = document.querySelector("#p-image");
   if (!original || original.dataset.uploadEnhanced === "1") return;
 
   const field = original.closest(".field");
   if (!field) return;
-  const currentUrl = original.value.trim();
+  const currentValue = original.value.trim();
 
   field.classList.add("product-image-upload");
   field.innerHTML = `
     <label>商品圖片</label>
-    <input id="p-image" type="hidden" value="${currentUrl.replace(/"/g, "&quot;")}" data-upload-enhanced="1">
-    <div class="product-image-upload-preview" data-image-preview>${previewMarkup(currentUrl)}</div>
+    <input id="p-image" type="hidden" value="${escapeAttr(currentValue)}" data-upload-enhanced="1">
+    <div class="product-image-upload-preview" data-image-preview>${previewMarkup(currentValue)}</div>
     <div class="product-image-upload-actions">
       <label class="product-image-upload-button">選擇圖片<input id="p-image-file" type="file" accept="image/jpeg,image/png,image/webp,image/avif"></label>
       <button class="mini-btn" type="button" data-image-remove>移除圖片</button>
     </div>
     <div class="product-image-upload-progress" aria-hidden="true"><i data-image-progress></i></div>
-    <div class="product-image-upload-status" data-image-status>支援 JPG、PNG、WebP、AVIF，單張上限 8MB。</div>`;
+    <div class="product-image-upload-status" data-image-status>圖片會自動壓縮後存入 Firestore，不需要 Firebase Storage。</div>`;
 
   const hidden = field.querySelector("#p-image");
   const input = field.querySelector("#p-image-file");
@@ -101,7 +138,7 @@ function enhanceImageField(storage, auth) {
     preview.innerHTML = previewMarkup("");
     progress.style.width = "0%";
     status.classList.remove("error");
-    status.textContent = "圖片已從此商品移除；儲存商品後生效。";
+    status.textContent = "圖片已移除；儲存商品後生效。";
   });
 
   input.addEventListener("change", async () => {
@@ -115,50 +152,29 @@ function enhanceImageField(storage, auth) {
       input.value = "";
       return;
     }
-    if (file.size > MAX_IMAGE_BYTES) {
+    if (file.size > MAX_SOURCE_BYTES) {
       status.classList.add("error");
-      status.textContent = "圖片超過 8MB，請先縮小後再上傳。";
+      status.textContent = "原始圖片超過 12MB，請先縮小後再選擇。";
       input.value = "";
-      return;
-    }
-    if (!auth.currentUser || auth.currentUser.isAnonymous) {
-      status.classList.add("error");
-      status.textContent = "管理員登入已失效，請重新登入後再上傳。";
       return;
     }
 
     try {
-      const uid = auth.currentUser.uid;
-      const path = `shop-products/${uid}/${Date.now()}-${safeFileName(file.name)}`;
-      const task = uploadBytesResumable(ref(storage, path), file, {
-        contentType: file.type,
-        cacheControl: "public,max-age=31536000,immutable",
-        customMetadata: { uploadedBy: uid, source: "77select-admin" },
-      });
-
-      status.textContent = "正在上傳…";
-      progress.style.width = "0%";
-
-      await new Promise((resolve, reject) => {
-        task.on("state_changed", (snapshot) => {
-          const pct = snapshot.totalBytes ? (snapshot.bytesTransferred / snapshot.totalBytes) * 100 : 0;
-          progress.style.width = `${Math.max(2, Math.min(100, pct))}%`;
-          status.textContent = `正在上傳 ${Math.round(pct)}%`;
-        }, reject, resolve);
-      });
-
-      const url = await getDownloadURL(task.snapshot.ref);
-      hidden.value = url;
-      preview.innerHTML = previewMarkup(url);
+      status.textContent = "正在壓縮圖片…";
+      progress.style.width = "35%";
+      const dataUrl = await resizeAndConvertToBase64(file);
       progress.style.width = "100%";
-      status.textContent = "圖片上傳完成。儲存商品後就會顯示在前台。";
+      hidden.value = dataUrl;
+      preview.innerHTML = previewMarkup(dataUrl);
+      status.textContent = `圖片處理完成（約 ${Math.round(dataUrl.length / 1024)} KB），儲存商品後寫入 Firestore。`;
     } catch (error) {
-      console.error("77select image upload failed", error);
+      console.error("77select image processing failed", error);
       status.classList.add("error");
-      status.textContent = error?.code === "storage/unauthorized"
-        ? "沒有圖片上傳權限。請確認 Firebase Storage Rules 已部署。"
-        : "圖片上傳失敗，請稍後再試。";
+      status.textContent = error?.message === "IMAGE_TOO_LARGE_AFTER_COMPRESSION"
+        ? "圖片壓縮後仍過大，請改用較簡單或較小的圖片。"
+        : "圖片處理失敗，請換一張圖片再試。";
       progress.style.width = "0%";
+      input.value = "";
     }
   });
 }
@@ -167,11 +183,10 @@ try {
   const app = await waitForAdminApp();
   const auth = getAuth(app);
   const db = getFirestore(app);
-  const storage = getStorage(app);
 
   const refresh = () => {
     setBrandText();
-    enhanceImageField(storage, auth);
+    enhanceImageField();
   };
 
   const observer = new MutationObserver(refresh);
