@@ -9,6 +9,10 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const $ = (selector, root = document) => root.querySelector(selector);
 const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const int = (value) => Math.max(0, Math.round(Number(value) || 0));
+const ranged = (value, min, max, fallback) => {
+  const parsed = Number(value);
+  return Math.min(max, Math.max(min, Number.isFinite(parsed) ? parsed : fallback));
+};
 
 async function waitForAdminApp() {
   for (let i = 0; i < 160; i += 1) {
@@ -141,11 +145,14 @@ function parseMedia(form, variants) {
     url: String(row?.url || row?.dataUrl || row?.imageUrl || ""),
     variantId: validVariantIds.has(String(row?.variantId || "")) ? String(row.variantId) : "",
     sortOrder: index,
+    focusX: ranged(row?.focusX, 0, 100, 50),
+    focusY: ranged(row?.focusY, 0, 100, 50),
+    cropZoom: ranged(row?.cropZoom, 1, 5, 1),
   })).filter((row) => row.url) : [];
 
   if (!rows.length) {
     const legacy = $("#p-image", form)?.value.trim() || "";
-    if (legacy) rows = [{ id: "legacy-main", url: legacy, variantId: "", sortOrder: 0 }];
+    if (legacy) rows = [{ id: "legacy-main", url: legacy, variantId: "", sortOrder: 0, focusX: 50, focusY: 50, cropZoom: 1 }];
   }
   return rows;
 }
