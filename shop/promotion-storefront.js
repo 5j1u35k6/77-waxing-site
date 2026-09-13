@@ -7,6 +7,7 @@ import { getPublicFirebase } from "../assets/public-firebase.js?v=20260913-shop2
 const { auth, db } = getPublicFirebase();
 const CART_KEY = "77select_cart_v4";
 const DEFAULT_EMAIL_URL = "https://script.google.com/macros/s/AKfycbx6iC26KXbHWYte5XhLGNRMmG16Yydx2vPHDxYpmp4rmWn3plk__6Qwwr7Y09hLptTW/exec";
+const PROMOTION_TYPES = ["bundle_price", "any_qty_bundle", "percent_off", "amount_off", "gift"];
 let market = document.documentElement.dataset.market === "HK"
   ? { code: "HK", currency: "HKD", symbol: "HK$" }
   : { code: "TW", currency: "TWD", symbol: "NT$" };
@@ -18,7 +19,6 @@ let applying = false;
 let scheduled = false;
 
 const $ = (selector, root = document) => root.querySelector(selector);
-const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 const int = (value) => Math.max(0, Math.round(Number(value) || 0));
 const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
@@ -111,25 +111,35 @@ function normalizePromotionItem(item = {}) {
   };
 }
 
+function normalizePromotionGroups(promo, type) {
+  const raw = Array.isArray(promo?.groups) ? promo.groups : [];
+  return raw.map((group, groupIndex) => ({
+    id: String(group?.id || (type === "any_qty_bundle" ? "any" : (groupIndex === 0 ? "buy" : "add"))),
+    title: String(group?.title || (type === "any_qty_bundle" ? "參加品項" : (groupIndex === 0 ? "購買品項" : "加購品項"))),
+    minQty: Math.max(1, int(group?.minQty || 1)),
+    items: Array.isArray(group?.items) ? group.items.map(normalizePromotionItem).filter((item) => item.productId && item.variantId) : [],
+  }));
+}
+
 function normalizePromotions() {
   const source = Array.isArray(settings.promotions) ? settings.promotions : [];
   return source.map((promo, index) => {
-    const groups = Array.isArray(promo?.groups) ? promo.groups.slice(0, 2).map((group, groupIndex) => ({
-      id: String(group?.id || (groupIndex === 0 ? "buy" : "add")),
-      title: String(group?.title || (groupIndex === 0 ? "購買品項" : "加購品項")),
-      minQty: Math.max(1, int(group?.minQty || 1)),
-      items: Array.isArray(group?.items) ? group.items.map(normalizePromotionItem).filter((item) => item.productId && item.variantId) : [],
-    })) : [];
+    const promotionType = PROMOTION_TYPES.includes(promo?.promotionType) ? promo.promotionType : "bundle_price";
+    const groups = normalizePromotionGroups(promo, promotionType);
     return {
       id: String(promo?.id || `promo-${index + 1}`),
       title: String(promo?.title || "促銷優惠"),
       active: promo?.active !== false,
-      promotionType: ["bundle_price", "percent_off", "amount_off", "gift"].includes(promo?.promotionType) ? promo.promotionType : "bundle_price",
+      promotionType,
       groups,
       discount: promo?.discount || {},
       gift: promo?.gift || null,
     };
-  }).filter((promo) => promo.active && promo.groups.length >= 2 && promo.groups.slice(0, 2).every((group) => group.items.length));
+  }).filter((promo) => {
+    if (!promo.active) return false;
+    if (promo.promotionType === "any_qty_bundle") return promo.groups[0]?.items?.length && int(promo.groups[0].minQty) >= 2;
+    return promo.groups.length >= 2 && promo.groups.slice(0, 2).every((group) => group.items.length);
+  });
 }
 
 function rowMatchesPromotionItem(row, item) {
@@ -207,7 +217,41 @@ function buildGiftLine(promo, setCount) {
   };
 }
 
-function calculateOnePromotion(promo, available) {
+function calculateAnyQtyBundle(promo, available) {
+  const group = promo.groups[0];
+  const minQty = Math.max(2, int(group?.minQty || 2));
+  const bundlePrice = promotionAmount(promo, "bundlePriceTWD", "bundlePriceHKD");
+  if (!group?.items?.length || bundlePrice <= 0) return { setCount: 0, regularTotal: 0, discountTotal: 0, gift: null };
+
+  let setCount = 0;
+  let regularTotal = 0;
+  let discountTotal = 0;
+  while (true) {
+    const picked = [];
+    const touched = [];
+    for (let i = 0; i < minQty; i += 1) {
+      const entry = pickPromotionUnit(group, available);
+      if (!entry) {
+        touched.forEach((row) => { row.remaining += 1; });
+        return { setCount, regularTotal, discountTotal, gift: null };
+      }
+      entry.remaining -= 1;
+      touched.push(entry);
+      picked.push(entry);
+    }
+    const regular = picked.reduce((sum, entry) => sum + Number(entry.unitPrice || 0), 0);
+    const discount = Math.max(0, regular - bundlePrice);
+    if (discount <= 0) {
+      touched.forEach((row) => { row.remaining += 1; });
+      return { setCount, regularTotal, discountTotal, gift: null };
+    }
+    regularTotal += regular;
+    discountTotal += discount;
+    setCount += 1;
+  }
+}
+
+function calculateTwoGroupPromotion(promo, available) {
   let setCount = 0;
   let regularTotal = 0;
   let discountTotal = 0;
@@ -245,6 +289,11 @@ function calculateOnePromotion(promo, available) {
     discountTotal += discount;
     setCount += 1;
   }
+}
+
+function calculateOnePromotion(promo, available) {
+  if (promo.promotionType === "any_qty_bundle") return calculateAnyQtyBundle(promo, available);
+  return calculateTwoGroupPromotion(promo, available);
 }
 
 function cartPricing(rows = reconcileCartRows()) {
