@@ -9,6 +9,94 @@ service cloud.firestore {
       return signedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
     }
 
+    function validShopOrderCreate() {
+      return signedIn()
+        && request.resource.data.keys().hasOnly([
+          'orderNo',
+          'ownerUid',
+          'customerName',
+          'phone',
+          'email',
+          'deliveryMethod',
+          'paymentMethod',
+          'storeInfo',
+          'shippingFee',
+          'items',
+          'subtotal',
+          'total',
+          'status',
+          'inventoryCommitted',
+          'trackingNumber',
+          'note',
+          'createdAt',
+          'updatedAt'
+        ])
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.orderNo is string
+        && request.resource.data.orderNo.size() > 0
+        && request.resource.data.orderNo.size() <= 50
+        && request.resource.data.customerName is string
+        && request.resource.data.customerName.size() > 0
+        && request.resource.data.customerName.size() <= 80
+        && request.resource.data.phone is string
+        && request.resource.data.phone.size() > 0
+        && request.resource.data.phone.size() <= 30
+        && request.resource.data.email is string
+        && request.resource.data.email.size() > 3
+        && request.resource.data.email.size() <= 160
+        && request.resource.data.email.matches('^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$')
+        && request.resource.data.deliveryMethod in ['pickup', '7-11', 'family']
+        && request.resource.data.paymentMethod in ['pickup_cash', 'transfer']
+        && request.resource.data.storeInfo is string
+        && request.resource.data.storeInfo.size() <= 180
+        && request.resource.data.shippingFee is number
+        && request.resource.data.shippingFee >= 0
+        && request.resource.data.shippingFee <= 10000
+        && request.resource.data.items is list
+        && request.resource.data.items.size() >= 1
+        && request.resource.data.items.size() <= 30
+        && request.resource.data.subtotal is number
+        && request.resource.data.subtotal >= 0
+        && request.resource.data.subtotal <= 10000000
+        && request.resource.data.total is number
+        && request.resource.data.total == request.resource.data.subtotal + request.resource.data.shippingFee
+        && request.resource.data.status == 'pending'
+        && request.resource.data.inventoryCommitted == false
+        && request.resource.data.trackingNumber == null
+        && (request.resource.data.note == null || (request.resource.data.note is string && request.resource.data.note.size() <= 1000))
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time;
+    }
+
+    function validShopMessageCreate() {
+      return signedIn()
+        && request.resource.data.keys().hasOnly([
+          'ownerUid',
+          'name',
+          'email',
+          'content',
+          'reply',
+          'status',
+          'createdAt',
+          'updatedAt'
+        ])
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.name.size() <= 80
+        && request.resource.data.email is string
+        && request.resource.data.email.size() > 3
+        && request.resource.data.email.size() <= 160
+        && request.resource.data.email.matches('^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$')
+        && request.resource.data.content is string
+        && request.resource.data.content.size() >= 2
+        && request.resource.data.content.size() <= 1500
+        && request.resource.data.reply == null
+        && request.resource.data.status == 'pending'
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time;
+    }
+
     function bookingAfter(bookingId) {
       return getAfter(/databases/$(database)/documents/bookings/$(bookingId));
     }
@@ -176,6 +264,32 @@ service cloud.firestore {
     }
 
     match /customerImportBatches/{batchId} {
+      allow read, write: if isAdmin();
+    }
+
+    match /shopProducts/{productId} {
+      allow read: if isAdmin() || resource.data.active == true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /shopOrders/{orderId} {
+      allow create: if validShopOrderCreate();
+      allow read: if isAdmin() || (signedIn() && resource.data.ownerUid == request.auth.uid);
+      allow update, delete: if isAdmin();
+    }
+
+    match /shopMessages/{messageId} {
+      allow create: if validShopMessageCreate();
+      allow read: if isAdmin() || (signedIn() && resource.data.ownerUid == request.auth.uid);
+      allow update, delete: if isAdmin();
+    }
+
+    match /shopSettings/{settingId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /shopAuditLogs/{logId} {
       allow read, write: if isAdmin();
     }
 
