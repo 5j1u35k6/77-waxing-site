@@ -2,7 +2,8 @@ name: Bootstrap 77waxing Shop
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
     paths:
       - .github/workflows/bootstrap-shop.yml
 
@@ -11,7 +12,7 @@ permissions:
 
 jobs:
   bootstrap:
-    if: github.event.head_commit.message == 'chore: bootstrap 77waxing shop clone'
+    if: ${{ github.event.head_commit.message == 'chore: bootstrap 77waxing shop clone' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout 77waxing
@@ -82,14 +83,14 @@ jobs:
         run: |
           cat >> assets/nav.css <<'CSS'
 
-/* 77waxing product-order entry */
-.header nav .product-order{min-width:102px;padding:10px 17px;background:linear-gradient(135deg,#d8bd95,#c5a070)!important;color:#2f2d2b!important;box-shadow:0 8px 20px rgba(139,106,71,.16);transition:transform .18s ease,box-shadow .18s ease,background .18s ease}
-.header nav .product-order .nav-zh,.header nav .product-order .nav-en{color:#2f2d2b!important}
-.header nav .product-order .nav-en{opacity:.62}
-.header nav .product-order:hover{background:linear-gradient(135deg,#e0c9a7,#c9a676)!important;box-shadow:0 10px 24px rgba(139,106,71,.22);transform:translateY(-1px)}
-.header nav .product-order:active{transform:translateY(0) scale(.98);box-shadow:0 5px 14px rgba(139,106,71,.16)}
-@media(max-width:850px){.header nav .product-order{width:100%;min-width:0;text-align:left;margin-top:4px;justify-items:start}}
-CSS
+          /* 77waxing product-order entry */
+          .header nav .product-order{min-width:102px;padding:10px 17px;background:linear-gradient(135deg,#d8bd95,#c5a070)!important;color:#2f2d2b!important;box-shadow:0 8px 20px rgba(139,106,71,.16);transition:transform .18s ease,box-shadow .18s ease,background .18s ease}
+          .header nav .product-order .nav-zh,.header nav .product-order .nav-en{color:#2f2d2b!important}
+          .header nav .product-order .nav-en{opacity:.62}
+          .header nav .product-order:hover{background:linear-gradient(135deg,#e0c9a7,#c9a676)!important;box-shadow:0 10px 24px rgba(139,106,71,.22);transform:translateY(-1px)}
+          .header nav .product-order:active{transform:translateY(0) scale(.98);box-shadow:0 5px 14px rgba(139,106,71,.16)}
+          @media(max-width:850px){.header nav .product-order{width:100%;min-width:0;text-align:left;margin-top:4px;justify-items:start}}
+          CSS
 
       - name: Record migration follow-up checklist
         shell: bash
