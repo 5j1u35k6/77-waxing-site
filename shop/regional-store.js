@@ -260,26 +260,43 @@ function renderProductDetail() {
   const body = $("#product-detail-body");
   if (!body) return;
 
-  body.innerHTML = `<div class="product-detail regional-product-detail">
-    ${galleryMarkup(selectedProduct, selectedVariantId)}
-    <div class="product-detail-copy">
+  // The first image is the catalog cover. Product detail starts from the
+  // remaining media so the modal never repeats the storefront cover.
+  const variantMedia = mediaForVariant(selectedProduct, selectedVariantId);
+  const detailMedia = variantMedia.length > 1 ? variantMedia.slice(1) : [];
+  const gallery = detailMedia.length ? `<section class="product-gallery product-detail-media-column" aria-label="商品圖片">
+    <div class="product-gallery-main"><img data-gallery-main src="${esc(detailMedia[0].url)}" alt="${esc(selectedProduct.name)}"></div>
+    ${detailMedia.length > 1 ? `<div class="product-gallery-thumbs">${detailMedia.map((row, index) => `<button type="button" class="gallery-thumb${index === 0 ? " on" : ""}" data-gallery-thumb="${esc(row.id)}" data-gallery-url="${esc(row.url)}" aria-label="查看商品圖片 ${index + 1}"><img src="${esc(row.url)}" alt=""></button>`).join("")}</div>` : ""}
+  </section>` : "";
+
+  body.innerHTML = `<div class="product-detail regional-product-detail regional-product-detail-v2${detailMedia.length ? "" : " detail-gallery-empty"}">
+    ${gallery}
+    <section class="product-detail-copy product-detail-info-column">
       <span class="eyebrow">${esc(selectedProduct.category || "PRODUCT")}</span>
       <h2>${esc(selectedProduct.name)}</h2>
-      <div class="market-inline strong">${esc(market.label)}｜${esc(market.currency)} 專屬價格</div>
       <p>${esc(selectedProduct.description || "")}</p>
       <div class="variant-picker" role="radiogroup" aria-label="選擇商品規格">
         ${variants.map((variant) => {
           const disabled = variant.stock <= 0;
           const discount = discountText(variant);
-          return `<button type="button" class="variant-choice${variant.id === selectedVariantId ? " on" : ""}" data-regional-variant="${esc(variant.id)}" ${disabled ? "disabled" : ""}>
-            <span><b>${esc(variant.name)}</b>${variant.capacity ? `<small>${esc(variant.capacity)}</small>` : ""}${discount ? `<small class="bulk-copy">${esc(discount)}</small>` : ""}</span>
-            <span class="variant-choice-price">${money(basePriceFor(variant))}${disabled ? `<small>售完</small>` : `<small>庫存 ${variant.stock}</small>`}</span>
+          const primaryLabel = variant.capacity || variant.name || "規格";
+          const pillLabel = variant.capacity ? variant.name : "商品規格";
+          return `<button type="button" role="radio" aria-checked="${variant.id === selectedVariantId ? "true" : "false"}" class="variant-choice variant-layout-v2${variant.id === selectedVariantId ? " on" : ""}" data-regional-variant="${esc(variant.id)}" ${disabled ? "disabled" : ""}>
+            <div class="variant-layout-row variant-layout-top">
+              <span class="variant-layout-capacity">${esc(primaryLabel)}</span>
+              <strong class="variant-layout-price">${money(basePriceFor(variant))}</strong>
+            </div>
+            <div class="variant-layout-row variant-layout-bottom">
+              <span class="variant-layout-pill">${esc(pillLabel)}</span>
+              <span class="variant-layout-stock">${disabled ? "售完" : `剩餘數量 ${variant.stock}`}</span>
+            </div>
+            ${discount ? `<div class="variant-layout-discount">多件優惠｜${esc(discount)}</div>` : ""}
           </button>`;
         }).join("")}
       </div>
       ${selectedVariant && discountText(selectedVariant) ? `<div class="bulk-notice">數量優惠｜${esc(discountText(selectedVariant))}</div>` : ""}
       ${selectedProduct.spec ? `<div class="spec">${esc(selectedProduct.spec)}</div>` : ""}
-    </div>
+    </section>
   </div>`;
   updateDetailAddButton();
 }
