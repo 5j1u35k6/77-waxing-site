@@ -7,6 +7,8 @@ const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 
 let scheduled = false;
 let applying = false;
+let cartDiscountOpen = false;
+const checkoutDiscountOpen = new Set();
 
 function parseMoney(text) {
   return Number(String(text || "").replace(/[^0-9.-]/g, "") || 0);
@@ -37,7 +39,7 @@ function cartMathRow(label, operator, value, currency, extraClass = "") {
 }
 
 function discountToggleRow(value, currency, open) {
-  return `<button class="cart-math-row discount cart-math-discount-toggle" type="button" data-cart-discount-toggle aria-expanded="${open ? "true" : "false"}" aria-controls="cart-discount-detail"><span class="cart-math-label">活動折扣</span><span class="cart-math-op">−</span><b class="cart-math-value">${money(value, currency)}</b></button>`;
+  return `<button class="cart-math-row discount cart-math-discount-toggle" type="button" data-cart-discount-toggle aria-expanded="${open ? "true" : "false"}" aria-controls="cart-discount-detail"><span class="cart-math-label">活動折扣明細</span><span class="cart-math-op">−</span><b class="cart-math-value">${money(value, currency)}</b></button>`;
 }
 
 function cartRowSubtotal(row) {
@@ -85,7 +87,6 @@ function discountDetailHtml(subtotalBeforeDiscount, discount, currency, open) {
 }
 
 function syncCartMath() {
-  scheduled = false;
   if (applying) return;
   applying = true;
   try {
@@ -105,16 +106,16 @@ function syncCartMath() {
     const label = totalLine.querySelector("span");
     if (!subtotalBeforeDiscount || discount <= 0) {
       existing?.remove();
+      cartDiscountOpen = false;
       if (label) label.textContent = "商品小計";
       return;
     }
 
     const shippingEstimate = 0;
-    const wasOpen = existing?.querySelector("#cart-discount-detail")?.hidden === false;
     const html = [
       cartMathRow("小計", "", subtotalBeforeDiscount, currency),
-      discountToggleRow(discount, currency, wasOpen),
-      discountDetailHtml(subtotalBeforeDiscount, discount, currency, wasOpen),
+      discountToggleRow(discount, currency, cartDiscountOpen),
+      discountDetailHtml(subtotalBeforeDiscount, discount, currency, cartDiscountOpen),
       cartMathRow("運費", "+", shippingEstimate, currency),
     ].join("");
 
@@ -138,14 +139,14 @@ function enhanceCheckoutDiscounts() {
     line.dataset.originalPromoText = rawText;
     const amount = Math.abs(parseMoney(line.querySelector("b")?.textContent || rawText));
     const detailId = `checkout-promo-detail-${index + 1}`;
-    const wasOpen = line.getAttribute("aria-expanded") === "true" && document.getElementById(detailId)?.hidden === false;
+    const open = checkoutDiscountOpen.has(detailId);
     line.setAttribute("role", "button");
     line.setAttribute("tabindex", "0");
-    line.setAttribute("aria-expanded", String(wasOpen));
+    line.setAttribute("aria-expanded", String(open));
     line.setAttribute("aria-controls", detailId);
-    line.innerHTML = `<span>活動折扣</span><em>−</em><b>${money(amount, currencyOf(rawText))}</b>`;
+    line.innerHTML = `<span>活動折扣明細</span><em>−</em><b>${money(amount, currencyOf(rawText))}</b>`;
     const next = line.nextElementSibling;
-    const detailHtml = `<div id="${detailId}" class="checkout-discount-detail" ${wasOpen ? "" : "hidden"}><h4>活動折扣明細</h4><ul><li>${esc(rawText.replace(/^促銷優惠[｜\s]*/u, ""))}</li></ul></div>`;
+    const detailHtml = `<div id="${detailId}" class="checkout-discount-detail" ${open ? "" : "hidden"}><h4>活動折扣明細</h4><ul><li>${esc(rawText.replace(/^促銷優惠[｜\s]*/u, ""))}</li></ul></div>`;
     if (next?.classList?.contains("checkout-discount-detail")) {
       if (next.outerHTML !== detailHtml) next.outerHTML = detailHtml;
     } else {
@@ -157,13 +158,12 @@ function enhanceCheckoutDiscounts() {
     const label = line.querySelector("span")?.textContent || "";
     if (!/運費|處理費/.test(label)) return;
     line.classList.add("checkout-math-line");
-    if (!line.querySelector("em")) {
-      line.querySelector("b")?.insertAdjacentHTML("beforebegin", "<em>＋</em>");
-    }
+    if (!line.querySelector("em")) line.querySelector("b")?.insertAdjacentHTML("beforebegin", "<em>＋</em>");
   });
 }
 
 function syncAll() {
+  scheduled = false;
   syncCartMath();
   enhanceCheckoutDiscounts();
 }
@@ -174,24 +174,40 @@ function scheduleSync() {
   requestAnimationFrame(syncAll);
 }
 
+function toggleDiscount(button) {
+  const controls = button.getAttribute("aria-controls") || "";
+  if (button.matches("[data-cart-discount-toggle]")) {
+    cartDiscountOpen = !cartDiscountOpen;
+  } else if (checkoutDiscountOpen.has(controls)) {
+    checkoutDiscountOpen.delete(controls);
+  } else if (controls) {
+    checkoutDiscountOpen.add(controls);
+  }
+  const detail = document.getElementById(controls);
+  const open = button.matches("[data-cart-discount-toggle]") ? cartDiscountOpen : checkoutDiscountOpen.has(controls);
+  if (detail) detail.hidden = !open;
+  button.setAttribute("aria-expanded", String(open));
+  scheduleSync();
+}
+
 document.addEventListener("click", (event) => {
   const button = event.target.closest?.("[data-cart-discount-toggle], #checkout-summary .promo-bridge-line[role='button']");
   if (!button) return;
-  const detail = document.getElementById(button.getAttribute("aria-controls") || "");
-  if (!detail) return;
   event.preventDefault();
-  const open = detail.hidden;
-  detail.hidden = !open;
-  button.setAttribute("aria-expanded", String(open));
-});
+  event.stopPropagation();
+  event.stopImmediatePropagation?.();
+  toggleDiscount(button);
+}, true);
 
 document.addEventListener("keydown", (event) => {
   if (event.key !== "Enter" && event.key !== " ") return;
-  const button = event.target.closest?.("#checkout-summary .promo-bridge-line[role='button']");
+  const button = event.target.closest?.("[data-cart-discount-toggle], #checkout-summary .promo-bridge-line[role='button']");
   if (!button) return;
   event.preventDefault();
-  button.click();
-});
+  event.stopPropagation();
+  event.stopImmediatePropagation?.();
+  toggleDiscount(button);
+}, true);
 
 new MutationObserver(scheduleSync).observe(document.documentElement, {
   childList: true,
