@@ -221,7 +221,7 @@ function sendShopOrderForStatus_(o, s) {
 
   if (status === 'pending') {
     if (customerEmail) {
-      const customerText = `${customerName} 您好,\n\n謝謝你訂購77 Select商品\n已經收到你的訂單，目前狀態為「待接單」。\n77waxing 確認後，會再寄一封 Email 通知你訂單已接單。\n\n────────────────────\n\n訂單編號 ${orderNo}\n\n訂購商品\n${itemText}\n\n商品小計        NT$${shopNumber_(pricing.subtotal)}\n活動折扣       -NT$${shopNumber_(pricing.discount)}\n運費            NT$${shopNumber_(pricing.shippingFee)}\n────────────────────\n訂單總計        NT$${shopNumber_(pricing.total)}\n\n取貨方式 ${delivery}\n付款方式 ${payment}\n${o.storeInfo ? storeInfo : ''}\n\n────────────────────\n\n之後只要訂單狀態更新，我們也會透過 Email 通知你。\n若訂單資料有需要修改，請直接與 77waxing 聯絡。\n\n\n77Select`;
+      const customerText = `${customerName} 您好，\n\n謝謝你訂購77 Select商品\n已經收到你的訂單，目前狀態為「待接單」。\n77waxing 確認後，會再寄一封 Email 通知你訂單已接單。\n\n────────────────────\n\n訂單編號 ${orderNo}\n\n訂購商品\n${itemText}\n\n商品小計        NT$${shopNumber_(pricing.subtotal)}\n活動折扣       -NT$${shopNumber_(pricing.discount)}\n運費            NT$${shopNumber_(pricing.shippingFee)}\n────────────────────\n訂單總計        NT$${shopNumber_(pricing.total)}\n\n取貨方式 ${delivery}\n付款方式 ${payment}\n${o.storeInfo ? storeInfo : ''}\n\n────────────────────\n\n之後只要訂單狀態更新，我們也會透過 Email 通知你。\n若訂單資料有需要修改，請直接與 77waxing 聯絡。\n\n\n77Select`;
       send_(customerEmail, '77 Select｜我們已收到你的訂單｜目前狀態「待接單」', shopShell_(customerText));
       sent = true;
     }
@@ -253,11 +253,11 @@ function sendShopOrderForStatus_(o, s) {
   }
   if (status === 'shipped') {
     const tracking = o.trackingNumber ? `<p><b>物流編號：${esc_(o.trackingNumber)}</b></p>` : '';
-    send_(customerEmail, `77 Select｜產品訂單已出貨 ${orderNo}`, shopHtmlShell_(`您好 ${customerName}，訂單已出貨`, `<p>你的商品已交付物流處理。</p>${shopOrderInfo_(o)}${tracking}`));
+    send_(customerEmail, `77waxing｜產品訂單已出貨 ${orderNo}`, shopHtmlShell_(`您好 ${customerName}，訂單已出貨`, `<p>你的商品已交付物流處理。</p>${shopOrderInfo_(o)}${tracking}`));
     return true;
   }
   if (status === 'completed') {
-    send_(customerEmail, `77 Select｜產品訂單已完成 ${orderNo}`, shopHtmlShell_(`您好 ${customerName}，訂單已完成`, `<p>這筆產品訂單已完成，謝謝你的訂購。</p>${shopOrderInfo_(o)}<p><a href="${SHOP_URL}" style="color:#8b7355">回到 77 Select 產品訂購</a></p>`));
+    send_(customerEmail, `77waxing｜產品訂單已完成 ${orderNo}`, shopHtmlShell_(`您好 ${customerName}，訂單已完成`, `<p>這筆產品訂單已完成，謝謝你的訂購。</p>${shopOrderInfo_(o)}<p><a href="${SHOP_URL}" style="color:#8b7355">回到 77waxing 產品訂購</a></p>`));
     return true;
   }
   if (status === 'cancelled') {
