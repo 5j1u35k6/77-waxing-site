@@ -1,5 +1,5 @@
-/* 77waxing wordmark rendering fix
-   Scope: public site header and footer brand marks only. Uses the SVG wordmark to avoid raster blur. */
+/* 77waxing wordmark rendering
+   Scope: public site header and footer brand marks only. Uses SVG for a sharp logo at every density. */
 
 .header .logo,
 .footer-brand-logo{
@@ -11,7 +11,7 @@
   white-space:nowrap!important;
   font-size:0!important;
   line-height:0!important;
-  background-image:url("/77-waxing-site/assets/77waxing-wordmark.svg?v=20260914-logo4")!important;
+  background-image:url("/77-waxing-site/assets/77waxing-wordmark.svg?v=20260914-logo5")!important;
   background-repeat:no-repeat!important;
   background-position:left center!important;
   background-size:contain!important;
