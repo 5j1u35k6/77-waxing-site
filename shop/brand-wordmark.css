@@ -1,0 +1,79 @@
+/* 77select logo wordmark refresh
+   Scope: shop page header logo only. */
+
+:root{
+  --select-brand-gold:#d7ad70;
+  --select-brand-word:#8c7a68;
+}
+
+.shop-nav .shop-brand{
+  display:inline-flex!important;
+  flex-wrap:wrap!important;
+  align-items:baseline!important;
+  column-gap:.34em!important;
+  row-gap:0!important;
+  max-width:180px!important;
+  margin-right:auto!important;
+  color:var(--select-brand-word)!important;
+  font-family:Georgia,"Times New Roman","Noto Serif TC",serif!important;
+  font-size:18px!important;
+  font-weight:400!important;
+  line-height:.92!important;
+  letter-spacing:.44em!important;
+  text-transform:uppercase!important;
+  white-space:normal!important;
+  text-decoration:none!important;
+  text-rendering:geometricPrecision;
+  -webkit-font-smoothing:antialiased;
+}
+
+.shop-nav .shop-brand b{
+  display:inline-block!important;
+  margin-right:.02em!important;
+  color:var(--select-brand-gold)!important;
+  font-family:Georgia,"Times New Roman",serif!important;
+  font-size:1.78em!important;
+  font-weight:400!important;
+  font-style:italic!important;
+  line-height:.78!important;
+  letter-spacing:-.08em!important;
+  transform:skewX(-7deg) translateY(.04em);
+  text-shadow:0 .4px 0 rgba(255,255,255,.22);
+}
+
+.shop-nav .shop-brand small{
+  flex:0 0 100%!important;
+  margin:5px 0 0!important;
+  padding-left:3px!important;
+  color:rgba(140,122,104,.76)!important;
+  font-family:Georgia,"Times New Roman","Noto Serif TC",serif!important;
+  font-size:7.5px!important;
+  font-weight:500!important;
+  line-height:1.05!important;
+  letter-spacing:.46em!important;
+  text-transform:uppercase!important;
+}
+
+@media(max-width:760px){
+  .shop-nav .shop-brand{
+    max-width:130px!important;
+    font-size:14px!important;
+    letter-spacing:.26em!important;
+  }
+  .shop-nav .shop-brand b{
+    font-size:1.7em!important;
+  }
+  .shop-nav .shop-brand small{
+    margin-top:4px!important;
+    font-size:6.5px!important;
+    letter-spacing:.32em!important;
+  }
+}
+
+@media(max-width:360px){
+  .shop-nav .shop-brand{
+    max-width:116px!important;
+    font-size:13px!important;
+    letter-spacing:.22em!important;
+  }
+}
