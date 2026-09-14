@@ -16,14 +16,21 @@
   document.body.style.overflow='hidden';
   const reduced=window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
   const timers=[];
+  let watchdog=0;
   let finished=false;
   let started=false;
+  let timelineStarted=false;
 
-  const later=(fn,ms)=>timers.push(setTimeout(fn,ms));
+  const later=(fn,ms)=>{
+    const id=setTimeout(fn,ms);
+    timers.push(id);
+    return id;
+  };
   const finish=()=>{
     if(finished)return;
     finished=true;
     timers.forEach(clearTimeout);
+    if(watchdog)clearTimeout(watchdog);
     html.classList.remove('brand-intro-pending');
     document.body.style.overflow=prevOverflow;
     root.remove();
@@ -34,21 +41,37 @@
     root.classList.add('is-exiting');
     later(finish,reduced?180:600);
   };
+  const runTimeline=()=>{
+    if(timelineStarted||finished)return;
+    timelineStarted=true;
+    if(reduced){
+      root.classList.add('is-logo-lit','is-reveal');
+      later(exit,180);
+      return;
+    }
+    later(()=>root.classList.add('is-logo-lit'),90);
+    later(()=>root.classList.add('is-reveal'),4450);
+    later(exit,5240);
+  };
   const start=()=>{
     if(started||finished)return;
     started=true;
-    requestAnimationFrame(()=>requestAnimationFrame(()=>{
-      if(reduced){
-        root.classList.add('is-logo-lit','is-reveal');
-        later(exit,180);
-        return;
-      }
-      later(()=>root.classList.add('is-logo-lit'),90);
-      later(()=>root.classList.add('is-reveal'),4450);
-      later(exit,5240);
-    }));
+
+    // Hard watchdog: the intro must never be able to block the homepage forever,
+    // even when requestAnimationFrame is suspended or fails to fire.
+    watchdog=setTimeout(finish,7000);
+
+    // Normal path keeps the first paint smooth. The timeout fallback starts the
+    // same timeline even if the browser does not deliver the animation frames.
+    later(runTimeline,160);
+    try{
+      requestAnimationFrame(()=>requestAnimationFrame(runTimeline));
+    }catch{
+      runTimeline();
+    }
   };
 
   root.querySelector('[data-brand-skip]')?.addEventListener('click',exit);
+  window.addEventListener('pagehide',finish,{once:true});
   start();
 })();
