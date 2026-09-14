@@ -1,21 +1,25 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 230" role="img" aria-labelledby="title desc">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 230" role="img" aria-labelledby="title desc" shape-rendering="geometricPrecision">
   <title id="title">77 SELECT by 77waxing</title>
-  <desc id="desc">77select brand wordmark</desc>
+  <desc id="desc">77select brand wordmark using the approved 77 numeral silhouette</desc>
   <defs>
-    <linearGradient id="gold" x1="0" y1="0" x2="0.9" y2="1">
-      <stop offset="0" stop-color="#e9c083"/>
-      <stop offset="0.55" stop-color="#d3a563"/>
-      <stop offset="1" stop-color="#f1d197"/>
+    <linearGradient id="gold77" x1="0" y1="0" x2="0.85" y2="1">
+      <stop offset="0" stop-color="#efc985"/>
+      <stop offset="0.42" stop-color="#d8aa67"/>
+      <stop offset="0.72" stop-color="#c99552"/>
+      <stop offset="1" stop-color="#e6b86f"/>
     </linearGradient>
     <linearGradient id="taupe" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0" stop-color="#6d5f52"/>
       <stop offset="1" stop-color="#9b8977"/>
     </linearGradient>
   </defs>
-  <g fill="url(#gold)" transform="translate(24 38) scale(.62)">
-    <path d="M36 45c-3-10 3-20 15-20h141c12 0 17 8 11 19L121 157c-7 10-17 16-29 16-16 0-21-10-13-24l70-92H56L42 81H17L36 45Z"/>
-    <path d="M223 45c-3-10 3-20 15-20h141c12 0 17 8 11 19L308 157c-7 10-17 16-29 16-16 0-21-10-13-24l70-92h-93l-14 24h-25l19-36Z"/>
+
+  <!-- Exact silhouette traced from the approved 77 artwork. -->
+  <g fill="url(#gold77)" transform="translate(22 37) scale(.42)">
+    <path d="M228 28L68 27L64 25L59 18L59 1L48 0L43 2L38 7L1 123L20 122L31 100L40 88L49 81L61 76L72 74L173 75L108 171L12 301L7 314L7 328L11 337L18 344L27 348L44 347L54 341L62 332L134 199L210 70L228 43L230 37Z"/>
+    <path transform="translate(223 0)" d="M229 28L69 27L64 25L59 18L61 3L59 1L44 1L38 7L2 115L1 123L18 123L22 121L36 93L46 83L61 76L71 74L175 75L109 175L18 301L13 314L13 327L16 336L24 344L33 348L46 348L57 343L69 330L156 167L225 50L231 36L231 31Z"/>
   </g>
-  <text x="315" y="112" fill="url(#taupe)" font-family="Georgia, 'Times New Roman', serif" font-size="58" font-weight="500" letter-spacing="28">SELECT</text>
-  <text x="315" y="178" fill="#9b8977" font-family="Georgia, 'Times New Roman', serif" font-size="28" font-weight="500" letter-spacing="20">BY 77WAXING</text>
+
+  <text x="285" y="112" fill="url(#taupe)" font-family="Georgia, 'Times New Roman', serif" font-size="58" font-weight="500" letter-spacing="28">SELECT</text>
+  <text x="285" y="178" fill="#9b8977" font-family="Georgia, 'Times New Roman', serif" font-size="28" font-weight="500" letter-spacing="20">BY 77WAXING</text>
 </svg>
