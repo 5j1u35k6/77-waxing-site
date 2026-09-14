@@ -1,58 +1,45 @@
-/* 77waxing logo wordmark refresh
+/* 77waxing SVG wordmark
    Scope: public site header and footer brand marks only. */
-
-:root{
-  --brand-gold:#d7ad70;
-  --brand-gold-soft:#e4bd7f;
-  --brand-word:#8c7a68;
-}
 
 .header .logo,
 .footer-brand-logo{
-  display:inline-flex!important;
-  align-items:baseline!important;
-  gap:.34em!important;
-  color:var(--brand-word)!important;
-  font-family:Georgia,"Times New Roman","Noto Serif TC",serif!important;
-  font-weight:400!important;
-  line-height:.92!important;
-  letter-spacing:.46em!important;
-  text-transform:uppercase!important;
-  white-space:nowrap!important;
+  display:block!important;
+  position:relative!important;
+  overflow:hidden!important;
+  background-image:url("/77-waxing-site/assets/77waxing-wordmark.svg?v=20260914-logo2")!important;
+  background-repeat:no-repeat!important;
+  background-position:left center!important;
+  background-size:contain!important;
+  color:transparent!important;
+  font-size:0!important;
+  line-height:1!important;
+  letter-spacing:0!important;
   text-decoration:none!important;
+  text-transform:none!important;
+  white-space:nowrap!important;
   text-rendering:geometricPrecision;
   -webkit-font-smoothing:antialiased;
 }
 
 .header .logo b,
 .footer-brand-logo b{
-  display:inline-block!important;
-  margin-right:.02em!important;
-  color:var(--brand-gold)!important;
-  font-family:Georgia,"Times New Roman",serif!important;
-  font-size:1.78em!important;
-  font-weight:400!important;
-  font-style:italic!important;
-  line-height:.78!important;
-  letter-spacing:-.08em!important;
-  transform:skewX(-7deg) translateY(.04em);
-  text-shadow:0 .4px 0 rgba(255,255,255,.22);
+  color:transparent!important;
+  font-size:0!important;
+  opacity:0!important;
 }
 
 .header .logo{
-  font-size:18px!important;
-  min-width:max-content;
+  width:176px!important;
+  min-width:176px!important;
+  height:44px!important;
   margin-right:auto!important;
 }
 
 .footer-brand-logo{
-  font-size:22px!important;
+  width:238px!important;
+  height:60px!important;
   margin:0!important;
-  color:#d8c7b0!important;
-}
-
-.footer-brand-logo b{
-  color:var(--brand-gold-soft)!important;
+  filter:brightness(1.28) saturate(.92);
 }
 
 .footer-studio-name{
@@ -66,21 +53,20 @@
 
 @media(max-width:850px){
   .header .logo{
-    font-size:16px!important;
-    letter-spacing:.34em!important;
-  }
-  .header .logo b{
-    font-size:1.72em!important;
+    width:148px!important;
+    min-width:148px!important;
+    height:38px!important;
   }
   .footer-brand-logo{
-    font-size:21px!important;
-    letter-spacing:.36em!important;
+    width:218px!important;
+    height:56px!important;
   }
 }
 
 @media(max-width:390px){
   .header .logo{
-    font-size:15px!important;
-    letter-spacing:.28em!important;
+    width:132px!important;
+    min-width:132px!important;
+    height:34px!important;
   }
 }
