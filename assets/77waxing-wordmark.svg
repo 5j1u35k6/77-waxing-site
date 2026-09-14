@@ -1,20 +1,24 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 190" role="img" aria-labelledby="title desc">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 190" role="img" aria-labelledby="title desc" shape-rendering="geometricPrecision">
   <title id="title">77 WAXING</title>
-  <desc id="desc">77waxing brand wordmark</desc>
+  <desc id="desc">77waxing brand wordmark using the approved 77 numeral silhouette</desc>
   <defs>
-    <linearGradient id="gold" x1="0" y1="0" x2="0.9" y2="1">
-      <stop offset="0" stop-color="#e9c083"/>
-      <stop offset="0.55" stop-color="#d3a563"/>
-      <stop offset="1" stop-color="#f1d197"/>
+    <linearGradient id="gold77" x1="0" y1="0" x2="0.85" y2="1">
+      <stop offset="0" stop-color="#efc985"/>
+      <stop offset="0.42" stop-color="#d8aa67"/>
+      <stop offset="0.72" stop-color="#c99552"/>
+      <stop offset="1" stop-color="#e6b86f"/>
     </linearGradient>
     <linearGradient id="taupe" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0" stop-color="#6d5f52"/>
       <stop offset="1" stop-color="#9b8977"/>
     </linearGradient>
   </defs>
-  <g fill="url(#gold)" transform="translate(18 34) scale(.67)">
-    <path d="M36 45c-3-10 3-20 15-20h141c12 0 17 8 11 19L121 157c-7 10-17 16-29 16-16 0-21-10-13-24l70-92H56L42 81H17L36 45Z"/>
-    <path d="M223 45c-3-10 3-20 15-20h141c12 0 17 8 11 19L308 157c-7 10-17 16-29 16-16 0-21-10-13-24l70-92h-93l-14 24h-25l19-36Z"/>
+
+  <!-- Exact silhouette traced from the approved 77 artwork. -->
+  <g fill="url(#gold77)" transform="translate(18 29) scale(.30)">
+    <path d="M331 33L327 31L91 31L81 26L77 21L77 1L62 1L60 3L0 150L16 151L32 126L47 108L58 100L76 93L241 92L260 94L106 287L47 365L41 380L40 396L44 408L52 417L64 422L82 420L97 411L111 396L207 238L327 57L334 41Z"/>
+    <path transform="translate(348 0)" d="M333 32L328 30L91 30L83 27L77 22L74 13L75 0L61 0L57 4L1 150L18 149L34 124L50 106L63 97L78 92L249 91L262 93L84 317L51 361L44 376L42 394L46 407L54 416L66 421L84 419L98 411L114 394L209 238L329 56L336 41L336 36Z"/>
   </g>
-  <text x="308" y="122" fill="url(#taupe)" font-family="Georgia, 'Times New Roman', serif" font-size="55" font-weight="500" letter-spacing="25">WAXING</text>
+
+  <text x="270" y="122" fill="url(#taupe)" font-family="Georgia, 'Times New Roman', serif" font-size="55" font-weight="500" letter-spacing="25">WAXING</text>
 </svg>
