@@ -12,9 +12,9 @@
       <stop offset="1" stop-color="#9b8977"/>
     </linearGradient>
   </defs>
-  <g fill="url(#gold)" transform="translate(10 12)">
+  <g fill="url(#gold)" transform="translate(18 34) scale(.67)">
     <path d="M36 45c-3-10 3-20 15-20h141c12 0 17 8 11 19L121 157c-7 10-17 16-29 16-16 0-21-10-13-24l70-92H56L42 81H17L36 45Z"/>
     <path d="M223 45c-3-10 3-20 15-20h141c12 0 17 8 11 19L308 157c-7 10-17 16-29 16-16 0-21-10-13-24l70-92h-93l-14 24h-25l19-36Z"/>
   </g>
-  <text x="410" y="117" fill="url(#taupe)" font-family="Georgia, 'Times New Roman', serif" font-size="57" font-weight="500" letter-spacing="26">WAXING</text>
+  <text x="308" y="122" fill="url(#taupe)" font-family="Georgia, 'Times New Roman', serif" font-size="55" font-weight="500" letter-spacing="25">WAXING</text>
 </svg>
