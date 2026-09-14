@@ -1,5 +1,6 @@
 /* 77select marketplace-style responsive polish.
    Scope: storefront header + product listing only. No cart, pricing, checkout, or product data logic. */
+@import url("./brand-wordmark.css?v=20260914-logo1");
 
 /* Desktop/tablet product list: denser shopping-grid presentation inspired by common marketplace layouts. */
 [data-view="shop"].section{
