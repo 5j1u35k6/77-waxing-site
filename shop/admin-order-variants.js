@@ -185,12 +185,15 @@ async function confirmVariantOrder(db, orderId) {
       total: subtotal + shippingFee,
       status: "confirmed",
       inventoryCommitted: true,
+      cancellationReason: null,
       updatedAt: serverTimestamp(),
     });
   });
 }
 
-async function cancelVariantOrder(db, orderId) {
+async function cancelVariantOrder(db, orderId, reason) {
+  const cleanReason = String(reason || "").trim();
+  if (!cleanReason) throw new Error("取消訂單時必須填寫原因。");
   const orderRef = doc(db, "shopOrders", orderId);
   await runTransaction(db, async (tx) => {
     const orderSnap = await tx.get(orderRef);
@@ -229,7 +232,37 @@ async function cancelVariantOrder(db, orderId) {
       }
     }
 
-    tx.update(orderRef, { status: "cancelled", inventoryCommitted: false, updatedAt: serverTimestamp() });
+    tx.update(orderRef, {
+      status: "cancelled",
+      inventoryCommitted: false,
+      cancellationReason: cleanReason.slice(0, 500),
+      updatedAt: serverTimestamp(),
+    });
+  });
+}
+
+function polishOrderUi() {
+  const actionLabels = {
+    confirm: "已接單",
+    packing: "處理中",
+    ready: "已準備完成・待取貨",
+    cancel: "已取消",
+  };
+  document.querySelectorAll("[data-order][data-action]").forEach((button) => {
+    if (button.disabled) return;
+    const label = actionLabels[button.dataset.action];
+    if (label && button.textContent.trim() !== label) button.textContent = label;
+  });
+
+  const statusLabels = {
+    "待確認": "待接單",
+    "已確認": "已接單",
+    "備貨中": "處理中",
+    "待自取": "已準備完成・待取貨",
+  };
+  document.querySelectorAll(".admin-table .status").forEach((status) => {
+    const next = statusLabels[status.textContent.trim()];
+    if (next) status.textContent = next;
   });
 }
 
@@ -246,16 +279,28 @@ document.addEventListener("click", async (event) => {
   event.preventDefault();
   event.stopImmediatePropagation();
   if (button.disabled) return;
+
+  let cancellationReason = "";
+  if (action === "cancel") {
+    const input = window.prompt("請輸入取消原因（客人會在訂單頁看到，Email 通知也會使用這段文字）：", "");
+    if (input === null) return;
+    cancellationReason = input.trim();
+    if (!cancellationReason) {
+      flash("取消訂單時必須填寫原因。", "error");
+      return;
+    }
+  }
+
   button.disabled = true;
   const original = button.textContent;
-  button.textContent = action === "confirm" ? "確認中…" : "取消中…";
+  button.textContent = action === "confirm" ? "接單中…" : "取消中…";
 
   try {
     if (action === "confirm") await confirmVariantOrder(db, button.dataset.order);
-    else await cancelVariantOrder(db, button.dataset.order);
-    await audit(db, auth, `order_${action}_variants`, button.dataset.order);
+    else await cancelVariantOrder(db, button.dataset.order, cancellationReason);
+    await audit(db, auth, `order_${action}_variants`, button.dataset.order, cancellationReason);
     await dispatchShopEmail(db, auth, button.dataset.order);
-    flash(action === "confirm" ? "訂單已確認，規格庫存與數量優惠已重新核對。" : "訂單已取消，規格庫存已回補。");
+    flash(action === "confirm" ? "訂單已接單，規格庫存與數量優惠已重新核對。" : "訂單已取消，原因已保存並同步給客人。 ");
   } catch (error) {
     console.error("77select variant order action failed", error);
     flash(error?.message || "更新訂單失敗。", "error");
@@ -263,6 +308,19 @@ document.addEventListener("click", async (event) => {
     if (button.isConnected) {
       button.disabled = false;
       button.textContent = original;
+      polishOrderUi();
     }
   }
 }, true);
+
+let polishScheduled = false;
+const polishObserver = new MutationObserver(() => {
+  if (polishScheduled) return;
+  polishScheduled = true;
+  requestAnimationFrame(() => {
+    polishScheduled = false;
+    polishOrderUi();
+  });
+});
+polishObserver.observe(document.documentElement, { childList: true, subtree: true });
+polishOrderUi();
