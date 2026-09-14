@@ -2,6 +2,31 @@
    Scope: storefront header + product listing only. No cart, pricing, checkout, or product data logic. */
 @import url("./brand-wordmark.css?v=20260914-logo5");
 
+/* Public storefront hero branding. Keep the official marketplace label fixed in
+   the UI even if an older Firestore setting still contains the legacy wording. */
+[data-view="shop"].hero .hero-inner{
+  width:min(1180px,calc(100% - 28px))!important;
+  max-width:1180px!important;
+}
+#hero-eyebrow{
+  display:inline-flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  font-size:0!important;
+  letter-spacing:0!important;
+}
+#hero-eyebrow::before{
+  content:"77waxing官方網路商城";
+  font:700 11px/1 Inter,"PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif;
+  letter-spacing:.12em;
+}
+#hero-title{
+  white-space:nowrap!important;
+  font-size:clamp(32px,4vw,50px)!important;
+  line-height:1.14!important;
+  letter-spacing:-.04em!important;
+}
+
 /* Desktop/tablet product list: denser shopping-grid presentation inspired by common marketplace layouts. */
 [data-view="shop"].section{
   background:#f8f4ed;
@@ -267,6 +292,14 @@
 }
 
 @media(max-width:560px){
+  #hero-title{
+    font-size:clamp(18px,5.2vw,25px)!important;
+    letter-spacing:-.05em!important;
+  }
+  #hero-eyebrow::before{
+    font-size:10px!important;
+    letter-spacing:.08em!important;
+  }
   .product-grid{
     grid-template-columns:repeat(2,minmax(0,1fr))!important;
     gap:10px!important;
@@ -307,6 +340,9 @@
 }
 
 @media(max-width:340px){
+  #hero-title{
+    font-size:18px!important;
+  }
   .product-grid{
     grid-template-columns:1fr!important;
   }
