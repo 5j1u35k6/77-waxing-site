@@ -1,4 +1,10 @@
 (()=>{
+  const source=document.currentScript?.src||location.href;
+  const memberUrl=new URL('./member-auth.js?v=20260914-member1',source).href;
+  import(memberUrl).catch(error=>console.warn('77waxing member layer unavailable',error));
+})();
+
+(()=>{
   const header=document.querySelector('.header');
   const nav=header?.querySelector('nav');
   if(!header||!nav)return;
