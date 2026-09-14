@@ -1,0 +1,158 @@
+/* 77select animated 2D pixel shopper scene.
+   Decorative storefront hero only; no product/cart/checkout logic is changed. */
+
+[data-view="shop"].hero{
+  min-height:460px!important;
+  padding:64px 22px 150px!important;
+}
+
+[data-view="shop"].hero .hero-inner{
+  z-index:4!important;
+}
+
+#hero-shop{
+  display:none!important;
+}
+
+.pixel-market{
+  position:absolute;
+  z-index:2;
+  left:50%;
+  bottom:0;
+  width:min(1120px,100%);
+  height:154px;
+  transform:translateX(-50%);
+  pointer-events:none;
+  overflow:hidden;
+}
+
+.pixel-market::before{
+  content:"";
+  position:absolute;
+  left:4%;
+  right:4%;
+  bottom:24px;
+  height:2px;
+  background:repeating-linear-gradient(90deg,rgba(139,115,85,.24) 0 18px,transparent 18px 29px);
+}
+
+.pixel-market::after{
+  content:"77waxing PICK & CARE";
+  position:absolute;
+  left:50%;
+  bottom:4px;
+  transform:translateX(-50%);
+  color:rgba(139,115,85,.58);
+  font:700 9px/1 Inter,Arial,sans-serif;
+  letter-spacing:.22em;
+  white-space:nowrap;
+}
+
+.pixel-shopper{
+  position:absolute;
+  z-index:5;
+  left:-82px;
+  bottom:27px;
+  width:72px;
+  height:108px;
+  transform-origin:50% 100%;
+  animation:pixelShopperRoute 14s linear infinite;
+  will-change:left,transform;
+}
+
+.pixel-shopper>svg{
+  width:100%;
+  height:100%;
+  display:block;
+  image-rendering:pixelated;
+  shape-rendering:crispEdges;
+  animation:pixelShopperBob .38s steps(2,end) infinite;
+  filter:drop-shadow(0 5px 0 rgba(111,89,64,.12));
+}
+
+.pixel-shopper .pixel-leg-a{animation:pixelLegA .38s steps(2,end) infinite;transform-box:fill-box;transform-origin:50% 0}
+.pixel-shopper .pixel-leg-b{animation:pixelLegB .38s steps(2,end) infinite;transform-box:fill-box;transform-origin:50% 0}
+.pixel-shopper .pixel-arm{animation:pixelArm .76s steps(2,end) infinite;transform-box:fill-box;transform-origin:20% 50%}
+
+.pixel-product{
+  position:absolute;
+  z-index:3;
+  bottom:31px;
+  width:38px;
+  height:48px;
+  display:grid;
+  place-items:end center;
+  transform-origin:50% 100%;
+  filter:drop-shadow(0 4px 0 rgba(93,74,52,.12));
+}
+.pixel-product svg{width:100%;height:100%;display:block;image-rendering:pixelated;shape-rendering:crispEdges}
+.pixel-product.p1{left:18%;animation:pixelPickup1 14s linear infinite}
+.pixel-product.p2{left:39%;animation:pixelPickup2 14s linear infinite}
+.pixel-product.p3{left:61%;animation:pixelPickup3 14s linear infinite}
+.pixel-product.p4{left:81%;animation:pixelPickup4 14s linear infinite}
+
+.pixel-product::after{
+  content:"✦";
+  position:absolute;
+  left:50%;
+  top:-14px;
+  color:#c99552;
+  font-size:14px;
+  transform:translateX(-50%);
+  opacity:.42;
+  animation:pixelTwinkle 1.2s steps(2,end) infinite;
+}
+
+@keyframes pixelShopperRoute{
+  0%{left:-82px;transform:scaleX(1)}
+  48%{left:calc(100% - 76px);transform:scaleX(1)}
+  50%{left:calc(100% - 76px);transform:scaleX(-1)}
+  98%{left:-82px;transform:scaleX(-1)}
+  100%{left:-82px;transform:scaleX(1)}
+}
+@keyframes pixelShopperBob{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+@keyframes pixelLegA{0%,100%{transform:translateX(-1px)}50%{transform:translateX(3px)}}
+@keyframes pixelLegB{0%,100%{transform:translateX(3px)}50%{transform:translateX(-1px)}}
+@keyframes pixelArm{0%,100%{transform:rotate(0deg)}50%{transform:rotate(-12deg)}}
+@keyframes pixelTwinkle{0%,100%{opacity:.18;transform:translateX(-50%) scale(.8)}50%{opacity:.7;transform:translateX(-50%) scale(1.1)}}
+
+/* Products disappear as the walking mascot reaches them, then reset for the return trip. */
+@keyframes pixelPickup1{
+  0%,7%{opacity:1;transform:scale(1)}10%,52%{opacity:0;transform:translateY(-12px) scale(.25)}55%,86%{opacity:1;transform:scale(1)}89%,98%{opacity:0;transform:translateY(-12px) scale(.25)}100%{opacity:1;transform:scale(1)}
+}
+@keyframes pixelPickup2{
+  0%,17%{opacity:1;transform:scale(1)}20%,52%{opacity:0;transform:translateY(-12px) scale(.25)}55%,76%{opacity:1;transform:scale(1)}79%,98%{opacity:0;transform:translateY(-12px) scale(.25)}100%{opacity:1;transform:scale(1)}
+}
+@keyframes pixelPickup3{
+  0%,27%{opacity:1;transform:scale(1)}30%,52%{opacity:0;transform:translateY(-12px) scale(.25)}55%,66%{opacity:1;transform:scale(1)}69%,98%{opacity:0;transform:translateY(-12px) scale(.25)}100%{opacity:1;transform:scale(1)}
+}
+@keyframes pixelPickup4{
+  0%,37%{opacity:1;transform:scale(1)}40%,52%{opacity:0;transform:translateY(-12px) scale(.25)}55%,56%{opacity:1;transform:scale(1)}59%,98%{opacity:0;transform:translateY(-12px) scale(.25)}100%{opacity:1;transform:scale(1)}
+}
+
+@media(max-width:820px){
+  [data-view="shop"].hero{
+    min-height:380px!important;
+    padding:36px 12px 138px!important;
+  }
+  .pixel-market{height:132px}
+  .pixel-shopper{width:62px;height:94px;bottom:26px}
+  .pixel-product{width:31px;height:40px;bottom:31px}
+  .pixel-market::after{font-size:8px;letter-spacing:.16em}
+}
+
+@media(max-width:430px){
+  [data-view="shop"].hero{
+    min-height:356px!important;
+    padding-bottom:126px!important;
+  }
+  .pixel-market{height:120px}
+  .pixel-shopper{width:56px;height:84px}
+  .pixel-product{width:27px;height:35px}
+}
+
+@media(prefers-reduced-motion:reduce){
+  .pixel-shopper,.pixel-shopper>svg,.pixel-shopper .pixel-leg-a,.pixel-shopper .pixel-leg-b,.pixel-shopper .pixel-arm,.pixel-product,.pixel-product::after{animation:none!important}
+  .pixel-shopper{left:8%;transform:none}
+  .pixel-product{opacity:1!important;transform:none!important}
+}
