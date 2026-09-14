@@ -260,8 +260,6 @@ function renderProductDetail() {
   const body = $("#product-detail-body");
   if (!body) return;
 
-  // The first image is the catalog cover. Product detail starts from the
-  // remaining media so the modal never repeats the storefront cover.
   const variantMedia = mediaForVariant(selectedProduct, selectedVariantId);
   const detailMedia = variantMedia.length > 1 ? variantMedia.slice(1) : [];
   const gallery = detailMedia.length ? `<section class="product-gallery product-detail-media-column" aria-label="商品圖片">
@@ -487,6 +485,33 @@ function validEmail(value) {
   return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(value || ""));
 }
 
+function taipeiOrderDay() {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Taipei", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date()).replace(/-/g, "");
+}
+
+async function createSequentialOrder(orderData) {
+  const day = taipeiOrderDay();
+  const hintKey = `77waxing_shop_sequence_${day}`;
+  const hint = Math.min(9998, int(localStorage.getItem(hintKey)));
+  const candidates = [];
+  for (let sequence = Math.max(1, hint + 1); sequence <= 9999; sequence += 1) candidates.push(sequence);
+  for (let sequence = 1; sequence <= hint; sequence += 1) candidates.push(sequence);
+
+  for (const sequence of candidates) {
+    const orderNo = `${day}${String(sequence).padStart(4, "0")}`;
+    const orderRef = doc(db, "shopOrders", orderNo);
+    try {
+      await setDoc(orderRef, { ...orderData, orderNo });
+      localStorage.setItem(hintKey, String(sequence));
+      return { orderRef, orderNo };
+    } catch (error) {
+      if (error?.code === "permission-denied") continue;
+      throw error;
+    }
+  }
+  throw new Error("今日訂單流水號已達上限，請聯絡 77 Select。");
+}
+
 async function submitOrder(event) {
   event.preventDefault();
   event.stopImmediatePropagation();
@@ -524,9 +549,6 @@ async function submitOrder(event) {
       if (!product || !variant || variant.stock < int(row.qty)) throw new Error(`${row.name}｜${row.variantName} 庫存不足，請重新確認購物車。`);
     }
 
-    const orderRef = doc(collection(db, "shopOrders"));
-    const day = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Taipei", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date()).replace(/-/g, "");
-    const orderNo = `77W-${day}-${orderRef.id.slice(0, 6).toUpperCase()}`;
     const items = cart.map((row) => ({
       productId: row.productId,
       variantId: row.variantId,
@@ -543,9 +565,7 @@ async function submitOrder(event) {
       imageUrl: row.imageUrl || "",
     }));
     const subtotal = items.reduce((sum, row) => sum + row.unitPrice * row.quantity, 0);
-
-    await setDoc(orderRef, {
-      orderNo,
+    const orderData = {
       ownerUid: currentUser.uid,
       customerName: name,
       phone,
@@ -563,7 +583,8 @@ async function submitOrder(event) {
       note: note || null,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
-    });
+    };
+    const { orderRef, orderNo } = await createSequentialOrder(orderData);
 
     localStorage.setItem("77waxing_shop_name", name);
     localStorage.setItem("77waxing_shop_phone", phone);
