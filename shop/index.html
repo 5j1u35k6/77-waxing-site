@@ -21,6 +21,7 @@
   <link rel="stylesheet" href="./marketplace-responsive.css?v=20260914-market3">
   <link rel="stylesheet" href="./cart-summary-polish.css?v=20260913-cart3">
   <link rel="stylesheet" href="./hero-pixel-shop.css?v=20260914-pixel2">
+  <link rel="stylesheet" href="./checkout-submit-fix.css?v=20260914-submit1">
 </head>
 <body>
   <header class="shop-nav">
@@ -147,7 +148,7 @@
     <button id="checkout-backdrop" class="modal-backdrop" type="button" aria-label="關閉結帳"></button>
     <section class="modal" role="dialog" aria-modal="true" aria-label="訂購資料">
       <div class="modal-head checkout-modal-head"><div><b>填寫訂購資料</b><div class="order-date">分成收件資料、配送付款、訂單確認三區，送出後由 77select 確認庫存與最終金額。</div></div><button id="checkout-close" class="icon-btn" type="button">關閉</button></div>
-      <form id="checkout-form" class="checkout-form-v2">
+      <form id="checkout-form" class="checkout-form-v2" novalidate>
         <div class="modal-body checkout-body-v2">
           <div class="checkout-layout-v2">
             <section class="checkout-section checkout-customer-section">
@@ -203,6 +204,7 @@
   <script type="module" src="./product-card-format.js?v=20260913-card5"></script>
   <script type="module" src="./quantity-checkout-polish.js?v=20260913-qty2"></script>
   <script type="module" src="./promotion-storefront.js?v=20260913-promo2"></script>
+  <script type="module" src="./checkout-submit-fix.js?v=20260914-submit1"></script>
   <script type="module" src="./cart-summary-polish.js?v=20260913-cart3"></script>
 </body>
 </html>
