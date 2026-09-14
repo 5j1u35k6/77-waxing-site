@@ -510,6 +510,38 @@ async function submitPromotedOrder(event) {
       imageUrl: row.imageUrl || "",
     }));
 
+    // Firestore's public-order rules intentionally allow only the established
+    // top-level order schema. Keep promotion metadata nested inside the first item
+    // so the discount details remain recorded without violating those rules.
+    const orderItems = [...items, ...giftItems];
+    if (orderItems.length) {
+      orderItems[0] = {
+        ...orderItems[0],
+        promotionSummary: {
+          subtotalBeforePromotions: Number(pricing.subtotal || 0),
+          discountTotal: Number(pricing.discountTotal || 0),
+          adjustments: pricing.adjustments.map((row) => ({
+            id: row.id,
+            title: row.title,
+            type: row.type,
+            setCount: row.setCount,
+            amount: row.amount,
+            regularTotal: row.regularTotal,
+          })),
+          gifts: pricing.gifts.map((row) => ({
+            promotionId: row.promotionId,
+            promotionTitle: row.promotionTitle,
+            productId: row.productId,
+            variantId: row.variantId,
+            name: row.name,
+            variantName: row.variantName,
+            capacity: row.capacity || "",
+            quantity: int(row.quantity),
+          })),
+        },
+      };
+    }
+
     await setDoc(orderRef, {
       orderNo,
       ownerUid: currentUser.uid,
@@ -520,11 +552,7 @@ async function submitPromotedOrder(event) {
       paymentMethod: paymentId,
       storeInfo,
       shippingFee: Number(delivery.fee || 0),
-      items: [...items, ...giftItems],
-      subtotalBeforePromotions: pricing.subtotal,
-      promotionDiscountTotal: pricing.discountTotal,
-      promotions: pricing.adjustments.map((row) => ({ id: row.id, title: row.title, type: row.type, setCount: row.setCount, amount: row.amount, regularTotal: row.regularTotal })),
-      promotionGifts: pricing.gifts.map((row) => ({ promotionId: row.promotionId, promotionTitle: row.promotionTitle, productId: row.productId, variantId: row.variantId, name: row.name, variantName: row.variantName, capacity: row.capacity || "", quantity: int(row.quantity) })),
+      items: orderItems,
       subtotal: pricing.total,
       total: pricing.total + Number(delivery.fee || 0),
       status: "pending",
