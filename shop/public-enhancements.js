@@ -1,3 +1,11 @@
+import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
+import { collection, onSnapshot, query, where } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
+import { getPublicFirebase } from "../assets/public-firebase.js?v=20260913-shop2";
+
+const { auth, db } = getPublicFirebase();
+let orderUnsubscribe = null;
+let ownOrderLookup = new Map();
+
 function normalizeProductCardActions() {
   document.querySelectorAll(".regional-product-card .product-actions").forEach((actions) => {
     const detail = actions.querySelector("[data-regional-detail]");
@@ -34,6 +42,57 @@ function normalizeMarketBadge() {
   badge.setAttribute("aria-label", `目前地區：${label}`);
 }
 
+function ensureOrderReasonStyle() {
+  if (document.querySelector("#order-status-polish-style")) return;
+  const style = document.createElement("style");
+  style.id = "order-status-polish-style";
+  style.textContent = `
+    .order-cancel-reason{margin-top:14px;padding:12px 14px;border:1px solid #e6cfc7;border-radius:12px;background:#fff7f4;color:#7b4439;display:grid;gap:4px}
+    .order-cancel-reason b{font-size:13px;letter-spacing:.04em}
+    .order-cancel-reason span{font-size:14px;line-height:1.6;white-space:pre-wrap}
+  `;
+  document.head.appendChild(style);
+}
+
+function polishOrderCards() {
+  ensureOrderReasonStyle();
+  const labels = {
+    pending: "待接單",
+    confirmed: "已接單",
+    packing: "處理中",
+    ready: "已準備完成・待取貨",
+    shipped: "已出貨",
+    completed: "已完成",
+    cancelled: "已取消",
+  };
+
+  document.querySelectorAll("#orders-list .order-card").forEach((card) => {
+    const orderNo = card.querySelector(".order-no")?.textContent?.trim() || "";
+    const order = ownOrderLookup.get(orderNo);
+    if (!order) return;
+
+    const status = card.querySelector(".status");
+    if (status && labels[order.status]) status.textContent = labels[order.status];
+
+    let reason = card.querySelector(".order-cancel-reason");
+    const reasonText = String(order.cancellationReason || "").trim();
+    if (order.status === "cancelled" && reasonText) {
+      if (!reason) {
+        reason = document.createElement("div");
+        reason.className = "order-cancel-reason";
+        const title = document.createElement("b");
+        title.textContent = "取消原因";
+        const body = document.createElement("span");
+        reason.append(title, body);
+        card.appendChild(reason);
+      }
+      reason.querySelector("span").textContent = reasonText;
+    } else {
+      reason?.remove();
+    }
+  });
+}
+
 function apply77selectBranding() {
   document.querySelectorAll(".product-media").forEach((node) => {
     if (node.children.length === 0 && node.textContent.trim() === "77waxing") node.textContent = "77select";
@@ -49,6 +108,7 @@ function apply77selectBranding() {
 
   normalizeMarketBadge();
   normalizeProductCardActions();
+  polishOrderCards();
 }
 
 let scheduled = false;
@@ -60,6 +120,25 @@ function scheduleEnhancements() {
     apply77selectBranding();
   });
 }
+
+onAuthStateChanged(auth, (user) => {
+  orderUnsubscribe?.();
+  orderUnsubscribe = null;
+  ownOrderLookup = new Map();
+  if (!user) return scheduleEnhancements();
+  orderUnsubscribe = onSnapshot(
+    query(collection(db, "shopOrders"), where("ownerUid", "==", user.uid)),
+    (snap) => {
+      ownOrderLookup = new Map();
+      snap.docs.forEach((row) => {
+        const data = { id: row.id, ...row.data() };
+        ownOrderLookup.set(String(data.orderNo || data.id), data);
+      });
+      scheduleEnhancements();
+    },
+    (error) => console.warn("77select order status polish unavailable", error),
+  );
+});
 
 const observer = new MutationObserver(scheduleEnhancements);
 observer.observe(document.documentElement, { childList: true, subtree: true });
