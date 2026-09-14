@@ -48,10 +48,8 @@
   white-space:nowrap;
 }
 
-/* Rebuilt from the supplied reference: dark brown bob + bangs, cream-yellow top,
-   white apron, beige loose trousers, white sneakers, and products in hand.
-   The PNG is a 3-frame pixel sprite sheet so the walking motion reads as an
-   actual block-character walk rather than a floating static figure. */
+/* Reference-based block pixel mascot: dark bob + bangs, cream-yellow sleeves,
+   white apron, loose beige trousers, white sneakers, and a product in hand. */
 .pixel-shopper{
   position:absolute;
   z-index:5;
@@ -67,7 +65,7 @@
   content:"";
   position:absolute;
   inset:0;
-  background-image:url("./pixel-shopper-girl-v3.png?v=20260914-girl3");
+  background-image:url("./pixel-shopper-girl-v4.png?v=20260914-girl4");
   background-repeat:no-repeat;
   background-size:300% 100%;
   background-position:0 100%;
