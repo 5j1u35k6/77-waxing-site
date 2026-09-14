@@ -1,3 +1,4 @@
+import "../assets/member-auth.js?v=20260914-member1";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
 import { collection, onSnapshot, query, where } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
 import { getPublicFirebase } from "../assets/public-firebase.js?v=20260913-shop2";
