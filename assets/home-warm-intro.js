@@ -1,6 +1,6 @@
 (()=>{
   const B=location.hostname.endsWith('github.io')?'/77-waxing-site':'';
-  const KEY='77waxing-brand-intro-v5-seen';
+  const KEY='77waxing-brand-intro-v6-seen';
   const path=location.pathname.startsWith(B)?location.pathname.slice(B.length):location.pathname;
   if(path!=='/'&&path!=='')return;
   try{if(sessionStorage.getItem(KEY)==='1')return;sessionStorage.setItem(KEY,'1')}catch{}
@@ -57,13 +57,13 @@
     if(started||finished)return;
     started=true;
 
-    // Hard watchdog: the intro must never be able to block the homepage forever,
-    // even when requestAnimationFrame is suspended or fails to fire.
-    watchdog=setTimeout(finish,7000);
+    // This timer is deliberately independent of animation frames. Even if a
+    // browser suspends transitions/requestAnimationFrame, the homepage unlocks.
+    watchdog=setTimeout(finish,6500);
 
-    // Normal path keeps the first paint smooth. The timeout fallback starts the
-    // same timeline even if the browser does not deliver the animation frames.
-    later(runTimeline,160);
+    // Start the same timeline from a normal timer as well as rAF. This avoids a
+    // permanently dark intro when the first animation frame is not delivered.
+    later(runTimeline,120);
     try{
       requestAnimationFrame(()=>requestAnimationFrame(runTimeline));
     }catch{
