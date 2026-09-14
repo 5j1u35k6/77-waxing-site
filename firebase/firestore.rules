@@ -5,6 +5,11 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function isMemberAuth() {
+      return signedIn()
+        && request.auth.token.firebase.sign_in_provider != 'anonymous';
+    }
+
     function isAdmin() {
       return signedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
     }
@@ -265,6 +270,14 @@ service cloud.firestore {
 
     match /customerImportBatches/{batchId} {
       allow read, write: if isAdmin();
+    }
+
+    match /memberProfiles/{uid} {
+      allow read: if isAdmin() || (isMemberAuth() && request.auth.uid == uid);
+      allow create, update: if isMemberAuth()
+        && request.auth.uid == uid
+        && request.resource.data.uid == uid;
+      allow delete: if isAdmin() || (isMemberAuth() && request.auth.uid == uid);
     }
 
     match /shopProducts/{productId} {
