@@ -1,7 +1,7 @@
 const PROJECT_ID = 'waxing-86909';
 const FIRESTORE_BASE = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
 const STORE_EMAIL = '77waxing.mail@gmail.com';
-const SCRIPT_VERSION = '2026-09-13-email-shop-v26';
+const SCRIPT_VERSION = '2026-09-14-email-shop-v27';
 const WEBSITE_URL = 'https://5j1u35k6.github.io/77-waxing-site/';
 const SHOP_URL = 'https://5j1u35k6.github.io/77-waxing-site/shop/';
 const EMAIL_FOOTER_IMAGE = 'https://5j1u35k6.github.io/77-waxing-site/assets/email-footer-77waxing-v25.jpg?v=20260911-0035';
@@ -209,16 +209,25 @@ function sendShopOrderForStatus_(o, s) {
   const customerName = String(o.customerName || '顧客').trim() || '顧客';
   const orderNo = String(o.orderNo || '').trim() || '未編號訂單';
   const status = String(o.status || 'pending');
+  const items = Array.isArray(o.items) ? o.items : [];
+  const itemCount = items.filter(item => !item.isGift).reduce((sum, item) => sum + Math.max(0, Number(item.quantity || 0)), 0);
+  const pricing = shopPricing_(o);
+  const itemText = shopItemsText_(o);
+  const delivery = shopDeliveryText_(o.deliveryMethod);
+  const payment = shopPaymentText_(o.paymentMethod);
+  const storeInfo = String(o.storeInfo || '').trim() || '—';
+  const note = String(o.note || '').trim() || '—';
   let sent = false;
 
   if (status === 'pending') {
     if (customerEmail) {
-      send_(customerEmail, `77waxing｜已收到產品訂單 ${orderNo}`, shell_(`您好 ${customerName}，已收到你的訂單`, `<p>你的產品訂單已送出，目前正在等待 77waxing 確認庫存與內容。</p>${shopOrderInfo_(o)}<p>確認完成後，我們會再寄一封 Email 通知你；在確認前不需要先提供信用卡資料。</p>`));
+      const customerText = `${customerName} 您好，\n\n謝謝你訂購77 Select商品\n已經收到你的訂單，目前狀態為「待接單」。\n77waxing 確認後，會再寄一封 Email 通知你訂單已接單。\n\n────────────────────\n\n訂單編號 ${orderNo}\n\n訂購商品\n${itemText}\n\n商品小計        NT$${shopNumber_(pricing.subtotal)}\n活動折扣       -NT$${shopNumber_(pricing.discount)}\n運費            NT$${shopNumber_(pricing.shippingFee)}\n────────────────────\n訂單總計        NT$${shopNumber_(pricing.total)}\n\n取貨方式 ${delivery}\n付款方式 ${payment}\n${o.storeInfo ? storeInfo : ''}\n\n────────────────────\n\n之後只要訂單狀態更新，我們也會透過 Email 通知你。\n若訂單資料有需要修改，請直接與 77waxing 聯絡。\n\n\n77Select`;
+      send_(customerEmail, '77 Select｜我們已收到你的訂單｜目前狀態「待接單」', shopShell_(customerText));
       sent = true;
     }
     if (storeEmail) {
-      const contact = `<table style="border-collapse:collapse;margin:16px 0">${line_('姓名', customerName)}${line_('手機', o.phone || '—')}${line_('Email', customerEmail || '—')}${o.note ? line_('備註', o.note) : ''}</table>`;
-      send_(storeEmail, `新產品訂單待確認｜${orderNo}｜${customerName}`, shell_('有新的產品訂單', `${shopOrderInfo_(o)}${contact}<p>請至產品訂購管理後台確認庫存與訂單。</p>`));
+      const storeText = `收到一筆新的產品訂單。\n\n訂單編號 ${orderNo}\n\n客人資料\n姓名：${customerName}\n電話：${String(o.phone || '').trim() || '—'}\nEmail：${customerEmail || '—'}\n\n訂購商品\n${itemText}\n\n商品小計：NT$${shopNumber_(pricing.subtotal)}\n活動折扣：-NT$${shopNumber_(pricing.discount)}\n運費：NT$${shopNumber_(pricing.shippingFee)}\n訂單總計：NT$${shopNumber_(pricing.total)}\n\n配送方式\n${delivery}\n\n付款方式\n${payment}\n\n門市資訊\n${storeInfo}\n\n客人備註\n${note}\n\n────────────────────\n\n請至 77select 商店管理後台確認訂單。`;
+      send_(storeEmail, `【77select 新訂單】｜${customerName}｜商品${itemCount}件`, shopShell_(storeText));
       sent = true;
     }
     return sent;
@@ -227,15 +236,19 @@ function sendShopOrderForStatus_(o, s) {
   if (!customerEmail) return false;
 
   if (status === 'confirmed') {
-    send_(customerEmail, `77waxing｜產品訂單已確認 ${orderNo}`, shell_(`您好 ${customerName}，訂單已確認`, `<p>77waxing 已確認商品與庫存，接下來會依訂單的付款與交付方式處理。</p>${shopOrderInfo_(o)}${o.paymentMethod === 'transfer' ? '<p>若本單使用銀行轉帳，請依 77waxing 正式通知提供的資訊付款。</p>' : ''}`));
+    const text = `${customerName} 您好，\n\n你的訂單已由 77 Select 接單。\n\n我們已確認訂單內容，\n接下來將開始處理你的商品。\n\n訂單編號：${orderNo}\n\n目前狀態：已接單\n\n商品準備完成後，\n我們會再透過 Email 通知你。\n\n77 Select`;
+    send_(customerEmail, '77 Select｜你的訂單進度已更新｜目前狀態「已接單」', shopShell_(text));
     return true;
   }
   if (status === 'packing') {
-    send_(customerEmail, `77waxing｜產品訂單備貨中 ${orderNo}`, shell_(`您好 ${customerName}，商品正在準備中`, `<p>你的訂單已進入備貨階段。</p>${shopOrderInfo_(o)}`));
+    const text = `${customerName} 您好，\n\n你的訂單目前正在準備中。\n\n訂單編號：${orderNo}\n\n目前狀態：處理中\n\n商品準備完成後，\n我們會再寄 Email 通知你。\n\n77 Select`;
+    send_(customerEmail, '77 Select｜你的訂單進度已更新｜目前狀態「處理中」', shopShell_(text));
     return true;
   }
   if (status === 'ready') {
-    send_(customerEmail, `77waxing｜產品訂單可自取 ${orderNo}`, shell_(`您好 ${customerName}，訂單已準備完成`, `<p>你的商品已準備完成，請依 77waxing 與你確認的時間前往自取。</p>${shopOrderInfo_(o)}`));
+    const pickupInfo = String(o.storeInfo || '').trim() || String(s.pickupNote || '').trim() || '—';
+    const text = `${customerName} 您好，\n\n你的訂單已經準備完成 🤎\n\n訂單編號：${orderNo}\n\n目前狀態：已準備完成・待取貨\n\n取貨方式：\n${delivery}\n\n${pickupInfo}\n\n請依照約定方式完成取貨。\n\n謝謝你本次向我們訂購，希望很快能再次為你服務。\n77 Select`;
+    send_(customerEmail, '77 Select｜你的訂單進度已更新｜目前狀態「已準備完成・待取貨」', shopShell_(text));
     return true;
   }
   if (status === 'shipped') {
@@ -248,10 +261,47 @@ function sendShopOrderForStatus_(o, s) {
     return true;
   }
   if (status === 'cancelled') {
-    send_(customerEmail, `77waxing｜產品訂單取消通知 ${orderNo}`, shell_(`您好 ${customerName}，訂單已取消`, `<p>這筆訂單目前已取消。如需確認原因或重新訂購，請直接與 77waxing 聯繫。</p>${shopOrderInfo_(o)}`));
+    const cancellationReason = String(o.cancellationReason || o.cancelReason || '').trim() || '未提供';
+    const text = `${customerName} 您好，\n\n你的這筆訂單已取消。\n\n訂單編號：${orderNo}\n\n目前狀態：已取消\n\n取消原因：\n${cancellationReason}\n\n如果對取消原因有疑問，\n或希望重新訂購，\n歡迎直接與 77 Select 聯絡。\n\n77 Select`;
+    send_(customerEmail, '77 Select｜你的訂單進度已更新｜目前狀態「訂單取消通知」', shopShell_(text));
     return true;
   }
   return false;
+}
+
+function shopPricing_(o) {
+  const items = Array.isArray(o.items) ? o.items : [];
+  const promo = items.length && items[0] && items[0].promotionSummary ? items[0].promotionSummary : {};
+  const subtotal = Number(promo.subtotalBeforePromotions != null ? promo.subtotalBeforePromotions : (o.subtotal || 0));
+  const discount = Number(promo.discountTotal || o.discountAmount || o.discount || 0);
+  const shippingFee = Number(o.shippingFee || 0);
+  const total = Number(o.total != null ? o.total : Math.max(0, subtotal - discount + shippingFee));
+  return { subtotal, discount, shippingFee, total };
+}
+
+function shopItemsText_(o) {
+  const items = Array.isArray(o.items) ? o.items : [];
+  if (!items.length) return '—';
+  return items.map(item => {
+    const spec = [item.variantName, item.capacity].map(v => String(v || '').trim()).filter(Boolean).join('｜') || '—';
+    const giftPrefix = item.isGift ? '贈品｜' : '';
+    return `${giftPrefix}${String(item.name || '商品').trim() || '商品'}｜${spec} × ${Math.max(0, Number(item.quantity || 0))}`;
+  }).join('\n');
+}
+
+function shopNumber_(value) {
+  const amount = Math.max(0, Math.round(Number(value || 0)));
+  return amount.toLocaleString('en-US');
+}
+
+function shopShell_(text) {
+  return `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang TC',sans-serif;color:#3a3836;max-width:680px;margin:auto;line-height:1.75">
+    <div style="padding:30px 24px 0">
+      <div style="font-family:Georgia,serif;font-size:28px;margin-bottom:22px"><b style="color:#c5a070">77</b>waxing</div>
+      <div style="font-size:15px;line-height:1.85;white-space:pre-line">${esc_(text)}</div>
+    </div>
+    <div style="margin:18px 0 0;padding:0;line-height:0;font-size:0">${footerHtml_()}</div>
+  </div>`;
 }
 
 function shopOrderInfo_(o) {
@@ -259,7 +309,9 @@ function shopOrderInfo_(o) {
   const itemRows = items.map(item => {
     const qty = Number(item.quantity || 0);
     const price = Number(item.unitPrice || 0);
-    return `<tr><td style="padding:7px 12px 7px 0;border-bottom:1px solid #eee">${esc_(item.name || '商品')} × ${qty}</td><td style="padding:7px 0;border-bottom:1px solid #eee;text-align:right">NT$${esc_(price * qty)}</td></tr>`;
+    const spec = [item.variantName, item.capacity].map(v => String(v || '').trim()).filter(Boolean).join('｜');
+    const label = `${item.name || '商品'}${spec ? `｜${spec}` : ''}`;
+    return `<tr><td style="padding:7px 12px 7px 0;border-bottom:1px solid #eee">${esc_(label)} × ${qty}</td><td style="padding:7px 0;border-bottom:1px solid #eee;text-align:right">NT$${esc_(price * qty)}</td></tr>`;
   }).join('');
   return `<div style="margin:22px 0;padding:18px 20px;background:#f9f6f0;border-radius:14px">
     <div style="font-size:13px;font-weight:700;letter-spacing:.08em;margin-bottom:12px">訂單資訊</div>
