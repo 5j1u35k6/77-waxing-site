@@ -48,31 +48,32 @@
   white-space:nowrap;
 }
 
+/* Character generated from the supplied reference girl, then reduced to a true
+   low-resolution palette sprite. The parent handles the route; ::before handles
+   the small walking bounce so horizontal flipping never distorts the art. */
 .pixel-shopper{
   position:absolute;
   z-index:5;
-  left:-82px;
-  bottom:27px;
-  width:72px;
-  height:108px;
+  left:-112px;
+  bottom:25px;
+  width:102px;
+  height:135px;
   transform-origin:50% 100%;
   animation:pixelShopperRoute 14s linear infinite;
   will-change:left,transform;
 }
-
-.pixel-shopper>svg{
-  width:100%;
-  height:100%;
-  display:block;
+.pixel-shopper::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  background:url("./pixel-shopper-girl-v2.png?v=20260914-girl2") center bottom/contain no-repeat;
   image-rendering:pixelated;
-  shape-rendering:crispEdges;
-  animation:pixelShopperBob .38s steps(2,end) infinite;
   filter:drop-shadow(0 5px 0 rgba(111,89,64,.12));
+  animation:pixelShopperBob .42s steps(2,end) infinite;
 }
-
-.pixel-shopper .pixel-leg-a{animation:pixelLegA .38s steps(2,end) infinite;transform-box:fill-box;transform-origin:50% 0}
-.pixel-shopper .pixel-leg-b{animation:pixelLegB .38s steps(2,end) infinite;transform-box:fill-box;transform-origin:50% 0}
-.pixel-shopper .pixel-arm{animation:pixelArm .76s steps(2,end) infinite;transform-box:fill-box;transform-origin:20% 50%}
+.pixel-shopper>svg{
+  display:none!important;
+}
 
 .pixel-product{
   position:absolute;
@@ -104,16 +105,13 @@
 }
 
 @keyframes pixelShopperRoute{
-  0%{left:-82px;transform:scaleX(1)}
-  48%{left:calc(100% - 76px);transform:scaleX(1)}
-  50%{left:calc(100% - 76px);transform:scaleX(-1)}
-  98%{left:-82px;transform:scaleX(-1)}
-  100%{left:-82px;transform:scaleX(1)}
+  0%{left:-112px;transform:scaleX(1)}
+  48%{left:calc(100% - 104px);transform:scaleX(1)}
+  50%{left:calc(100% - 104px);transform:scaleX(-1)}
+  98%{left:-112px;transform:scaleX(-1)}
+  100%{left:-112px;transform:scaleX(1)}
 }
 @keyframes pixelShopperBob{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
-@keyframes pixelLegA{0%,100%{transform:translateX(-1px)}50%{transform:translateX(3px)}}
-@keyframes pixelLegB{0%,100%{transform:translateX(3px)}50%{transform:translateX(-1px)}}
-@keyframes pixelArm{0%,100%{transform:rotate(0deg)}50%{transform:rotate(-12deg)}}
 @keyframes pixelTwinkle{0%,100%{opacity:.18;transform:translateX(-50%) scale(.8)}50%{opacity:.7;transform:translateX(-50%) scale(1.1)}}
 
 /* Products disappear as the walking mascot reaches them, then reset for the return trip. */
@@ -136,9 +134,16 @@
     padding:36px 12px 138px!important;
   }
   .pixel-market{height:132px}
-  .pixel-shopper{width:62px;height:94px;bottom:26px}
+  .pixel-shopper{width:86px;height:114px;bottom:24px}
   .pixel-product{width:31px;height:40px;bottom:31px}
   .pixel-market::after{font-size:8px;letter-spacing:.16em}
+  @keyframes pixelShopperRoute{
+    0%{left:-94px;transform:scaleX(1)}
+    48%{left:calc(100% - 88px);transform:scaleX(1)}
+    50%{left:calc(100% - 88px);transform:scaleX(-1)}
+    98%{left:-94px;transform:scaleX(-1)}
+    100%{left:-94px;transform:scaleX(1)}
+  }
 }
 
 @media(max-width:430px){
@@ -147,12 +152,12 @@
     padding-bottom:126px!important;
   }
   .pixel-market{height:120px}
-  .pixel-shopper{width:56px;height:84px}
+  .pixel-shopper{width:76px;height:101px;bottom:23px}
   .pixel-product{width:27px;height:35px}
 }
 
 @media(prefers-reduced-motion:reduce){
-  .pixel-shopper,.pixel-shopper>svg,.pixel-shopper .pixel-leg-a,.pixel-shopper .pixel-leg-b,.pixel-shopper .pixel-arm,.pixel-product,.pixel-product::after{animation:none!important}
+  .pixel-shopper,.pixel-shopper::before,.pixel-product,.pixel-product::after{animation:none!important}
   .pixel-shopper{left:8%;transform:none}
   .pixel-product{opacity:1!important;transform:none!important}
 }
