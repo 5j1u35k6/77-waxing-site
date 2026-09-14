@@ -1,0 +1,29 @@
+/* Checkout submit reliability layer. Functional z-index/pointer fixes only. */
+#checkout-wrap .checkout-foot-v2{
+  position:relative!important;
+  z-index:30!important;
+  pointer-events:auto!important;
+}
+#checkout-wrap #checkout-submit{
+  position:relative!important;
+  z-index:31!important;
+  pointer-events:auto!important;
+  cursor:pointer!important;
+  touch-action:manipulation;
+}
+#checkout-wrap #checkout-submit:disabled{
+  cursor:wait!important;
+}
+
+/* Validation/order feedback must stay visible above cart/product/checkout layers. */
+#toast{
+  z-index:9999!important;
+}
+
+#checkout-wrap .checkout-validation-attention{
+  animation:checkoutValidationAttention .7s ease both;
+}
+@keyframes checkoutValidationAttention{
+  0%,100%{filter:none}
+  45%{filter:brightness(.985) saturate(1.04)}
+}
