@@ -1,79 +1,52 @@
-/* 77select logo wordmark refresh
+/* 77select SVG wordmark
    Scope: shop page header logo only. */
 
-:root{
-  --select-brand-gold:#d7ad70;
-  --select-brand-word:#8c7a68;
-}
-
-.shop-nav .shop-brand{
-  display:inline-flex!important;
-  flex-wrap:wrap!important;
-  align-items:baseline!important;
-  column-gap:.34em!important;
-  row-gap:0!important;
-  max-width:180px!important;
+html body .shop-nav .shop-brand{
+  display:block!important;
+  position:relative!important;
+  width:158px!important;
+  min-width:158px!important;
+  max-width:158px!important;
+  height:42px!important;
   margin-right:auto!important;
-  color:var(--select-brand-word)!important;
-  font-family:Georgia,"Times New Roman","Noto Serif TC",serif!important;
-  font-size:18px!important;
-  font-weight:400!important;
-  line-height:.92!important;
-  letter-spacing:.44em!important;
-  text-transform:uppercase!important;
-  white-space:normal!important;
+  overflow:hidden!important;
+  background-image:url("./77select-wordmark.svg?v=20260914-logo2")!important;
+  background-repeat:no-repeat!important;
+  background-position:left center!important;
+  background-size:contain!important;
+  color:transparent!important;
+  font-size:0!important;
+  line-height:1!important;
+  letter-spacing:0!important;
   text-decoration:none!important;
+  text-transform:none!important;
+  white-space:nowrap!important;
   text-rendering:geometricPrecision;
   -webkit-font-smoothing:antialiased;
 }
 
-.shop-nav .shop-brand b{
-  display:inline-block!important;
-  margin-right:.02em!important;
-  color:var(--select-brand-gold)!important;
-  font-family:Georgia,"Times New Roman",serif!important;
-  font-size:1.78em!important;
-  font-weight:400!important;
-  font-style:italic!important;
-  line-height:.78!important;
-  letter-spacing:-.08em!important;
-  transform:skewX(-7deg) translateY(.04em);
-  text-shadow:0 .4px 0 rgba(255,255,255,.22);
+html body .shop-nav .shop-brand b,
+html body .shop-nav .shop-brand small{
+  color:transparent!important;
+  font-size:0!important;
+  line-height:0!important;
+  opacity:0!important;
 }
 
-.shop-nav .shop-brand small{
-  flex:0 0 100%!important;
-  margin:5px 0 0!important;
-  padding-left:3px!important;
-  color:rgba(140,122,104,.76)!important;
-  font-family:Georgia,"Times New Roman","Noto Serif TC",serif!important;
-  font-size:7.5px!important;
-  font-weight:500!important;
-  line-height:1.05!important;
-  letter-spacing:.46em!important;
-  text-transform:uppercase!important;
-}
-
-@media(max-width:760px){
-  .shop-nav .shop-brand{
-    max-width:130px!important;
-    font-size:14px!important;
-    letter-spacing:.26em!important;
-  }
-  .shop-nav .shop-brand b{
-    font-size:1.7em!important;
-  }
-  .shop-nav .shop-brand small{
-    margin-top:4px!important;
-    font-size:6.5px!important;
-    letter-spacing:.32em!important;
+@media(max-width:820px){
+  html body .shop-nav .shop-brand{
+    width:116px!important;
+    min-width:116px!important;
+    max-width:116px!important;
+    height:34px!important;
   }
 }
 
 @media(max-width:360px){
-  .shop-nav .shop-brand{
-    max-width:116px!important;
-    font-size:13px!important;
-    letter-spacing:.22em!important;
+  html body .shop-nav .shop-brand{
+    width:108px!important;
+    min-width:108px!important;
+    max-width:108px!important;
+    height:32px!important;
   }
 }
