@@ -15,11 +15,11 @@ const { auth, db } = getPublicFirebase();
 const PENDING_TARGET_KEY = "77waxing_member_pending_target";
 const LINE_STATE_KEY = "77waxing_line_oauth_state";
 const LINE_DEBUG_KEY = "77waxing_line_auth_debug";
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbx6iC26KXbHWYte5XhLGNRMmG16Yydx2vPHDxYpmp4rmWn3plk__6Qwwr7Y09hLptTW/exec";
+const LINE_AUTH_PROXY_URL = "https://77waxing-line-auth-proxy.max19450.workers.dev/";
 const LINE_CHANNEL_ID = "2011606795";
 const LINE_CALLBACK_URL = "https://5j1u35k6.github.io/77-waxing-site/line-auth/";
 const LINE_AUTHORIZE_URL = "https://access.line.me/oauth2/v2.1/authorize";
-const VERSION = "20260915-line-custom3";
+const VERSION = "20260915-line-custom4";
 
 function statusElement() {
   return document.querySelector("#member-auth-wrap [data-member-auth-status]");
@@ -70,6 +70,24 @@ function randomUrlSafe(bytes = 32) {
 function cleanAuthFragment() {
   if (!location.hash) return;
   history.replaceState(null, "", `${location.pathname}${location.search}`);
+}
+
+async function proxyRequest(payload) {
+  const response = await fetch(LINE_AUTH_PROXY_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+    credentials: "omit",
+    cache: "no-store",
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok || !result?.ok) {
+    const code = String(result?.error || `proxy_http_${response.status}`);
+    const error = new Error(code);
+    error.code = code;
+    throw error;
+  }
+  return result;
 }
 
 async function consumeLineCallback() {
@@ -127,7 +145,6 @@ async function consumeLineCallback() {
         updatedAt: serverTimestamp(),
       }, { merge: true });
     } catch (error) {
-      // Firestore profile permissions must not undo an otherwise valid Firebase login.
       console.warn("LINE member profile write unavailable", error);
       rememberDebug("firebase_signed_in_profile_write_failed", error?.code || error?.message || "");
     }
@@ -138,8 +155,6 @@ async function consumeLineCallback() {
     window.dispatchEvent(new CustomEvent("77waxing:line-login-complete", { detail: { user: result.user } }));
     rememberDebug("complete");
 
-    // Rebuild the member shell from persisted Firebase Auth state. This also
-    // avoids any race between the base member module and the custom-token module.
     setTimeout(() => location.reload(), 180);
     return true;
   } catch (error) {
@@ -161,25 +176,14 @@ async function beginLineLogin() {
   rememberDebug("prepare_started");
   setStatus("正在前往 LINE 官方登入…");
 
-  const prepareUrl = new URL(APPS_SCRIPT_URL);
-  prepareUrl.searchParams.set("action", "line_prepare");
-  prepareUrl.searchParams.set("state", state);
-  prepareUrl.searchParams.set("nonce", nonce);
-  prepareUrl.searchParams.set("target", target);
-  prepareUrl.searchParams.set("_", String(Date.now()));
-
   try {
-    await fetch(prepareUrl.href, {
-      method: "GET",
-      mode: "no-cors",
-      credentials: "omit",
-      cache: "no-store",
-    });
-    rememberDebug("prepare_request_sent");
+    await proxyRequest({ action: "line_prepare", state, nonce, target });
+    rememberDebug("prepare_complete");
   } catch (error) {
     console.error("LINE prepare failed", error);
     sessionStorage.removeItem(LINE_STATE_KEY);
-    showLoginError("LINE 登入初始化失敗，請稍後再試。", error?.message || "prepare_failed");
+    const code = String(error?.code || error?.message || "prepare_failed");
+    showLoginError(`LINE 登入初始化失敗（${code}），請稍後再試。`, code);
     return;
   }
 
