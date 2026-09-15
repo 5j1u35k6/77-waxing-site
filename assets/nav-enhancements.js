@@ -110,3 +110,16 @@
   addEventListener('resize',hide);
   new MutationObserver(()=>{if(aboutMenu.classList.contains('on'))position()}).observe(nav,{childList:true,subtree:true});
 })();
+
+(()=>{
+  const B=location.hostname.endsWith('github.io')?'/77-waxing-site':'';
+  const legal=document.querySelector('.footer-legal');
+  if(!legal||legal.querySelector('[data-privacy-link]'))return;
+  const p=document.createElement('p');
+  const a=document.createElement('a');
+  a.href=`${B}/privacy/`;
+  a.textContent='隱私權政策';
+  a.dataset.privacyLink='1';
+  p.appendChild(a);
+  legal.insertBefore(p,legal.querySelector('.footer-credit')||null);
+})();
