@@ -1,7 +1,7 @@
 (()=>{
   const source=document.currentScript?.src||location.href;
   const memberUrl=new URL('./member-auth.js?v=20260915-member2',source).href;
-  const googleUrl=new URL('./google-auth-ui.js?v=20260915-google3-gis',source).href;
+  const googleUrl=new URL('./google-auth-ui.js?v=20260915-google4-restore',source).href;
   const popupFixUrl=new URL('./member-auth-popup-fix.js?v=20260915-line-custom5',source).href;
   import(memberUrl)
     .then(()=>import(googleUrl))
