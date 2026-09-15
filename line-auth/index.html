@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#f8f4ee">
+  <title>77waxing｜LINE 登入</title>
+  <style>
+    html,body{margin:0;min-height:100%;background:#f8f4ee;color:#292724;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+    body{display:grid;place-items:center;min-height:100vh;padding:24px;box-sizing:border-box}
+    main{text-align:center;max-width:420px}
+    h1{font-size:20px;margin:0 0 10px}
+    p{margin:0;color:#6d665f;line-height:1.7}
+  </style>
+</head>
+<body>
+  <main>
+    <h1>正在完成 LINE 登入</h1>
+    <p id="status">請稍候，正在驗證會員身分…</p>
+  </main>
+  <script>
+    (()=>{
+      const APPS_SCRIPT_URL='https://script.google.com/macros/s/AKfycbx6iC26KXbHWYte5XhLGNRMmG16Yydx2vPHDxYpmp4rmWn3plk__6Qwwr7Y09hLptTW/exec';
+      const PENDING_TARGET_KEY='77waxing_member_pending_target';
+      const LINE_STATE_KEY='77waxing_line_oauth_state';
+      const HOME='https://5j1u35k6.github.io/77-waxing-site/';
+      const status=document.getElementById('status');
+      const params=new URLSearchParams(location.search);
+      const state=String(params.get('state')||'').trim();
+      const code=String(params.get('code')||'').trim();
+      const error=String(params.get('error')||'').trim();
+      const expectedState=String(sessionStorage.getItem(LINE_STATE_KEY)||'').trim();
+      const target=String(sessionStorage.getItem(PENDING_TARGET_KEY)||HOME);
+
+      function safeTarget(value){
+        const text=String(value||'');
+        return text.startsWith(HOME)?text:HOME;
+      }
+      function finish(fragment){
+        const base=safeTarget(target).split('#')[0];
+        location.replace(`${base}#${fragment}`);
+      }
+      if(!state||!expectedState||state!==expectedState){
+        status.textContent='LINE 登入驗證狀態不一致，正在返回網站…';
+        finish(`77line_error=state_mismatch&77line_state=${encodeURIComponent(state)}`);
+        return;
+      }
+      if(error){
+        status.textContent='LINE 登入未完成，正在返回網站…';
+        finish(`77line_error=${encodeURIComponent(error)}&77line_state=${encodeURIComponent(state)}`);
+        return;
+      }
+      if(!code){
+        status.textContent='LINE 未回傳登入憑證，正在返回網站…';
+        finish(`77line_error=missing_code&77line_state=${encodeURIComponent(state)}`);
+        return;
+      }
+
+      window.__77LineExchange=(result)=>{
+        if(!result||String(result.state||'')!==state){
+          finish(`77line_error=exchange_state_mismatch&77line_state=${encodeURIComponent(state)}`);
+          return;
+        }
+        if(!result.ok||!result.customToken){
+          finish(`77line_error=${encodeURIComponent(String(result&&result.error||'exchange_failed'))}&77line_state=${encodeURIComponent(state)}`);
+          return;
+        }
+        const destination=safeTarget(result.target||target).split('#')[0];
+        location.replace(`${destination}#77line_token=${encodeURIComponent(result.customToken)}&77line_state=${encodeURIComponent(state)}`);
+      };
+
+      const script=document.createElement('script');
+      script.src=`${APPS_SCRIPT_URL}?action=line_exchange&callback=__77LineExchange&state=${encodeURIComponent(state)}&code=${encodeURIComponent(code)}&_=${Date.now()}`;
+      script.async=true;
+      script.onerror=()=>finish(`77line_error=exchange_network_failed&77line_state=${encodeURIComponent(state)}`);
+      document.head.appendChild(script);
+    })();
+  </script>
+</body>
+</html>
