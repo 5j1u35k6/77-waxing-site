@@ -123,3 +123,9 @@
   p.appendChild(a);
   legal.insertBefore(p,legal.querySelector('.footer-credit')||null);
 })();
+
+(()=>{
+  const source=document.currentScript?.src||location.href;
+  const railUrl=new URL('./desktop-rail-nav.js?v=20260915-rail1',source).href;
+  import(railUrl).catch(error=>console.warn('77waxing desktop rail unavailable',error));
+})();
