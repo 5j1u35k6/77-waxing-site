@@ -1,5 +1,6 @@
 /* 77select admin full-screen shell.
-   Keep the shop controls/components intact while matching the 77waxing admin canvas. */
+   Match the 77waxing admin canvas and left navigation structure while keeping
+   all shop-specific controls/components intact. */
 
 html,body{min-height:100%;}
 body{margin:0;background:#f1ece2;overflow-x:hidden;}
@@ -21,54 +22,123 @@ body{margin:0;background:#f1ece2;overflow-x:hidden;}
   background:#f1ece2;
 }
 
+/* Sidebar mirrors assets/admin-shell.css used by 77waxing. */
 #admin-app .admin-side{
   position:sticky!important;
   top:0;
   align-self:start;
   height:100vh;
   min-height:100vh;
+  box-sizing:border-box;
   display:flex;
   flex-direction:column;
   min-width:0;
   padding:32px 18px 24px!important;
   overflow:hidden;
-  background:#2f2d2b;
+  background:#3a3836!important;
 }
 
 #admin-app .admin-side .shop-brand{
   display:block;
   margin:4px 2px 28px!important;
+  padding:0!important;
   font-size:28px!important;
   line-height:1;
   white-space:nowrap;
+  color:#f9f6f0!important;
+  text-decoration:none;
 }
 
 #admin-app .admin-side .shop-brand small{
+  display:block;
   margin-top:7px;
   font-size:9px;
   letter-spacing:.22em;
+  color:rgba(249,246,240,.54)!important;
 }
 
 #admin-app .admin-nav{
   display:grid!important;
-  gap:4px!important;
+  gap:0!important;
   min-width:0;
 }
 
 #admin-app .admin-nav button{
+  appearance:none;
   width:100%;
   min-height:44px!important;
-  margin:2px 0;
+  margin:2px 0!important;
   padding:11px 12px!important;
+  border:0!important;
   border-radius:11px!important;
+  background:transparent!important;
+  color:#f9f6f0!important;
   text-align:left;
+  font:inherit;
   font-size:15px!important;
+  font-weight:600;
   line-height:1.35;
+  cursor:pointer;
   transition:background .16s ease,color .16s ease,transform .16s ease;
 }
 
-#admin-app .admin-nav button:hover{transform:translateX(2px);background:rgba(255,255,255,.09);}
-#admin-app .admin-nav button.on{background:rgba(255,255,255,.13);}
+#admin-app .admin-nav button:hover{
+  transform:translateX(2px);
+  background:rgba(255,255,255,.09)!important;
+}
+#admin-app .admin-nav button.on{
+  background:rgba(255,255,255,.13)!important;
+}
+
+/* Bottom actions: same hierarchy as 77waxing's 回到網站 / 登出 controls. */
+#admin-app .admin-side-tools{
+  margin-top:auto;
+  padding-top:18px;
+  border-top:1px solid rgba(255,255,255,.12);
+  display:grid;
+  gap:10px;
+}
+
+#admin-app .admin-site-link{
+  display:flex;
+  align-items:center;
+  min-height:42px;
+  padding:0 12px;
+  border-radius:11px;
+  color:#f9f6f0;
+  text-decoration:none;
+  font-size:15px;
+  font-weight:600;
+  line-height:1.35;
+  transition:background .16s ease,transform .16s ease;
+}
+#admin-app .admin-site-link:hover{
+  background:rgba(255,255,255,.09);
+  transform:translateX(2px);
+}
+
+#admin-app #logout.admin-side-logout{
+  appearance:none;
+  width:100%;
+  min-height:42px;
+  margin:0!important;
+  padding:0 14px!important;
+  border:1px solid rgba(249,246,240,.24)!important;
+  border-radius:999px!important;
+  background:transparent!important;
+  color:#f9f6f0!important;
+  font:inherit;
+  font-size:15px!important;
+  font-weight:600!important;
+  cursor:pointer;
+  box-shadow:none!important;
+  transition:background .16s ease,color .16s ease,border-color .16s ease;
+}
+#admin-app #logout.admin-side-logout:hover{
+  background:#f9f6f0!important;
+  color:#3a3836!important;
+  border-color:#f9f6f0!important;
+}
 
 #admin-app .admin-main{
   width:100%;
@@ -132,7 +202,10 @@ body{margin:0;background:#f1ece2;overflow-x:hidden;}
   #admin-app .admin-side .shop-brand{flex:0 0 auto;margin:0 12px 0 0!important;font-size:23px!important;}
   #admin-app .admin-side .shop-brand small{display:none;}
   #admin-app .admin-nav{display:flex!important;flex:1 0 auto!important;gap:6px!important;overflow-x:auto!important;}
-  #admin-app .admin-nav button{flex:0 0 auto;width:auto;min-height:40px!important;margin:0;padding:9px 11px!important;font-size:13px!important;}
+  #admin-app .admin-nav button{flex:0 0 auto;width:auto;min-height:40px!important;margin:0!important;padding:9px 11px!important;font-size:13px!important;}
+  #admin-app .admin-side-tools{flex:0 0 auto;margin:0 0 0 auto;padding:0;border-top:0;display:flex;align-items:center;gap:6px;}
+  #admin-app .admin-site-link{min-height:40px;padding:0 11px;font-size:13px;white-space:nowrap;}
+  #admin-app #logout.admin-side-logout{width:auto;min-height:40px;padding:0 13px!important;font-size:13px!important;white-space:nowrap;}
   #admin-app .admin-main{padding:22px 16px 40px!important;}
   #admin-app .admin-top{gap:18px!important;}
   #admin-app .admin-top h1{font-size:clamp(32px,8vw,42px)!important;}
@@ -143,4 +216,5 @@ body{margin:0;background:#f1ece2;overflow-x:hidden;}
   #admin-app .admin-top>div:last-child{text-align:left!important;margin-top:14px;}
   #admin-app .metric-grid{grid-template-columns:1fr 1fr!important;gap:10px!important;}
   #admin-app .table-wrap{margin-inline:-16px!important;width:calc(100% + 32px)!important;border-radius:0!important;}
+  #admin-app .admin-site-link{display:none;}
 }
