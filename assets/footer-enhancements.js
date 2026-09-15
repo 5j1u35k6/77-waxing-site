@@ -41,7 +41,7 @@
       <div class="footer-v2-directory" aria-label="網站導覽">
         ${linkList('探索 77',[
           ['關於我們',`${B}/about/`],
-          ['首次來店',`${B}/about/#first-visit`],
+          ['首次來店','https://5j1u35k6.github.io/77-waxing-site/about/#first-visit'],
           ['價目',`${B}/menu/`],
           ['空間',`${B}/space/`],
           ['教學',`${B}/courses/`],
