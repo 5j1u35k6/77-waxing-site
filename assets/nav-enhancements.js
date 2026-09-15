@@ -126,6 +126,6 @@
 
 (()=>{
   const source=document.currentScript?.src||location.href;
-  const railUrl=new URL('./desktop-rail-nav.js?v=20260915-rail2',source).href;
+  const railUrl=new URL('./desktop-rail-nav.js?v=20260915-rail3',source).href;
   import(railUrl).catch(error=>console.warn('77waxing desktop rail unavailable',error));
 })();
