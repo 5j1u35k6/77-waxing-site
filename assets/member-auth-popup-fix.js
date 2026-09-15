@@ -1,14 +1,19 @@
 import {
   browserLocalPersistence,
-  OAuthProvider,
   setPersistence,
-  signInWithPopup,
+  signInWithCustomToken,
 } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
+import {
+  doc,
+  serverTimestamp,
+  setDoc,
+} from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
 import { getPublicFirebase } from "./public-firebase.js?v=20260912-1330";
 
-const { auth } = getPublicFirebase();
+const { auth, db } = getPublicFirebase();
 const PENDING_TARGET_KEY = "77waxing_member_pending_target";
-const runtimeConfig = window.__77_MEMBER_AUTH_CONFIG__ || {};
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbx6iC26KXbHWYte5XhLGNRMmG16Yydx2vPHDxYpmp4rmWn3plk__6Qwwr7Y09hLptTW/exec";
+const VERSION = "20260915-line-custom1";
 
 function statusElement() {
   return document.querySelector("#member-auth-wrap [data-member-auth-status]");
@@ -21,85 +26,91 @@ function setStatus(message = "", state = "") {
   if (el.dataset.state !== state) el.dataset.state = state;
 }
 
-function providerFor(kind) {
-  if (kind === "line") {
-    return {
-      label: "LINE",
-      providerId: runtimeConfig.lineProviderId || "oidc.line",
-      scopes: runtimeConfig.lineRequestEmail === true
-        ? ["openid", "profile", "email"]
-        : ["openid", "profile"],
-    };
+function decodeCustomClaims(token) {
+  try {
+    const part = String(token || "").split(".")[1] || "";
+    const base64 = part.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = base64 + "=".repeat((4 - base64.length % 4) % 4);
+    const json = decodeURIComponent(Array.from(atob(padded), c => `%${c.charCodeAt(0).toString(16).padStart(2, "0")}`).join(""));
+    return JSON.parse(json)?.claims || {};
+  } catch (error) {
+    console.warn("LINE custom token claims unavailable", error);
+    return {};
   }
-  if (kind === "whatsapp" && runtimeConfig.whatsappProviderId) {
-    return {
-      label: "WhatsApp",
-      providerId: runtimeConfig.whatsappProviderId,
-      scopes: ["openid", "profile"],
-    };
-  }
-  return null;
 }
 
-function friendlyError(label, error) {
-  const code = String(error?.code || "");
-  if (code.includes("operation-not-allowed") || code.includes("invalid-provider-id") || code.includes("invalid-oauth-provider")) {
-    return `${label} 登入供應商尚未在 Firebase Authentication 正確啟用。`;
-  }
-  if (code.includes("unauthorized-domain")) {
-    return "目前網站網域尚未加入 Firebase Authentication 的 Authorized domains。";
-  }
-  if (code.includes("popup-blocked")) {
-    return "瀏覽器阻擋了登入視窗，請允許此網站開啟彈出式視窗後再試。";
-  }
-  if (code.includes("popup-closed-by-user") || code.includes("cancelled-popup-request")) {
-    return "登入視窗已關閉，尚未完成登入。";
-  }
-  if (code.includes("account-exists-with-different-credential")) {
-    return "這個帳號已用其他登入方式建立，請先使用原本方式登入。";
-  }
-  return `${label} 登入沒有完成${code ? `（${code}）` : ""}。`;
+function cleanAuthFragment() {
+  if (!location.hash) return;
+  history.replaceState(null, "", `${location.pathname}${location.search}`);
 }
 
-async function loginWithPopup(kind) {
-  if (kind === "whatsapp" && !runtimeConfig.whatsappProviderId) {
-    setStatus("WhatsApp 目前尚未接上可用的會員驗證服務；現有 oidc.whatsapp 只是預留值，不能直接拿 WhatsApp 帳號登入。", "error");
-    return;
-  }
+async function consumeLineCallback() {
+  const params = new URLSearchParams(location.hash.replace(/^#/, ""));
+  const errorCode = String(params.get("77line_error") || "").trim();
+  const customToken = String(params.get("77line_token") || "").trim();
+  if (!errorCode && !customToken) return false;
 
-  const config = providerFor(kind);
-  if (!config) return;
+  if (errorCode) {
+    cleanAuthFragment();
+    setTimeout(() => setStatus(`LINE 登入未完成（${errorCode}），請再試一次。`, "error"), 0);
+    return true;
+  }
 
   try {
-    setStatus(`正在開啟 ${config.label} 登入…`);
+    const claims = decodeCustomClaims(customToken);
     await setPersistence(auth, browserLocalPersistence);
+    setStatus("LINE 身分驗證完成，正在登入會員…");
+    const result = await signInWithCustomToken(auth, customToken);
+    if (!result?.user || result.user.isAnonymous) throw new Error("LINE_CUSTOM_SIGNIN_EMPTY");
 
-    const provider = new OAuthProvider(config.providerId);
-    config.scopes.forEach((scope) => provider.addScope(scope));
+    const displayName = String(claims.lineName || "").trim();
+    const lineUserId = String(claims.lineUserId || "").trim();
+    const linePicture = String(claims.linePicture || "").trim();
+    await setDoc(doc(db, "memberProfiles", result.user.uid), {
+      uid: result.user.uid,
+      ...(displayName ? { displayName } : {}),
+      provider: "LINE",
+      ...(lineUserId ? { lineUserId } : {}),
+      ...(linePicture ? { linePicture } : {}),
+      updatedAt: serverTimestamp(),
+    }, { merge: true });
 
-    const result = await signInWithPopup(auth, provider);
-    if (!result?.user || result.user.isAnonymous) throw new Error("MEMBER_LOGIN_EMPTY_RESULT");
-
-    const target = sessionStorage.getItem(PENDING_TARGET_KEY) || "";
     sessionStorage.removeItem(PENDING_TARGET_KEY);
-    setStatus(`${config.label} 登入成功，正在載入會員資料…`);
-
-    if (target && target !== location.href) location.assign(target);
+    cleanAuthFragment();
+    setStatus("LINE 登入成功，正在載入會員資料…");
+    window.dispatchEvent(new CustomEvent("77waxing:line-login-complete", { detail: { user: result.user } }));
+    return true;
   } catch (error) {
-    console.error("member popup login failed", error);
-    setStatus(friendlyError(config.label, error), "error");
+    console.error("LINE custom token login failed", error);
+    cleanAuthFragment();
+    setTimeout(() => setStatus(`LINE 已授權，但會員登入失敗（${String(error?.code || error?.message || "unknown")}）。`, "error"), 0);
+    return true;
   }
 }
 
-// The site is hosted on GitHub Pages while Firebase Auth uses a firebaseapp.com
-// authDomain. Modern browsers restrict the cross-origin storage used by
-// signInWithRedirect(), so intercept provider buttons and use a popup flow.
+function beginLineLogin() {
+  const target = sessionStorage.getItem(PENDING_TARGET_KEY) || location.href;
+  if (!sessionStorage.getItem(PENDING_TARGET_KEY)) sessionStorage.setItem(PENDING_TARGET_KEY, target);
+  setStatus("正在前往 LINE 官方登入…");
+  const url = `${APPS_SCRIPT_URL}?action=line_login&target=${encodeURIComponent(target)}`;
+  location.assign(url);
+}
+
 document.addEventListener("click", (event) => {
   const button = event.target.closest?.("[data-member-provider]");
   if (!button) return;
+  const kind = button.dataset.memberProvider;
   event.preventDefault();
   event.stopImmediatePropagation();
-  loginWithPopup(button.dataset.memberProvider);
+
+  if (kind === "line") {
+    beginLineLogin();
+    return;
+  }
+  if (kind === "whatsapp") {
+    setStatus("WhatsApp 會員驗證尚未接通；目前先使用 LINE 登入。", "error");
+  }
 }, true);
 
-window.__77_MEMBER_LOGIN_TRANSPORT__ = "popup";
+await consumeLineCallback();
+window.__77_MEMBER_LOGIN_TRANSPORT__ = VERSION;
