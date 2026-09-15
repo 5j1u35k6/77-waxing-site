@@ -2,11 +2,15 @@ const GAS_URL = 'https://script.google.com/macros/s/AKfycbx6iC26KXbHWYte5XhLGNRM
 const ALLOWED_ORIGIN = 'https://5j1u35k6.github.io';
 const ALLOWED_TARGET_PREFIX = 'https://5j1u35k6.github.io/77-waxing-site/';
 const LINE_JSONP_CALLBACK = '__77LineExchange';
+const POST_ACTIONS = new Set([
+  'identity_status',
+  'identity_resolve',
+  'identity_bind_google',
+  'line_link_prepare',
+]);
 
 export default {
   async fetch(request) {
-    const url = new URL(request.url);
-
     if (request.method === 'OPTIONS') {
       return new Response(null, { status: 204, headers: corsHeaders_(request) });
     }
@@ -24,16 +28,13 @@ export default {
       const body = await request.json().catch(() => ({}));
       const action = String(body.action || '').trim();
 
-      if (action === 'line_prepare') {
-        return await prepare_(body, request);
-      }
-
-      if (action === 'line_exchange') {
-        return await exchange_(body, request);
-      }
+      if (action === 'line_prepare') return await prepare_(body, request);
+      if (action === 'line_exchange') return await exchange_(body, request);
+      if (POST_ACTIONS.has(action)) return await backendPost_(body, request);
 
       return json_({ ok: false, error: 'invalid_action' }, 400, request);
     } catch (error) {
+      console.error('77waxing auth proxy error', error);
       return json_({ ok: false, error: 'proxy_error' }, 500, request);
     }
   },
@@ -58,7 +59,7 @@ async function prepare_(body, request) {
   const response = await fetch(gas.href, {
     method: 'GET',
     redirect: 'follow',
-    headers: { 'User-Agent': '77waxing-line-auth-proxy/1.0' },
+    headers: { 'User-Agent': '77waxing-line-auth-proxy/1.1' },
   });
 
   const text = await response.text();
@@ -69,7 +70,7 @@ async function prepare_(body, request) {
     return json_({ ok: false, error: payload?.error || 'prepare_backend_failed' }, 502, request);
   }
 
-  return json_({ ok: true }, 200, request);
+  return json_({ ok: true, version: payload.version || null }, 200, request);
 }
 
 async function exchange_(body, request) {
@@ -90,7 +91,7 @@ async function exchange_(body, request) {
   const response = await fetch(gas.href, {
     method: 'GET',
     redirect: 'follow',
-    headers: { 'User-Agent': '77waxing-line-auth-proxy/1.0' },
+    headers: { 'User-Agent': '77waxing-line-auth-proxy/1.1' },
   });
 
   const source = await response.text();
@@ -104,6 +105,40 @@ async function exchange_(body, request) {
   }
 
   return json_(payload, 200, request);
+}
+
+async function backendPost_(body, request) {
+  const safeBody = { ...body };
+  if ('target' in safeBody) safeBody.target = sanitizeTarget_(safeBody.target);
+
+  const response = await fetch(GAS_URL, {
+    method: 'POST',
+    redirect: 'follow',
+    headers: {
+      'Content-Type': 'application/json',
+      'User-Agent': '77waxing-line-auth-proxy/1.1',
+    },
+    body: JSON.stringify(safeBody),
+  });
+
+  const text = await response.text();
+  let payload = null;
+  try { payload = JSON.parse(text); } catch {}
+
+  if (!response.ok || !payload) {
+    return json_({ ok: false, error: 'identity_backend_invalid' }, 502, request);
+  }
+
+  const status = payload.ok ? 200 : backendErrorStatus_(payload.error);
+  return json_(payload, status, request);
+}
+
+function backendErrorStatus_(error) {
+  const code = String(error || '');
+  if (code === 'firebase_auth_invalid') return 401;
+  if (code === 'google_already_linked' || code === 'line_already_linked' || code === 'primary_google_exists') return 409;
+  if (code === 'invalid_link_prepare' || code === 'google_identity_missing') return 400;
+  return 502;
 }
 
 function parseJsonp_(source) {
