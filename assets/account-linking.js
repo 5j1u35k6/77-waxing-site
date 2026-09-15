@@ -11,7 +11,7 @@ import { firebaseConfig } from "./firebase-config.js";
 import { getPublicFirebase } from "./public-firebase.js?v=20260912-1330";
 
 const { auth } = getPublicFirebase();
-const VERSION = "20260915-account-link1";
+const VERSION = "20260915-account-link2-diagnostics";
 const LINE_AUTH_PROXY_URL = "https://77waxing-line-auth-proxy.max19450.workers.dev/";
 const LINE_CHANNEL_ID = "2011606795";
 const LINE_CALLBACK_URL = "https://5j1u35k6.github.io/77-waxing-site/line-auth/";
@@ -115,6 +115,15 @@ async function loadStatus(force = false) {
   return statusCache;
 }
 
+function inferLocalProviders() {
+  const user = auth.currentUser;
+  if (!user || user.isAnonymous) return { line:false, google:false };
+  return {
+    line: String(user.uid || "").startsWith("line_"),
+    google: Boolean(user.providerData?.some((entry) => entry?.providerId === "google.com")),
+  };
+}
+
 function paintStatus(providers) {
   const section = ensureSection();
   if (!section || !providers) return;
@@ -131,18 +140,29 @@ function paintStatus(providers) {
   });
 }
 
+function statusReadErrorText(error) {
+  const code = String(error?.code || error?.message || "unknown");
+  if (code.includes("invalid_action")) return "綁定後端尚未更新到新版 Cloudflare Worker（invalid_action）。";
+  if (code.includes("missing_data") || code.includes("missing_shop_data")) return "Apps Script 尚未把會員綁定請求交給 IdentityLink（missing_data）。";
+  if (code.includes("firebase_auth_invalid")) return "會員登入狀態已過期，請重新登入後再試。";
+  if (code.includes("identity_server_error")) return "會員綁定後端執行失敗（identity_server_error），請檢查 Apps Script 執行紀錄。";
+  if (code.includes("identity_backend_invalid")) return "Cloudflare 已收到請求，但 Apps Script 回傳格式不正確（identity_backend_invalid）。";
+  if (code.includes("proxy_http_")) return `會員綁定服務目前無法連線（${code}）。`;
+  return `目前無法讀取綁定狀態（${code}）。`;
+}
+
 async function render(force = false) {
   const section = ensureSection();
   if (!section || !auth.currentUser || auth.currentUser.isAnonymous) return;
   try {
     paintStatus(await loadStatus(force));
+    setLocalStatus("");
   } catch (error) {
     console.warn("member identity status unavailable", error);
-    section.querySelectorAll("[data-link-provider]").forEach((button) => {
-      button.disabled = true;
-      button.textContent = "暫時無法使用";
-    });
-    setLocalStatus("目前無法讀取綁定狀態，請稍後再試。", "error");
+    statusCache = inferLocalProviders();
+    statusForUid = auth.currentUser.uid;
+    paintStatus(statusCache);
+    setLocalStatus(statusReadErrorText(error), "error");
   }
 }
 
@@ -264,6 +284,9 @@ function bindingErrorText(error) {
   if (code.includes("line_already_linked")) return "這個 LINE 已經綁定其他 77waxing 會員。";
   if (code.includes("primary_google_exists")) return "目前會員已經綁定另一個 Google 帳號。";
   if (code.includes("firebase_auth_invalid")) return "會員登入狀態已過期，請重新登入後再綁定。";
+  if (code.includes("invalid_action")) return "Cloudflare Worker 尚未更新到支援會員綁定的版本。";
+  if (code.includes("missing_data") || code.includes("missing_shop_data")) return "Apps Script 的 doPost 尚未接上會員綁定路由。";
+  if (code.includes("identity_server_error")) return "Apps Script 會員綁定後端執行失敗，請檢查執行紀錄。";
   return `綁定目前無法完成（${code}）。`;
 }
 
