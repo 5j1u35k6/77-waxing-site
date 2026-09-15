@@ -12,8 +12,12 @@ import { getPublicFirebase } from "./public-firebase.js?v=20260912-1330";
 
 const { auth, db } = getPublicFirebase();
 const PENDING_TARGET_KEY = "77waxing_member_pending_target";
+const LINE_STATE_KEY = "77waxing_line_oauth_state";
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbx6iC26KXbHWYte5XhLGNRMmG16Yydx2vPHDxYpmp4rmWn3plk__6Qwwr7Y09hLptTW/exec";
-const VERSION = "20260915-line-custom1";
+const LINE_CHANNEL_ID = "2011606795";
+const LINE_CALLBACK_URL = "https://5j1u35k6.github.io/77-waxing-site/line-auth/";
+const LINE_AUTHORIZE_URL = "https://access.line.me/oauth2/v2.1/authorize";
+const VERSION = "20260915-line-custom2";
 
 function statusElement() {
   return document.querySelector("#member-auth-wrap [data-member-auth-status]");
@@ -39,6 +43,14 @@ function decodeCustomClaims(token) {
   }
 }
 
+function randomUrlSafe(bytes = 32) {
+  const data = new Uint8Array(bytes);
+  crypto.getRandomValues(data);
+  let binary = "";
+  data.forEach((value) => { binary += String.fromCharCode(value); });
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+
 function cleanAuthFragment() {
   if (!location.hash) return;
   history.replaceState(null, "", `${location.pathname}${location.search}`);
@@ -48,7 +60,18 @@ async function consumeLineCallback() {
   const params = new URLSearchParams(location.hash.replace(/^#/, ""));
   const errorCode = String(params.get("77line_error") || "").trim();
   const customToken = String(params.get("77line_token") || "").trim();
+  const returnedState = String(params.get("77line_state") || "").trim();
   if (!errorCode && !customToken) return false;
+
+  const expectedState = String(sessionStorage.getItem(LINE_STATE_KEY) || "").trim();
+  if (!expectedState || !returnedState || expectedState !== returnedState) {
+    cleanAuthFragment();
+    sessionStorage.removeItem(LINE_STATE_KEY);
+    setTimeout(() => setStatus("LINE 登入驗證狀態不一致，請重新登入。", "error"), 0);
+    return true;
+  }
+
+  sessionStorage.removeItem(LINE_STATE_KEY);
 
   if (errorCode) {
     cleanAuthFragment();
@@ -88,12 +111,44 @@ async function consumeLineCallback() {
   }
 }
 
-function beginLineLogin() {
+async function beginLineLogin() {
   const target = sessionStorage.getItem(PENDING_TARGET_KEY) || location.href;
   if (!sessionStorage.getItem(PENDING_TARGET_KEY)) sessionStorage.setItem(PENDING_TARGET_KEY, target);
+
+  const state = randomUrlSafe(32);
+  const nonce = randomUrlSafe(32);
+  sessionStorage.setItem(LINE_STATE_KEY, state);
   setStatus("正在前往 LINE 官方登入…");
-  const url = `${APPS_SCRIPT_URL}?action=line_login&target=${encodeURIComponent(target)}`;
-  location.assign(url);
+
+  const prepareUrl = new URL(APPS_SCRIPT_URL);
+  prepareUrl.searchParams.set("action", "line_prepare");
+  prepareUrl.searchParams.set("state", state);
+  prepareUrl.searchParams.set("nonce", nonce);
+  prepareUrl.searchParams.set("target", target);
+  prepareUrl.searchParams.set("_", String(Date.now()));
+
+  try {
+    await fetch(prepareUrl.href, {
+      method: "GET",
+      mode: "no-cors",
+      credentials: "omit",
+      cache: "no-store",
+    });
+  } catch (error) {
+    console.error("LINE prepare failed", error);
+    sessionStorage.removeItem(LINE_STATE_KEY);
+    setStatus("LINE 登入初始化失敗，請稍後再試。", "error");
+    return;
+  }
+
+  const authorizeUrl = new URL(LINE_AUTHORIZE_URL);
+  authorizeUrl.searchParams.set("response_type", "code");
+  authorizeUrl.searchParams.set("client_id", LINE_CHANNEL_ID);
+  authorizeUrl.searchParams.set("redirect_uri", LINE_CALLBACK_URL);
+  authorizeUrl.searchParams.set("state", state);
+  authorizeUrl.searchParams.set("scope", "openid profile");
+  authorizeUrl.searchParams.set("nonce", nonce);
+  location.assign(authorizeUrl.href);
 }
 
 document.addEventListener("click", (event) => {
