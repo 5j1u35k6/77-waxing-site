@@ -1,4 +1,4 @@
-const LINE_AUTH_VERSION = '2026-09-15-line-custom-v2';
+const LINE_AUTH_VERSION = '2026-09-15-line-custom-v3-link';
 const LINE_AUTHORIZE_URL = 'https://access.line.me/oauth2/v2.1/authorize';
 const LINE_TOKEN_URL = 'https://api.line.me/oauth2/v2.1/token';
 const LINE_VERIFY_URL = 'https://api.line.me/oauth2/v2.1/verify';
@@ -11,7 +11,6 @@ function routeLineAuthGet_(e) {
   const action = String(e && e.parameter && e.parameter.action || '').trim();
   if (action === 'line_prepare') return linePrepare_(e);
   if (action === 'line_exchange') return lineExchangeJsonp_(e);
-  // Kept as a diagnostic fallback. Production login starts directly from 77waxing.
   if (action === 'line_login') return lineLoginStart_(e);
   if (action === 'line_callback') return lineLoginCallback_(e);
   return null;
@@ -27,7 +26,7 @@ function linePrepare_(e) {
     }
     CacheService.getScriptCache().put(
       `line_oauth:${state}`,
-      JSON.stringify({ target, nonce, createdAt: Date.now() }),
+      JSON.stringify({ target, nonce, createdAt:Date.now(), mode:'login' }),
       LINE_STATE_TTL_SECONDS
     );
     return json_({ ok:true, version:LINE_AUTH_VERSION });
@@ -44,16 +43,16 @@ function lineLoginStart_(e) {
   const nonce = randomUrlSafe_(32);
   CacheService.getScriptCache().put(
     `line_oauth:${state}`,
-    JSON.stringify({ target, nonce, createdAt: Date.now() }),
+    JSON.stringify({ target, nonce, createdAt:Date.now(), mode:'login' }),
     LINE_STATE_TTL_SECONDS
   );
 
   const params = {
-    response_type: 'code',
-    client_id: config.channelId,
-    redirect_uri: config.callbackUrl,
+    response_type:'code',
+    client_id:config.channelId,
+    redirect_uri:config.callbackUrl,
     state,
-    scope: 'openid profile',
+    scope:'openid profile',
     nonce,
   };
   const authorizeUrl = LINE_AUTHORIZE_URL + '?' + formEncode_(params);
@@ -62,9 +61,7 @@ function lineLoginStart_(e) {
 
 function lineExchangeJsonp_(e) {
   const callback = String(e && e.parameter && e.parameter.callback || '').trim();
-  if (callback !== LINE_JSONP_CALLBACK) {
-    return javascriptOutput_('void 0;');
-  }
+  if (callback !== LINE_JSONP_CALLBACK) return javascriptOutput_('void 0;');
 
   const state = String(e && e.parameter && e.parameter.state || '').trim();
   const code = String(e && e.parameter && e.parameter.code || '').trim();
@@ -83,15 +80,15 @@ function lineLoginCallback_(e) {
   const target = sanitizeLineTarget_(result.target);
   if (!result.ok) {
     return htmlRedirect_(appendFragmentParams_(target, {
-      '77line_error': String(result.error || 'login_failed'),
-      '77line_state': String(state || ''),
+      '77line_error':String(result.error || 'login_failed'),
+      '77line_state':String(state || ''),
     }), 'LINE 登入未完成，正在返回 77waxing…');
   }
 
   return htmlRedirect_(appendFragmentParams_(target, {
-    '77line_token': result.customToken,
-    '77line_state': state,
-  }), 'LINE 登入成功，正在回到 77waxing…');
+    '77line_token':result.customToken,
+    '77line_state':state,
+  }), result.linked ? 'LINE 綁定成功，正在回到 77waxing…' : 'LINE 登入成功，正在回到 77waxing…');
 }
 
 function exchangeLineCode_(state, code) {
@@ -107,16 +104,16 @@ function exchangeLineCode_(state, code) {
   try {
     const config = lineAuthConfig_();
     const tokenResponse = UrlFetchApp.fetch(LINE_TOKEN_URL, {
-      method: 'post',
-      contentType: 'application/x-www-form-urlencoded',
-      payload: {
-        grant_type: 'authorization_code',
+      method:'post',
+      contentType:'application/x-www-form-urlencoded',
+      payload:{
+        grant_type:'authorization_code',
         code,
-        redirect_uri: config.callbackUrl,
-        client_id: config.channelId,
-        client_secret: config.channelSecret,
+        redirect_uri:config.callbackUrl,
+        client_id:config.channelId,
+        client_secret:config.channelSecret,
       },
-      muteHttpExceptions: true,
+      muteHttpExceptions:true,
     });
     if (tokenResponse.getResponseCode() !== 200) {
       console.error('LINE token exchange failed', tokenResponse.getContentText());
@@ -128,10 +125,10 @@ function exchangeLineCode_(state, code) {
     if (!idToken) return { ok:false, error:'missing_id_token', state, target };
 
     const verifyResponse = UrlFetchApp.fetch(LINE_VERIFY_URL, {
-      method: 'post',
-      contentType: 'application/x-www-form-urlencoded',
-      payload: { id_token: idToken, client_id: config.channelId },
-      muteHttpExceptions: true,
+      method:'post',
+      contentType:'application/x-www-form-urlencoded',
+      payload:{ id_token:idToken, client_id:config.channelId },
+      muteHttpExceptions:true,
     });
     if (verifyResponse.getResponseCode() !== 200) {
       console.error('LINE id_token verify failed', verifyResponse.getContentText());
@@ -146,17 +143,35 @@ function exchangeLineCode_(state, code) {
     const lineUserId = String(identity.sub || '').trim();
     if (!lineUserId) return { ok:false, error:'missing_line_user', state, target };
 
-    const customToken = firebaseCustomToken_(`line_${lineUserId}`, {
-      provider: 'line',
+    const defaultUid = `line_${lineUserId}`.slice(0, 128);
+    const mode = String(saved.mode || 'login');
+    let firebaseUid = defaultUid;
+    let linked = false;
+
+    if (mode === 'link') {
+      firebaseUid = completeLineLink_(lineUserId, saved.canonicalUid, defaultUid);
+      linked = true;
+    } else {
+      firebaseUid = resolveLineCanonicalUid_(lineUserId, defaultUid);
+    }
+
+    const customToken = firebaseCustomToken_(firebaseUid, {
+      provider:'line',
       lineUserId,
-      lineName: String(identity.name || '').slice(0, 100),
-      linePicture: String(identity.picture || '').slice(0, 500),
+      lineName:String(identity.name || '').slice(0, 100),
+      linePicture:String(identity.picture || '').slice(0, 500),
+      ...(linked ? { linked:true } : {}),
     });
 
     cache.remove(stateKey);
-    return { ok:true, customToken, state, target };
+    return { ok:true, customToken, state, target, linked, canonicalUid:firebaseUid };
   } catch (err) {
     console.error(err && err.stack ? err.stack : String(err));
+    const message = String(err && err.message || 'server_error');
+    if (message.indexOf('line_already_linked') >= 0) return { ok:false, error:'line_already_linked', state, target };
+    if (message.indexOf('firebase_admin_') >= 0 || message.indexOf('firestore_admin_') >= 0) {
+      return { ok:false, error:'link_backend_failed', state, target };
+    }
     return { ok:false, error:'server_error', state, target };
   }
 }
@@ -177,15 +192,15 @@ function lineAuthConfig_() {
 function firebaseCustomToken_(uid, claims) {
   const config = lineAuthConfig_();
   const now = Math.floor(Date.now() / 1000);
-  const header = { alg: 'RS256', typ: 'JWT' };
+  const header = { alg:'RS256', typ:'JWT' };
   const payload = {
-    iss: config.serviceAccountEmail,
-    sub: config.serviceAccountEmail,
-    aud: FIREBASE_CUSTOM_TOKEN_AUD,
-    iat: now,
-    exp: now + 3600,
-    uid: String(uid || '').slice(0, 128),
-    claims: claims || {},
+    iss:config.serviceAccountEmail,
+    sub:config.serviceAccountEmail,
+    aud:FIREBASE_CUSTOM_TOKEN_AUD,
+    iat:now,
+    exp:now + 3600,
+    uid:String(uid || '').slice(0, 128),
+    claims:claims || {},
   };
   const unsigned = `${base64UrlJson_(header)}.${base64UrlJson_(payload)}`;
   const signature = Utilities.computeRsaSha256Signature(unsigned, config.privateKey);
