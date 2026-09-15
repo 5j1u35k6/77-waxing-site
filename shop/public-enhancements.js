@@ -119,6 +119,13 @@ function applyMemberBranding() {
   const centerTitle = document.querySelector("#member-center-title");
   if (centerTitle && centerTitle.textContent.trim() === "我的紀錄") centerTitle.textContent = "會員中心";
 
+  document.querySelectorAll("#member-center-wrap .member-history-empty").forEach((node) => {
+    const text = node.textContent.trim();
+    if (text === "正在讀取預約紀錄…") node.textContent = "正在讀取訂單紀錄…";
+    if (text === "目前還沒有預約／施作紀錄。") node.textContent = "目前還沒有訂單紀錄。";
+    if (text === "目前無法讀取預約紀錄，請稍後再試。") node.textContent = "目前無法讀取訂單紀錄，請稍後再試。";
+  });
+
   const ordersIntro = document.querySelector('[data-view="orders"] .section-head p');
   if (ordersIntro && ordersIntro.textContent.includes("匿名帳號")) {
     ordersIntro.textContent = "登入 LINE 或 Google 後，訂單會安全同步在同一個 77select 會員帳號。";
