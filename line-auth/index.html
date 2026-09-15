@@ -22,15 +22,41 @@
     (()=>{
       const LINE_AUTH_PROXY_URL='https://77waxing-line-auth-proxy.max19450.workers.dev/';
       const PENDING_TARGET_KEY='77waxing_member_pending_target';
+      const PENDING_TARGET_LOCAL_KEY='77waxing_member_pending_target_persist';
+      const PENDING_TARGET_COOKIE='77waxing_member_pending_target_cookie';
       const LINE_STATE_KEY='77waxing_line_oauth_state';
+      const LINE_STATE_LOCAL_KEY='77waxing_line_oauth_state_persist';
+      const LINE_STATE_COOKIE='77waxing_line_oauth_state_cookie';
+      const OAUTH_STORAGE_TTL_MS=15*60*1000;
       const HOME='https://5j1u35k6.github.io/77-waxing-site/';
       const status=document.getElementById('status');
       const params=new URLSearchParams(location.search);
       const state=String(params.get('state')||'').trim();
       const code=String(params.get('code')||'').trim();
       const error=String(params.get('error')||'').trim();
-      const expectedState=String(sessionStorage.getItem(LINE_STATE_KEY)||'').trim();
-      const target=String(sessionStorage.getItem(PENDING_TARGET_KEY)||HOME);
+
+      function cookieValue(name){
+        const prefix=`${name}=`;
+        const item=String(document.cookie||'').split('; ').find(part=>part.startsWith(prefix));
+        if(!item)return '';
+        try{return decodeURIComponent(item.slice(prefix.length));}catch{return '';}
+      }
+      function readOAuthValue(sessionKey,localKey,cookieName){
+        try{
+          const value=String(sessionStorage.getItem(sessionKey)||'').trim();
+          if(value)return value;
+        }catch{}
+        try{
+          const saved=JSON.parse(localStorage.getItem(localKey)||'null');
+          if(saved&&Date.now()-Number(saved.at||0)<=OAUTH_STORAGE_TTL_MS){
+            const value=String(saved.value||'').trim();
+            if(value)return value;
+          }
+        }catch{}
+        return String(cookieValue(cookieName)||'').trim();
+      }
+      const expectedState=readOAuthValue(LINE_STATE_KEY,LINE_STATE_LOCAL_KEY,LINE_STATE_COOKIE);
+      const target=readOAuthValue(PENDING_TARGET_KEY,PENDING_TARGET_LOCAL_KEY,PENDING_TARGET_COOKIE)||HOME;
 
       function safeTarget(value){
         const text=String(value||'');
