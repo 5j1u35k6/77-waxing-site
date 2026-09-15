@@ -20,7 +20,7 @@ import {
 import { getPublicFirebase } from "./public-firebase.js?v=20260912-1330";
 
 const { auth, db } = getPublicFirebase();
-const VERSION = "20260914-member1";
+const VERSION = "20260915-member2";
 const PENDING_TARGET_KEY = "77waxing_member_pending_target";
 const PROFILE_COLLECTION = "memberProfiles";
 const runtimeConfig = window.__77_MEMBER_AUTH_CONFIG__ || {};
@@ -128,8 +128,8 @@ function ensureLoginModal() {
 
 function setLoginStatus(message = "", state = "") {
   const status = ensureLoginModal().querySelector("[data-member-auth-status]");
-  status.textContent = message;
-  status.dataset.state = state;
+  if (status.textContent !== message) status.textContent = message;
+  if (status.dataset.state !== state) status.dataset.state = state;
 }
 
 function openLogin({ required = false, reason = "", targetUrl = "" } = {}) {
@@ -140,11 +140,12 @@ function openLogin({ required = false, reason = "", targetUrl = "" } = {}) {
   const close = wrap.querySelector(".member-auth-close");
   close.hidden = loginRequired;
   const copy = wrap.querySelector("[data-member-auth-copy]");
-  copy.textContent = reason === "booking"
+  const copyText = reason === "booking"
     ? "登入後會直接進入預約畫面；若你從價目表進來，剛剛選好的服務會保留。"
     : reason === "checkout"
       ? "登入後即可繼續訂購，姓名、電話與 Email 會優先從會員資料帶入。"
       : "登入後即可查看預約、施作與訂單紀錄。";
+  if (copy.textContent !== copyText) copy.textContent = copyText;
   setLoginStatus("");
   wrap.hidden = false;
   document.documentElement.classList.add("member-auth-open");
@@ -279,12 +280,13 @@ function ensureShopMemberButton() {
 function syncMemberButtons() {
   ensureMainMemberButton();
   ensureShopMemberButton();
+  const label = memberButtonLabel();
   document.querySelectorAll("[data-member-trigger]").forEach((button) => {
     if (button.matches("a")) {
       const zh = button.querySelector(".nav-zh");
-      if (zh) zh.textContent = memberButtonLabel();
-    } else {
-      button.textContent = memberButtonLabel();
+      if (zh && zh.textContent !== label) zh.textContent = label;
+    } else if (button.textContent !== label) {
+      button.textContent = label;
     }
   });
 }
@@ -521,7 +523,9 @@ function watchDom() {
   const schedule = () => {
     if (scheduled) return;
     scheduled = true;
-    queueMicrotask(run);
+    // Yield back to the browser. Using an endless microtask chain here can
+    // starve timers, CSS animation progress and the homepage intro watchdog.
+    setTimeout(run, 0);
   };
   new MutationObserver(schedule).observe(document.documentElement, { childList: true, subtree: true });
   run();
