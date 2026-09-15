@@ -11,7 +11,7 @@ import { getPublicFirebase } from "./public-firebase.js?v=20260912-1330";
 
 const { auth, db } = getPublicFirebase();
 const PENDING_TARGET_KEY = "77waxing_member_pending_target";
-const VERSION = "20260915-google1";
+const VERSION = "20260915-google2";
 
 function modal() {
   return document.querySelector("#member-auth-wrap");
@@ -24,8 +24,8 @@ function statusElement() {
 function setStatus(message = "", state = "") {
   const el = statusElement();
   if (!el) return;
-  el.textContent = message;
-  el.dataset.state = state;
+  if (el.textContent !== message) el.textContent = message;
+  if (el.dataset.state !== state) el.dataset.state = state;
 }
 
 function injectStyles() {
@@ -42,13 +42,13 @@ function retagGoogleButton() {
   if (!wrap) return;
   const button = wrap.querySelector('[data-member-provider="whatsapp"], [data-member-provider="google"]');
   if (!button) return;
-  button.dataset.memberProvider = "google";
-  button.classList.remove("member-provider-whatsapp");
-  button.classList.add("member-provider-google");
+  if (button.dataset.memberProvider !== "google") button.dataset.memberProvider = "google";
+  if (button.classList.contains("member-provider-whatsapp")) button.classList.remove("member-provider-whatsapp");
+  if (!button.classList.contains("member-provider-google")) button.classList.add("member-provider-google");
   const title = button.querySelector("span");
   const subtitle = button.querySelector("small");
-  if (title) title.textContent = "Google";
-  if (subtitle) subtitle.textContent = "使用 Google 登入";
+  if (title && title.textContent !== "Google") title.textContent = "Google";
+  if (subtitle && subtitle.textContent !== "使用 Google 登入") subtitle.textContent = "使用 Google 登入";
 }
 
 function pendingTarget() {
@@ -118,7 +118,15 @@ async function beginGoogleLogin() {
 }
 
 retagGoogleButton();
-new MutationObserver(retagGoogleButton).observe(document.documentElement, { childList: true, subtree: true });
+let retagScheduled = false;
+new MutationObserver(() => {
+  if (retagScheduled) return;
+  retagScheduled = true;
+  setTimeout(() => {
+    retagScheduled = false;
+    retagGoogleButton();
+  }, 0);
+}).observe(document.documentElement, { childList: true, subtree: true });
 
 document.addEventListener("click", (event) => {
   const button = event.target.closest?.('[data-member-provider="google"]');
