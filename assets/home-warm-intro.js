@@ -1,6 +1,6 @@
 (()=>{
   const B=location.hostname.endsWith('github.io')?'/77-waxing-site':'';
-  const KEY='77waxing-brand-intro-v6-seen';
+  const KEY='77waxing-brand-intro-v7-seen';
   const path=location.pathname.startsWith(B)?location.pathname.slice(B.length):location.pathname;
   if(path!=='/'&&path!=='')return;
   try{if(sessionStorage.getItem(KEY)==='1')return;sessionStorage.setItem(KEY,'1')}catch{}
