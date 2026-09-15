@@ -132,6 +132,6 @@
 
 (()=>{
   const source=document.currentScript?.src||location.href;
-  const footerUrl=new URL('./footer-enhancements.js?v=20260915-footer2',source).href;
+  const footerUrl=new URL('./footer-enhancements.js?v=20260915-footer3-coral',source).href;
   import(footerUrl).catch(error=>console.warn('77waxing footer unavailable',error));
 })();
