@@ -8,7 +8,7 @@
   if(!document.querySelector('link[data-footer-v2-style="1"]')){
     const link=document.createElement('link');
     link.rel='stylesheet';
-    link.href=new URL('./footer.css?v=20260915-footer2',assetBase).href;
+    link.href=new URL('./footer.css?v=20260915-footer3-coral',assetBase).href;
     link.dataset.footerV2Style='1';
     document.head.appendChild(link);
   }
