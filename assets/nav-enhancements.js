@@ -1,11 +1,13 @@
 (()=>{
   const source=document.currentScript?.src||location.href;
   const memberUrl=new URL('./member-auth.js?v=20260915-member2',source).href;
-  const googleUrl=new URL('./google-auth-ui.js?v=20260915-google4-restore',source).href;
-  const popupFixUrl=new URL('./member-auth-popup-fix.js?v=20260915-line-custom5',source).href;
+  const googleUrl=new URL('./google-auth-ui.js?v=20260915-google5-linked',source).href;
+  const popupFixUrl=new URL('./member-auth-popup-fix.js?v=20260915-line-custom6-linked',source).href;
+  const accountLinkUrl=new URL('./account-linking.js?v=20260915-account-link1',source).href;
   import(memberUrl)
     .then(()=>import(googleUrl))
     .then(()=>import(popupFixUrl))
+    .then(()=>import(accountLinkUrl))
     .catch(error=>console.warn('77waxing member layer unavailable',error));
 })();
 
