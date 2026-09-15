@@ -1,4 +1,7 @@
-import "../assets/member-auth.js?v=20260914-member1";
+import "../assets/member-auth.js?v=20260915-member2";
+import "../assets/google-auth-ui.js?v=20260915-google5-linked";
+import "../assets/member-auth-popup-fix.js?v=20260915-line-custom6-linked";
+import "../assets/account-linking.js?v=20260915-account-link1";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
 import { collection, onSnapshot, query, where } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
 import { getPublicFirebase } from "../assets/public-firebase.js?v=20260913-shop2";
@@ -6,6 +9,18 @@ import { getPublicFirebase } from "../assets/public-firebase.js?v=20260913-shop2
 const { auth, db } = getPublicFirebase();
 let orderUnsubscribe = null;
 let ownOrderLookup = new Map();
+
+function ensureMemberShopStyle() {
+  if (document.querySelector("#shop-member-auth-style")) return;
+  const style = document.createElement("style");
+  style.id = "shop-member-auth-style";
+  style.textContent = `
+    .shop-member-button{max-width:160px;overflow:hidden;text-overflow:ellipsis;flex:0 1 auto}
+    @media(max-width:760px){.shop-member-button{max-width:112px;padding:8px 10px;font-size:11px}}
+    @media(max-width:430px){.shop-member-button{max-width:94px;padding:8px 9px}}
+  `;
+  document.head.appendChild(style);
+}
 
 function normalizeProductCardActions() {
   document.querySelectorAll(".regional-product-card .product-actions").forEach((actions) => {
@@ -94,6 +109,22 @@ function polishOrderCards() {
   });
 }
 
+function applyMemberBranding() {
+  ensureMemberShopStyle();
+
+  document.querySelectorAll(".member-auth-kicker").forEach((node) => {
+    if (node.textContent.trim() === "77waxing MEMBER") node.textContent = "77select MEMBER";
+  });
+
+  const centerTitle = document.querySelector("#member-center-title");
+  if (centerTitle && centerTitle.textContent.trim() === "我的紀錄") centerTitle.textContent = "會員中心";
+
+  const ordersIntro = document.querySelector('[data-view="orders"] .section-head p');
+  if (ordersIntro && ordersIntro.textContent.includes("匿名帳號")) {
+    ordersIntro.textContent = "登入 LINE 或 Google 後，訂單會安全同步在同一個 77select 會員帳號。";
+  }
+}
+
 function apply77selectBranding() {
   document.querySelectorAll(".product-media").forEach((node) => {
     if (node.children.length === 0 && node.textContent.trim() === "77waxing") node.textContent = "77select";
@@ -110,6 +141,7 @@ function apply77selectBranding() {
   normalizeMarketBadge();
   normalizeProductCardActions();
   polishOrderCards();
+  applyMemberBranding();
 }
 
 let scheduled = false;
@@ -126,6 +158,14 @@ onAuthStateChanged(auth, (user) => {
   orderUnsubscribe?.();
   orderUnsubscribe = null;
   ownOrderLookup = new Map();
+
+  const connection = document.querySelector("#connection-state");
+  if (connection) {
+    connection.textContent = user && !user.isAnonymous
+      ? "會員資料已安全連線"
+      : "商品瀏覽已連線｜結帳與訂單查詢請先登入";
+  }
+
   if (!user) return scheduleEnhancements();
   orderUnsubscribe = onSnapshot(
     query(collection(db, "shopOrders"), where("ownerUid", "==", user.uid)),
