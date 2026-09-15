@@ -1,7 +1,10 @@
 (()=>{
   const source=document.currentScript?.src||location.href;
   const memberUrl=new URL('./member-auth.js?v=20260915-member2',source).href;
-  import(memberUrl).catch(error=>console.warn('77waxing member layer unavailable',error));
+  const popupFixUrl=new URL('./member-auth-popup-fix.js?v=20260915-popup1',source).href;
+  import(memberUrl)
+    .then(()=>import(popupFixUrl))
+    .catch(error=>console.warn('77waxing member layer unavailable',error));
 })();
 
 (()=>{
