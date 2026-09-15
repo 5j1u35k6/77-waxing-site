@@ -23,7 +23,6 @@
   const serviceLink=findTop('/services');
   const serviceMenu=()=>nav.querySelector('.service-flyout');
 
-
   if(!aboutLink)return;
   const ABOUT_ITEMS=[
     ['理念','philosophy','PHILOSOPHY'],
@@ -40,8 +39,6 @@
     aboutLink.after(aboutMenu);
   }
 
-  // Match the Services parent item: it is a submenu trigger only, not a navigable page link.
-  // pages.js captures [data-link] clicks at document level, so remove that marker before any interaction.
   aboutLink.removeAttribute('data-link');
   aboutLink.dataset.aboutTrigger='1';
   aboutLink.setAttribute('aria-haspopup','true');
@@ -131,4 +128,10 @@
   import(railUrl)
     .then(()=>import(railPolishUrl))
     .catch(error=>console.warn('77waxing desktop rail unavailable',error));
+})();
+
+(()=>{
+  const source=document.currentScript?.src||location.href;
+  const footerUrl=new URL('./footer-enhancements.js?v=20260915-footer2',source).href;
+  import(footerUrl).catch(error=>console.warn('77waxing footer unavailable',error));
 })();
