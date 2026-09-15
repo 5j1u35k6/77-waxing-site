@@ -1,9 +1,11 @@
 import {
   GoogleAuthProvider,
+  signInWithCustomToken,
   signInWithPopup,
 } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
 import {
   doc,
+  getDoc,
   serverTimestamp,
   setDoc,
 } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
@@ -11,7 +13,8 @@ import { getPublicFirebase } from "./public-firebase.js?v=20260912-1330";
 
 const { auth, db } = getPublicFirebase();
 const PENDING_TARGET_KEY = "77waxing_member_pending_target";
-const VERSION = "20260915-google4-restore";
+const LINE_AUTH_PROXY_URL = "https://77waxing-line-auth-proxy.max19450.workers.dev/";
+const VERSION = "20260915-google5-linked";
 
 function modal() {
   return document.querySelector("#member-auth-wrap");
@@ -63,20 +66,68 @@ function clearPendingTarget() {
   try { sessionStorage.removeItem(PENDING_TARGET_KEY); } catch {}
 }
 
-async function saveGoogleProfile(user) {
+function googleIdentity(user) {
+  const provider = user?.providerData?.find((entry) => entry?.providerId === "google.com") || user?.providerData?.find(Boolean) || {};
+  return {
+    displayName: String(user?.displayName || provider.displayName || "").trim(),
+    email: String(user?.email || provider.email || "").trim().toLowerCase(),
+    avatarUrl: String(user?.photoURL || provider.photoURL || "").trim(),
+  };
+}
+
+async function proxyRequest(payload) {
+  const response = await fetch(LINE_AUTH_PROXY_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+    credentials: "omit",
+    cache: "no-store",
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok || !result?.ok) {
+    const code = String(result?.error || `proxy_http_${response.status}`);
+    const error = new Error(code);
+    error.code = code;
+    throw error;
+  }
+  return result;
+}
+
+async function resolveGoogleMember(googleUser) {
+  const firebaseIdToken = await googleUser.getIdToken(true);
+  const resolution = await proxyRequest({
+    action: "identity_resolve",
+    provider: "google",
+    firebaseIdToken,
+  });
+  if (!resolution?.mapped || !resolution?.customToken) {
+    return { user: googleUser, mapped: false };
+  }
+  setStatus("已找到綁定的會員，正在載入同一帳號…");
+  const canonical = await signInWithCustomToken(auth, resolution.customToken);
+  if (!canonical?.user || canonical.user.isAnonymous) throw new Error("GOOGLE_CANONICAL_SIGNIN_EMPTY");
+  await canonical.user.getIdToken(true);
+  return { user: canonical.user, mapped: true };
+}
+
+async function saveGoogleProfile(user, identity, { mapped = false } = {}) {
   if (!user || user.isAnonymous) return;
-  const provider = user.providerData?.find((entry) => entry?.providerId === "google.com") || user.providerData?.find(Boolean) || {};
-  const displayName = String(user.displayName || provider.displayName || "").trim();
-  const email = String(user.email || provider.email || "").trim().toLowerCase();
-  const avatarUrl = String(user.photoURL || provider.photoURL || "").trim();
-  await setDoc(doc(db, "memberProfiles", user.uid), {
+  const ref = doc(db, "memberProfiles", user.uid);
+  const current = await getDoc(ref).then((snap) => snap.exists() ? snap.data() : {}).catch(() => ({}));
+  const patch = {
     uid: user.uid,
-    provider: "Google",
-    ...(displayName ? { displayName } : {}),
-    ...(email ? { email } : {}),
-    ...(avatarUrl ? { avatarUrl } : {}),
+    googleEmail: identity.email || "",
+    googleAvatarUrl: identity.avatarUrl || "",
     updatedAt: serverTimestamp(),
-  }, { merge: true });
+  };
+
+  const empty = (value) => value === undefined || value === null || String(value).trim() === "";
+  if (!mapped || empty(current.provider)) patch.provider = mapped ? (current.provider || "會員") : "Google";
+  if (identity.displayName && empty(current.displayName)) patch.displayName = identity.displayName;
+  if (identity.email && empty(current.email)) patch.email = identity.email;
+  if (identity.avatarUrl && empty(current.avatarUrl)) patch.avatarUrl = identity.avatarUrl;
+
+  await setDoc(ref, patch, { merge: true });
 }
 
 function errorText(error) {
@@ -86,6 +137,8 @@ function errorText(error) {
   if (code.includes("popup-closed-by-user")) return "Google 登入已取消。";
   if (code.includes("popup-blocked")) return "瀏覽器阻擋了 Google 登入視窗，請允許彈出式視窗後再試。";
   if (code.includes("account-exists-with-different-credential")) return "這個 Email 已使用其他登入方式建立會員，請先用原本方式登入。";
+  if (code.includes("firebase_auth_invalid")) return "會員驗證已過期，請重新登入。";
+  if (code.includes("identity_backend") || code.includes("proxy_")) return "會員綁定服務目前無法連線，請稍後再試。";
   return `Google 登入目前無法使用（${code}）。`;
 }
 
@@ -99,18 +152,21 @@ async function beginGoogleLogin() {
 
   try {
     const result = await signInWithPopup(auth, provider);
-    const user = result?.user;
-    if (!user || user.isAnonymous) throw new Error("GOOGLE_SIGNIN_EMPTY");
-    await user.getIdToken(true);
-    await saveGoogleProfile(user).catch((error) => console.warn("Google member profile write unavailable", error));
-    setStatus("Google 登入成功，正在載入會員資料…", "success");
+    const googleUser = result?.user;
+    if (!googleUser || googleUser.isAnonymous) throw new Error("GOOGLE_SIGNIN_EMPTY");
+    const identity = googleIdentity(googleUser);
+    const resolved = await resolveGoogleMember(googleUser);
+    const user = resolved.user;
+    await saveGoogleProfile(user, identity, { mapped: resolved.mapped })
+      .catch((error) => console.warn("Google member profile write unavailable", error));
+    setStatus(resolved.mapped ? "Google 已連到原本的會員帳號。" : "Google 登入成功，正在載入會員資料…", "success");
     clearPendingTarget();
-    window.dispatchEvent(new CustomEvent("77waxing:google-login-complete", { detail: { user } }));
+    window.dispatchEvent(new CustomEvent("77waxing:google-login-complete", { detail: { user, mapped: resolved.mapped } }));
     if (target && target !== location.href) {
       location.assign(target);
       return;
     }
-    setTimeout(() => location.reload(), 120);
+    setTimeout(() => location.reload(), 160);
   } catch (error) {
     console.error("Google member login failed", error);
     setStatus(errorText(error), "error");
