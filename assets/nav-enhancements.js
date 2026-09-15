@@ -1,10 +1,10 @@
 (()=>{
   const source=document.currentScript?.src||location.href;
   const memberUrl=new URL('./member-auth.js?v=20260915-member2',source).href;
-  const whatsappUrl=new URL('./whatsapp-auth-ui.js?v=20260915-whatsapp-ui1',source).href;
+  const googleUrl=new URL('./google-auth-ui.js?v=20260915-google1',source).href;
   const popupFixUrl=new URL('./member-auth-popup-fix.js?v=20260915-line-custom5',source).href;
   import(memberUrl)
-    .then(()=>import(whatsappUrl))
+    .then(()=>import(googleUrl))
     .then(()=>import(popupFixUrl))
     .catch(error=>console.warn('77waxing member layer unavailable',error));
 })();
