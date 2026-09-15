@@ -19,12 +19,13 @@ const LINE_STATE_KEY = "77waxing_line_oauth_state";
 const LINE_STATE_LOCAL_KEY = "77waxing_line_oauth_state_persist";
 const LINE_STATE_COOKIE = "77waxing_line_oauth_state_cookie";
 const LINE_DEBUG_KEY = "77waxing_line_auth_debug";
+const LINK_RETURN_KEY = "77waxing_account_link_return";
 const LINE_AUTH_PROXY_URL = "https://77waxing-line-auth-proxy.max19450.workers.dev/";
 const LINE_CHANNEL_ID = "2011606795";
 const LINE_CALLBACK_URL = "https://5j1u35k6.github.io/77-waxing-site/line-auth/";
 const LINE_AUTHORIZE_URL = "https://access.line.me/oauth2/v2.1/authorize";
 const OAUTH_STORAGE_TTL_MS = 15 * 60 * 1000;
-const VERSION = "20260915-line-custom5";
+const VERSION = "20260915-line-custom6-linked";
 
 function statusElement() {
   return document.querySelector("#member-auth-wrap [data-member-auth-status]");
@@ -195,8 +196,10 @@ async function consumeLineCallback() {
     const displayName = String(claims.lineName || "").trim();
     const lineUserId = String(claims.lineUserId || "").trim();
     const linePicture = String(claims.linePicture || "").trim();
+    const defaultLineUid = lineUserId ? `line_${lineUserId}`.slice(0, 128) : "";
+    const mappedIdentity = Boolean(claims.linked) || Boolean(defaultLineUid && result.user.uid !== defaultLineUid);
 
-    if (displayName || linePicture) {
+    if (!mappedIdentity && (displayName || linePicture)) {
       await updateProfile(result.user, {
         ...(displayName ? { displayName } : {}),
         ...(linePicture ? { photoURL: linePicture } : {}),
@@ -204,23 +207,31 @@ async function consumeLineCallback() {
     }
 
     try {
-      await setDoc(doc(db, "memberProfiles", result.user.uid), {
+      const patch = {
         uid: result.user.uid,
-        ...(displayName ? { displayName } : {}),
-        provider: "LINE",
         ...(lineUserId ? { lineUserId } : {}),
         ...(linePicture ? { linePicture } : {}),
+        ...(displayName ? { lineName: displayName } : {}),
         updatedAt: serverTimestamp(),
-      }, { merge: true });
+      };
+      if (!mappedIdentity) {
+        if (displayName) patch.displayName = displayName;
+        patch.provider = "LINE";
+      }
+      await setDoc(doc(db, "memberProfiles", result.user.uid), patch, { merge: true });
     } catch (error) {
       console.warn("LINE member profile write unavailable", error);
       rememberDebug("firebase_signed_in_profile_write_failed", error?.code || error?.message || "");
     }
 
+    if (claims.linked) {
+      try { sessionStorage.setItem(LINK_RETURN_KEY, "line"); } catch {}
+    }
+
     clearPendingTarget();
     cleanAuthFragment();
-    setStatus("LINE 登入成功，正在載入會員資料…");
-    window.dispatchEvent(new CustomEvent("77waxing:line-login-complete", { detail: { user: result.user } }));
+    setStatus(claims.linked ? "LINE 綁定成功，正在回到會員中心…" : "LINE 登入成功，正在載入會員資料…", "success");
+    window.dispatchEvent(new CustomEvent("77waxing:line-login-complete", { detail: { user: result.user, linked: Boolean(claims.linked) } }));
     rememberDebug("complete");
 
     setTimeout(() => location.reload(), 180);
