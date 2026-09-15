@@ -20,7 +20,7 @@
   </main>
   <script>
     (()=>{
-      const APPS_SCRIPT_URL='https://script.google.com/macros/s/AKfycbx6iC26KXbHWYte5XhLGNRMmG16Yydx2vPHDxYpmp4rmWn3plk__6Qwwr7Y09hLptTW/exec';
+      const LINE_AUTH_PROXY_URL='https://77waxing-line-auth-proxy.max19450.workers.dev/';
       const PENDING_TARGET_KEY='77waxing_member_pending_target';
       const LINE_STATE_KEY='77waxing_line_oauth_state';
       const HOME='https://5j1u35k6.github.io/77-waxing-site/';
@@ -36,10 +36,28 @@
         const text=String(value||'');
         return text.startsWith(HOME)?text:HOME;
       }
-      function finish(fragment){
-        const base=safeTarget(target).split('#')[0];
+      function finish(fragment,destination=target){
+        const base=safeTarget(destination).split('#')[0];
         location.replace(`${base}#${fragment}`);
       }
+      async function exchange(){
+        const response=await fetch(LINE_AUTH_PROXY_URL,{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({action:'line_exchange',state,code}),
+          credentials:'omit',
+          cache:'no-store',
+        });
+        const result=await response.json().catch(()=>({}));
+        if(!response.ok||!result||!result.ok||!result.customToken){
+          const errorCode=String(result&&result.error||`proxy_http_${response.status}`);
+          finish(`77line_error=${encodeURIComponent(errorCode)}&77line_state=${encodeURIComponent(state)}`);
+          return;
+        }
+        const destination=safeTarget(result.target||target);
+        finish(`77line_token=${encodeURIComponent(result.customToken)}&77line_state=${encodeURIComponent(state)}`,destination);
+      }
+
       if(!state||!expectedState||state!==expectedState){
         status.textContent='LINE 登入驗證狀態不一致，正在返回網站…';
         finish(`77line_error=state_mismatch&77line_state=${encodeURIComponent(state)}`);
@@ -56,24 +74,11 @@
         return;
       }
 
-      window.__77LineExchange=(result)=>{
-        if(!result||String(result.state||'')!==state){
-          finish(`77line_error=exchange_state_mismatch&77line_state=${encodeURIComponent(state)}`);
-          return;
-        }
-        if(!result.ok||!result.customToken){
-          finish(`77line_error=${encodeURIComponent(String(result&&result.error||'exchange_failed'))}&77line_state=${encodeURIComponent(state)}`);
-          return;
-        }
-        const destination=safeTarget(result.target||target).split('#')[0];
-        location.replace(`${destination}#77line_token=${encodeURIComponent(result.customToken)}&77line_state=${encodeURIComponent(state)}`);
-      };
-
-      const script=document.createElement('script');
-      script.src=`${APPS_SCRIPT_URL}?action=line_exchange&callback=__77LineExchange&state=${encodeURIComponent(state)}&code=${encodeURIComponent(code)}&_=${Date.now()}`;
-      script.async=true;
-      script.onerror=()=>finish(`77line_error=exchange_network_failed&77line_state=${encodeURIComponent(state)}`);
-      document.head.appendChild(script);
+      status.textContent='LINE 已完成授權，正在建立會員登入…';
+      exchange().catch((exchangeError)=>{
+        console.error('LINE proxy exchange failed',exchangeError);
+        finish(`77line_error=proxy_network_failed&77line_state=${encodeURIComponent(state)}`);
+      });
     })();
   </script>
 </body>
