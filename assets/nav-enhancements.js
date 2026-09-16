@@ -1,6 +1,6 @@
 (()=>{
   const source=document.currentScript?.src||location.href;
-  const seoUrl=new URL('./seo.js?v=20260916-seo1',source).href;
+  const seoUrl=new URL('./seo.js?v=20260916-seo2-address',source).href;
   import(seoUrl).catch(error=>console.warn('77waxing SEO layer unavailable',error));
 })();
 
