@@ -1,3 +1,4 @@
+import "./seo.js?v=20260916-shopseo1";
 import "../assets/member-auth.js?v=20260915-member2";
 import "../assets/google-auth-ui.js?v=20260915-google5-linked";
 import "../assets/member-auth-popup-fix.js?v=20260915-line-custom6-linked";
