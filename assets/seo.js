@@ -4,6 +4,7 @@
   const HOME_TITLE='77美學工作室｜基隆熱蠟除毛・清粉刺・肌膚管理｜77waxing';
   const HOME_DESCRIPTION='基隆 77美學工作室，提供女性與男性熱蠟除毛、手工清粉刺、肌膚管理與美胸保養。線上查看價目與預約服務。';
   const BUSINESS_ID=`${SITE}/#business`;
+  const MAP_URL='https://www.google.com/maps/search/?api=1&query=%E5%9F%BA%E9%9A%86%E5%B8%82%E4%B8%AD%E6%AD%A3%E5%8D%80%E7%BE%A9%E4%B8%80%E8%B7%AF56%E8%99%9F2%E6%A8%93';
 
   const ROUTES={
     '/':{
@@ -100,11 +101,13 @@
     description:HOME_DESCRIPTION,
     image:`${SITE}/assets/77waxing-wordmark.svg`,
     logo:`${SITE}/assets/77waxing-wordmark.svg`,
+    hasMap:MAP_URL,
     address:{
       '@type':'PostalAddress',
       streetAddress:'義一路56號2樓',
       addressLocality:'中正區',
       addressRegion:'基隆市',
+      postalCode:'202',
       addressCountry:'TW'
     },
     areaServed:[
