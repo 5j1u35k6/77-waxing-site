@@ -102,15 +102,10 @@
     logo:`${SITE}/assets/77waxing-wordmark.svg`,
     address:{
       '@type':'PostalAddress',
-      streetAddress:'仁二路43號2樓',
-      addressLocality:'仁愛區',
+      streetAddress:'義一路56號2樓',
+      addressLocality:'中正區',
       addressRegion:'基隆市',
       addressCountry:'TW'
-    },
-    geo:{
-      '@type':'GeoCoordinates',
-      latitude:25.1275212,
-      longitude:121.7498951
     },
     areaServed:[
       {'@type':'City',name:'基隆市'},
