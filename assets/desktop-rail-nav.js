@@ -275,9 +275,40 @@
 
   syncMemberRailLabel();
   syncActive();
-  expandRail();
-  scheduleCollapse(3600);
-  addEventListener('popstate',()=>{hideSubmenu();syncActive();expandRail();scheduleCollapse(3600)});
+
+  const isHome=()=>cleanPath(location.pathname)==='/';
+  const previewHomeRail=()=>{
+    if(innerWidth<=850||!isHome())return;
+    const reveal=()=>{
+      expandRail();
+      scheduleCollapse(5200);
+    };
+    if(document.documentElement.classList.contains('brand-intro-pending')){
+      const introObserver=new MutationObserver(()=>{
+        if(document.documentElement.classList.contains('brand-intro-pending'))return;
+        introObserver.disconnect();
+        setTimeout(reveal,120);
+      });
+      introObserver.observe(document.documentElement,{attributes:true,attributeFilter:['class']});
+    }else{
+      reveal();
+    }
+  };
+
+  if(isHome())previewHomeRail();
+  else{
+    expandRail();
+    scheduleCollapse(3600);
+  }
+  addEventListener('popstate',()=>{
+    hideSubmenu();
+    syncActive();
+    if(isHome())previewHomeRail();
+    else{
+      expandRail();
+      scheduleCollapse(3600);
+    }
+  });
   addEventListener('resize',()=>{
     if(innerWidth<=850){
       clearTimeout(collapseTimer);
