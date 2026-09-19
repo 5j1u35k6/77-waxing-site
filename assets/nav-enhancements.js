@@ -131,7 +131,7 @@
 
 (()=>{
   const source=document.currentScript?.src||location.href;
-  const railUrl=new URL('./desktop-rail-nav.js?v=20260915-rail3',source).href;
+  const railUrl=new URL('./desktop-rail-nav.js?v=20260919-home-preview1',source).href;
   const railPolishUrl=new URL('./desktop-rail-collapse-polish.js?v=20260915-rail4-polish',source).href;
   import(railUrl)
     .then(()=>import(railPolishUrl))
