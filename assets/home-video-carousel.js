@@ -42,8 +42,7 @@
     root.dataset.videoCarouselReady='1';
     root.innerHTML=`<div class="wrap home-video-carousel-layout">
       <aside class="home-video-side">
-        <span class="tag">VIDEO LIBRARY</span>
-        <h2>7777waxing video</h2>
+        <h2 class="home-section-title">7777waxing video</h2>
         <nav class="home-video-categories" aria-label="影片分類" data-video-categories></nav>
         <a class="home-video-instagram" href="https://www.instagram.com/77waxing/?hl=zh-tw" target="_blank" rel="noreferrer">Instagram @77waxing ↗</a>
       </aside>
