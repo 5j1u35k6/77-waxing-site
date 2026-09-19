@@ -347,3 +347,8 @@
     grid-template-columns:1fr!important;
   }
 }
+
+
+/* 77select cart icon centering */
+#cart-open.cart-btn{display:grid!important;place-items:center!important;line-height:0!important}
+#cart-open.cart-btn>svg{position:absolute!important;inset:0!important;margin:auto!important;display:block!important;transform:none!important}
