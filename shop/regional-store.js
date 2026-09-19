@@ -190,7 +190,10 @@ function ensureMarketBadge() {
     const cartButton = $("#cart-open");
     cartButton?.parentElement?.insertBefore(badge, cartButton);
   }
-  if (badge) badge.innerHTML = `<b>${esc(market.label)}</b><span>${esc(market.symbol)} 專屬售價</span>`;
+  if (badge) {
+    badge.textContent = market.label;
+    badge.setAttribute("aria-label", `目前地區：${market.label}`);
+  }
   document.documentElement.dataset.market = market.code;
 }
 
@@ -232,7 +235,6 @@ function renderProducts() {
       ${cardMediaMarkup(product)}
       <div class="product-body">
         <div class="product-top"><h3 class="product-title">${esc(product.name)}</h3><div class="product-price">${priceText}</div></div>
-        <div class="market-inline">${esc(market.label)}專屬售價</div>
         ${hasBulk ? `<div class="bulk-badge">多件優惠</div>` : ""}
         <p class="product-desc">${esc(product.description || "")}</p>
         <div class="product-meta"><span>${esc(product.category || "其他")}</span><span>${variants.length} 種規格${stock > 0 ? `｜共 ${stock} 件` : "｜目前售完"}</span></div>
@@ -664,7 +666,10 @@ async function loadProducts() {
   renderProducts();
   reconcileCart();
   const connection = $("#connection-state");
-  if (connection) connection.textContent = `${market.label}｜${market.currency} 專屬售價`;
+  if (connection) {
+    connection.textContent = "";
+    connection.hidden = true;
+  }
 }
 
 function bindCaptureHandlers() {
