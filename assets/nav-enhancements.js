@@ -140,6 +140,6 @@
 
 (()=>{
   const source=document.currentScript?.src||location.href;
-  const footerUrl=new URL('./footer-enhancements.js?v=20260922-footer-credit1',source).href;
+  const footerUrl=new URL('./footer-enhancements.js?v=20260922-footer-services1',source).href;
   import(footerUrl).catch(error=>console.warn('77waxing footer unavailable',error));
 })();
