@@ -101,15 +101,6 @@ function syncServiceMenus() {
   }
 }
 
-function syncFooterServices() {
-  const host = document.querySelector("[data-footer-service-links]");
-  if (!host) return;
-  const signature = catalog.map((service) => `${service.key}:${service.slug}:${service.name}`).join("|");
-  if (host.dataset.catalogSignature === signature) return;
-  host.innerHTML = catalog.map((service) => `<a href="${servicePath(service)}" data-catalog-link>${esc(service.name)}</a>`).join("");
-  host.dataset.catalogSignature = signature;
-}
-
 function syncHomeCards() {
   if (normalizedPath() !== "/") return;
   const section = document.querySelector("#app [data-home-service-catalog]");
@@ -129,7 +120,6 @@ function renderCurrent(force = false) {
   if (rendering) return;
   if (!catalog.length) { renderLoading(); return; }
   syncServiceMenus();
-  syncFooterServices();
   syncHomeCards();
   const root = app(); if (!root) return;
   const path = normalizedPath();
@@ -176,8 +166,6 @@ async function start() {
     renderCurrent(true);
   });
 }
-
-document.addEventListener("77footerready", () => syncFooterServices());
 
 document.addEventListener("click", (event) => {
   const link = event.target.closest?.("a[data-catalog-link]");
