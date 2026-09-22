@@ -103,9 +103,8 @@ function syncServiceMenus() {
 
 function syncHomeCards() {
   if (normalizedPath() !== "/") return;
-  const sections = [...document.querySelectorAll("#app .section")];
-  const section = sections.find((node) => node.querySelector(".tag")?.textContent.trim() === "START HERE");
-  const grid = section?.querySelector(".grid4");
+  const section = document.querySelector("#app [data-home-service-catalog]");
+  const grid = section?.querySelector("[data-home-service-grid]");
   if (!grid || grid.dataset.dynamicCatalog === "1") return;
   const known = {
     women: "VIO 私密處、腋下、四肢與細部熱蠟整理",
