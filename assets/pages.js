@@ -4,12 +4,6 @@ const app=document.querySelector('#app');
 if(!app)return;
 let brandIntroRequested=false;
 
-const SERVICE_CARDS=[
-  ['女性熱蠟','VIO 私密處、腋下、四肢與細部熱蠟整理','women-waxing'],
-  ['男士熱蠟','男士私密處、胸腹背、四肢與細部熱蠟整理','men-waxing'],
-  ['肌膚管理','臉部、粉刺、撥筋與身體肌膚保養','skin-care'],
-  ['美胸保養','依時間與需求選擇不同美胸保養流程','bust-care']
-];
 const FLOW_STEPS=[
   ['arrival','抵達與接待','確認今天的需求與身體狀況。'],
   ['consult','諮詢與評估','不確定服務也沒關係，先把需求說清楚。'],
@@ -59,7 +53,7 @@ const experienceFlow=()=>`<div class="experience-flow">${FLOW_STEPS.map(([scene,
 
 function home(){
   return `<section class="hero"><div class="wrap hero-grid"><div><span class="tag">77waxing · 基隆最安心的美容美體工作室</span><h1 class="home-reassurance"><span>只需要安心躺好，剩下的交給77就可以了。</span><small>安心瞓好，剩低嘅交畀77就得喇。</small></h1><p class="lead">怕痛、害羞、不知道第一次要準備什麼，都不用先變成專家。把服務、流程、價目與預約說清楚，讓你在決定以前就先感到安心。</p><div class="btns"><a class="btn dark" href="${B}/booking/">預約時段讓自己更好</a><a class="btn" data-link href="${B}/services/">77waxing提供的服務</a><a class="btn" data-link href="${B}/beginner/">第一次熱蠟，可能也會想問...</a></div></div><div class="art" aria-hidden="true"></div></div></section>
-  <section class="section soft"><div class="wrap"><div class="head"><div><h2 class="home-section-title">第一次，不需要一次懂全部。</h2></div></div><div class="grid4">${SERVICE_CARDS.map(([name,desc,slug],i)=>`<article class="card"><div class="num">0${i+1}</div><h3>${name}</h3><p>${desc}</p><a href="${B}/services/${slug}/" data-catalog-link>了解服務 →</a></article>`).join('')}</div></div></section>
+  <section class="section soft" data-home-service-catalog><div class="wrap"><div class="head"><div><h2 class="home-section-title">第一次，不需要一次懂全部。</h2></div></div><div class="grid4" data-home-service-grid aria-live="polite"></div></div></section>
   <section class="section home-safe-section"><div class="wrap home-safe-layout"><div class="art home-safe-art" aria-hidden="true"></div><div class="home-safe-copy"><h2 class="home-safe-title home-section-title">把「會不會尷尬」先放下。</h2>${experienceFlow()}</div></div></section>
   <section class="section home-video-section"><div class="wrap"><div class="home-feature-head"><h2 class="home-section-title">7777waxing video</h2></div><div class="home-video-shell" data-home-video-slot aria-label="7777waxing video"><span class="home-video-play" aria-hidden="true"></span></div></div></section>
   <section class="section home-recommend-section"><div class="wrap narrow"><div class="home-feature-head"><h2 class="home-section-title">為什麼大家都推薦77waxing？</h2></div><div class="home-recommend-slot" data-home-recommend-slot></div></div></section>`;
