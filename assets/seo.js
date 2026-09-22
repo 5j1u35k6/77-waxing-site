@@ -114,17 +114,7 @@
       {'@type':'City',name:'基隆市'},
       {'@type':'AdministrativeArea',name:'北部地區'}
     ],
-    sameAs:['https://www.instagram.com/77waxing/'],
-    hasOfferCatalog:{
-      '@type':'OfferCatalog',
-      name:'77waxing 服務項目',
-      itemListElement:[
-        {'@type':'Offer','itemOffered':{'@type':'Service','name':'女性熱蠟除毛','url':`${SITE}/services/women-waxing/`}},
-        {'@type':'Offer','itemOffered':{'@type':'Service','name':'男性熱蠟除毛','url':`${SITE}/services/men-waxing/`}},
-        {'@type':'Offer','itemOffered':{'@type':'Service','name':'清粉刺與肌膚管理','url':`${SITE}/services/skin-care/`}},
-        {'@type':'Offer','itemOffered':{'@type':'Service','name':'美胸保養','url':`${SITE}/services/bust-care/`}}
-      ]
-    }
+    sameAs:['https://www.instagram.com/77waxing/']
   });
 
   const routeSchema=(path,config,canonical)=>{
