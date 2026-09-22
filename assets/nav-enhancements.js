@@ -1,6 +1,6 @@
 (()=>{
   const source=document.currentScript?.src||location.href;
-  const seoUrl=new URL('./seo.js?v=20260916-seo2-address',source).href;
+  const seoUrl=new URL('./seo.js?v=20260922-no-static-service-catalog1',source).href;
   import(seoUrl).catch(error=>console.warn('77waxing SEO layer unavailable',error));
 })();
 
@@ -140,6 +140,6 @@
 
 (()=>{
   const source=document.currentScript?.src||location.href;
-  const footerUrl=new URL('./footer-enhancements.js?v=20260915-footer5-first-visit',source).href;
+  const footerUrl=new URL('./footer-enhancements.js?v=20260922-footer-credit1',source).href;
   import(footerUrl).catch(error=>console.warn('77waxing footer unavailable',error));
 })();
