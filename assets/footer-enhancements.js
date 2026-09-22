@@ -46,12 +46,10 @@
           ['空間',`${B}/space/`],
           ['教學',`${B}/courses/`],
         ])}
-        ${linkList('服務項目',[
-          ['女性熱蠟',`${B}/services/women-waxing/`],
-          ['男士熱蠟',`${B}/services/men-waxing/`],
-          ['肌膚管理',`${B}/services/skin-care/`],
-          ['美胸保養',`${B}/services/bust-care/`],
-        ])}
+        <section class="footer-v2-group" data-footer-service-group>
+          <h3>服務項目</h3>
+          <div class="footer-v2-links" data-footer-service-links aria-live="polite"></div>
+        </section>
         ${linkList('預約與購物',[
           ['立即預約',`${B}/booking/`],
           ['產品訂購',`${B}/shop/`,'target="_blank" rel="noopener noreferrer"'],
@@ -93,4 +91,6 @@
       socialWrap.appendChild(a);
     });
   }
+
+  document.dispatchEvent(new CustomEvent('77footerready'));
 })();
