@@ -1,3 +1,5 @@
+import { loadCatalog, publicCatalog, watchCatalog } from "./service-catalog-store.js?v=20260912-1330";
+
 (()=>{
   const footer=document.querySelector('.site-footer');
   if(!footer||footer.dataset.footerV2==='1')return;
@@ -75,6 +77,16 @@
       </div>
     </div>`;
 
+  const serviceHost=footer.querySelector('[data-footer-service-links]');
+  const esc=(value)=>String(value??'').replace(/[&<>"']/g,(ch)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+  const renderFooterServices=(categories)=>{
+    if(!serviceHost)return;
+    const services=publicCatalog(categories);
+    serviceHost.innerHTML=services.length
+      ? services.map((service)=>`<a href="${B}/services/${encodeURIComponent(service.slug)}/">${esc(service.name)}</a>`).join('')
+      : `<a href="${B}/services/">查看服務項目</a>`;
+  };
+
   const socialWrap=footer.querySelector('.footer-v2-socials');
   if(oldSocials.length){
     oldSocials.forEach((a)=>{
@@ -91,6 +103,16 @@
       socialWrap.appendChild(a);
     });
   }
+
+  (async()=>{
+    try{
+      renderFooterServices(await loadCatalog());
+      await watchCatalog(renderFooterServices);
+    }catch(error){
+      console.warn('77waxing footer service catalog unavailable',error);
+      if(serviceHost)serviceHost.innerHTML=`<a href="${B}/services/">查看服務項目</a>`;
+    }
+  })();
 
   document.dispatchEvent(new CustomEvent('77footerready'));
 })();
