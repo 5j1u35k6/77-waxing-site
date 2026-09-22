@@ -68,8 +68,7 @@
 
     <div class="footer-v2-bottom">
       <div>
-        <strong>77美學工作室</strong>
-        <span>安心躺好，剩下的交給 77。</span>
+        <strong>微調工作室 | 92768887</strong>
       </div>
       <div class="footer-v2-legal">
         <span>© 2026 77waxing. All Rights Reserved.</span>
