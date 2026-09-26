@@ -310,3 +310,44 @@ function boot() {
 }
 
 boot();
+
+
+function enhanceGroupEditors() {
+  document.querySelectorAll(".catalog-group-head").forEach((head) => {
+    const actions = head.querySelector(".catalog-group-actions");
+    if (!actions || actions.querySelector("[data-edit-group]")) return;
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "catalog-mini-btn";
+    button.dataset.editGroup = "";
+    button.textContent = "編輯主部位";
+    actions.insertBefore(button, actions.querySelector("[data-add-item]") || null);
+  });
+}
+
+document.addEventListener("click", async (event) => {
+  const button = event.target.closest?.("[data-edit-group]");
+  if (!button) return;
+  event.preventDefault(); event.stopPropagation();
+  const categoryNode = button.closest("[data-category]");
+  const groupNode = button.closest("[data-group]");
+  const key = categoryNode?.dataset.category || "";
+  const groupId = groupNode?.dataset.group || "";
+  const currentCategory = categoryAt(key);
+  const currentGroup = groupAt(currentCategory, groupId);
+  if (!currentCategory || !currentGroup) return;
+  const values = await openForm({ title: `編輯主部位／區塊：${currentGroup.title}`, fields: [
+    { name: "title", label: "主部位／區塊名稱", value: currentGroup.title, required: true },
+    { name: "priceTitle", label: "價目表顯示名稱", value: currentGroup.priceTitle || currentGroup.title, required: true },
+    { name: "kind", label: "區塊類型", type: "select", value: currentGroup.kind || "main", options: [["main", "一般服務"], ["addon", "加購項目"]] },
+    { name: "desc", label: "服務項目標題下方說明", type: "textarea", value: currentGroup.desc || "", full: true },
+  ], submitText: "儲存主部位" });
+  if (!values) return;
+  return commitChange((next) => {
+    const target = groupAt(categoryAt(key, next), groupId);
+    Object.assign(target, { title: values.title.trim(), priceTitle: values.priceTitle.trim() || values.title.trim(), kind: values.kind, desc: values.desc.trim() });
+  }, "正在更新主部位…");
+}, true);
+
+new MutationObserver(enhanceGroupEditors).observe(document.querySelector("#app") || document.body, { childList: true, subtree: true });
+enhanceGroupEditors();
