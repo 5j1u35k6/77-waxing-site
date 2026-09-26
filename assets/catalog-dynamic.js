@@ -6,6 +6,10 @@ let catalog = [];
 let scheduled = false;
 let rendering = false;
 
+const catalogHierarchyStyle = document.createElement("style");
+catalogHierarchyStyle.textContent = ".service-group-head{display:block!important}.service-group-head p{margin:8px 0 0!important;max-width:620px}";
+document.head.appendChild(catalogHierarchyStyle);
+
 const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
 const app = () => document.querySelector("#app");
 const normalizedPath = () => {
