@@ -9,7 +9,7 @@ hierarchyStyle.textContent='.pagehero h1,.catalog-hero h1{margin-bottom:13px}.pa
 document.head.appendChild(hierarchyStyle);
 
 function use77selectEntry(){
-  document.querySelectorAll('a[href="/77-waxing-site/shop/"]').forEach(link=>link.setAttribute('href',B+'/77select/'));
+  document.querySelectorAll('a[href="/77-waxing-site/shop/"]').forEach(link=>link.setAttribute('href','https://5j1u35k6.github.io/77select/'));
 }
 new MutationObserver(use77selectEntry).observe(document.documentElement,{childList:true,subtree:true});
 use77selectEntry();
