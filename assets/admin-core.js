@@ -129,6 +129,10 @@ function delegateCatalog(view){
 }
 
 function renderView(view){
+  if(view==="pricing"){
+    history.replaceState(null,"",`${location.pathname}#services`);
+    view="services";
+  }
   currentView=view;
   if(view==="dashboard"){setBaseVisibility(true);return;}
   if(view==="calendar")return renderCalendar();
@@ -164,3 +168,17 @@ function init(){
 
 const boot=setInterval(()=>{if(getApps().length){clearInterval(boot);init();}},100);
 setTimeout(()=>clearInterval(boot),15000);
+
+function simplifyServiceNavigation(){
+  document.querySelectorAll("body.admin-page .sidebar a").forEach((link)=>{
+    const label=(link.textContent||"").trim();
+    if(label==="價格功能") link.remove();
+    if(label==="服務功能") link.textContent="服務管理";
+  });
+  if(location.hash==="#pricing"){
+    history.replaceState(null,"",`${location.pathname}#services`);
+    renderView("services");
+  }
+}
+new MutationObserver(simplifyServiceNavigation).observe(document.querySelector("#app")||document.body,{childList:true,subtree:true});
+simplifyServiceNavigation();
