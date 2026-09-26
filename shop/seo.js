@@ -1,5 +1,5 @@
 (()=>{
-  const URL='https://5j1u35k6.github.io/77-waxing-site/shop/';
+  const URL='https://5j1u35k6.github.io/77select/';
   const TITLE='77select｜熱蠟後保養・居家保養商品選物';
   const DESCRIPTION='77select 精選熱蠟除毛後保養、肌膚舒緩與日常居家保養商品，提供台灣與香港訂購。';
 
@@ -59,8 +59,8 @@
         name:'77select',
         url:URL,
         description:DESCRIPTION,
-        logo:'https://5j1u35k6.github.io/77-waxing-site/shop/77select-wordmark.svg',
-        image:'https://5j1u35k6.github.io/77-waxing-site/shop/77select-wordmark.svg',
+        logo:'https://5j1u35k6.github.io/77select/77select-wordmark.svg',
+        image:'https://5j1u35k6.github.io/77select/77select-wordmark.svg',
         areaServed:[
           {'@type':'Country','name':'台灣'},
           {'@type':'Country','name':'香港'}
