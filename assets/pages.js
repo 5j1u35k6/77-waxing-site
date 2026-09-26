@@ -4,6 +4,16 @@ const app=document.querySelector('#app');
 if(!app)return;
 let brandIntroRequested=false;
 
+const hierarchyStyle=document.createElement('style');
+hierarchyStyle.textContent='.pagehero h1,.catalog-hero h1{margin-bottom:13px}.pagehero .lead,.catalog-hero .lead{font-size:clamp(17px,2vw,21px);line-height:1.65;opacity:.72}.home-reassurance .home-subtitle{font:inherit;display:block;font-size:clamp(18px,2.4vw,26px);font-weight:400;letter-spacing:0;opacity:.68;margin-top:7px}.home-reassurance+.home-body-copy{font-size:18px;line-height:1.85;max-width:680px;margin-top:20px}@media(max-width:640px){.home-reassurance .home-subtitle{font-size:17px;white-space:normal}.home-reassurance+.home-body-copy{font-size:16px}}';
+document.head.appendChild(hierarchyStyle);
+
+function use77selectEntry(){
+  document.querySelectorAll('a[href="/77-waxing-site/shop/"]').forEach(link=>link.setAttribute('href',B+'/77select/'));
+}
+new MutationObserver(use77selectEntry).observe(document.documentElement,{childList:true,subtree:true});
+use77selectEntry();
+
 const FLOW_STEPS=[
   ['arrival','抵達與接待','確認今天的需求與身體狀況。'],
   ['consult','諮詢與評估','不確定服務也沒關係，先把需求說清楚。'],
@@ -137,6 +147,14 @@ function render(){
   else if(path==='/booking/')app.innerHTML=bookingShell();
   else if(path==='/menu/'||path==='/services/'||path.startsWith('/services/'))app.innerHTML=catalogShell();
   else app.innerHTML=notFound();
+  const primary=document.querySelector('#app .pagehero h1, #app .catalog-hero h1');
+  primary?.classList.add('page-main-title');
+  document.querySelectorAll('#app .pagehero .lead, #app .catalog-hero .lead').forEach(node=>node.classList.add('page-subtitle'));
+  const homeTitle=document.querySelector('#app .home-reassurance');
+  if(homeTitle){
+    homeTitle.querySelector('small')?.classList.add('home-subtitle');
+    homeTitle.nextElementSibling?.classList.add('home-body-copy');
+  }
   ensureBrandIntro(path);
   window.scrollTo({top:0,behavior:'auto'});
 }
