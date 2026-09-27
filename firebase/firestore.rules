@@ -118,13 +118,13 @@ service cloud.firestore {
     }
 
     function validRoundedLockCount(durationMinutes, lockCount) {
-      return (durationMinutes > 0 && durationMinutes < 30 && lockCount == 1)
-        || (durationMinutes >= 30 && durationMinutes < 60 && lockCount == 2)
-        || (durationMinutes >= 60 && durationMinutes < 90 && lockCount == 3)
-        || (durationMinutes >= 90 && durationMinutes < 120 && lockCount == 4)
-        || (durationMinutes >= 120 && durationMinutes < 150 && lockCount == 5)
-        || (durationMinutes >= 150 && durationMinutes < 180 && lockCount == 6)
-        || (durationMinutes == 180 && lockCount == 7);
+      // Half-open time ranges: a 90 minute appointment owns exactly 3 slots.
+      return (durationMinutes > 0 && durationMinutes <= 30 && lockCount == 1)
+        || (durationMinutes > 30 && durationMinutes <= 60 && lockCount == 2)
+        || (durationMinutes > 60 && durationMinutes <= 90 && lockCount == 3)
+        || (durationMinutes > 90 && durationMinutes <= 120 && lockCount == 4)
+        || (durationMinutes > 120 && durationMinutes <= 150 && lockCount == 5)
+        || (durationMinutes > 150 && durationMinutes <= 180 && lockCount == 6);
     }
 
     function validAllBookingLocks(bookingId) {
@@ -149,6 +149,8 @@ service cloud.firestore {
           'customerPhoneInternational',
           'customerEmail',
           'customerLineId',
+          'customerGender',
+          'customerBirthday',
           'serviceName',
           'preferredDate',
           'preferredTime',
@@ -184,6 +186,9 @@ service cloud.firestore {
         && request.resource.data.customerEmail.size() <= 160
         && request.resource.data.customerEmail.matches('^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$')
         && (request.resource.data.customerLineId == null || (request.resource.data.customerLineId is string && request.resource.data.customerLineId.size() <= 100))
+        && request.resource.data.customerGender in ['female', 'male']
+        && request.resource.data.customerBirthday is string
+        && request.resource.data.customerBirthday.matches('^\\d{4}-\\d{2}-\\d{2}$')
         && request.resource.data.serviceName is string
         && request.resource.data.serviceName.size() > 0
         && request.resource.data.serviceName.size() <= 120
