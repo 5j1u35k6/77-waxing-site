@@ -595,7 +595,7 @@ async function submitOrder(event) {
     saveCart();
     $("#checkout-wrap")?.classList.add("hidden");
     document.body.style.overflow = "";
-    toast(`訂單 ${orderNo} 已送出，等待 77select 確認。`);
+    toast(`訂單 ${orderNo} 已送出，等待 77select 確認。77 Select 信件可能被判定為垃圾郵件；若超過 5 分鐘仍未收到信件，請與我們聯絡。`);
     dispatchShopEmail(orderRef.id);
   } catch (error) {
     console.error(error);

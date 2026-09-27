@@ -60,3 +60,7 @@ html[data-market="HK"] #checkout-open:disabled{opacity:.72;background:#8b7355;co
   .product-gallery-main{height:min(92vw,420px)}
   .product-gallery-thumbs{grid-template-columns:repeat(4,minmax(0,1fr))}
 }
+/* 77 Select wood-tone layer */
+body{background:#fbf7ef;background-image:linear-gradient(125deg,rgba(148,99,56,.055),transparent 48%),repeating-linear-gradient(0deg,rgba(116,75,43,.018) 0 1px,transparent 1px 8px)}
+.shop-nav,.panel,.product-card,.modal,.cart-drawer,.order-card{border-color:rgba(120,78,44,.2)!important;box-shadow:0 12px 28px rgba(88,55,30,.08)}
+.shop-nav,.modal,.cart-drawer{background-color:#fffaf1!important}.primary-btn{background:#684832!important;color:#fffaf3!important}.primary-btn:hover{background:#513522!important}
