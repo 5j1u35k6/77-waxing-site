@@ -192,6 +192,7 @@ function fallbackProfile(user) {
     phone: "",
     phoneCountry: "Taiwan",
     gender: "",
+    birthday: "",
     provider: providerLabel(user),
   };
 }
@@ -292,7 +293,12 @@ function syncMemberButtons() {
 }
 
 function genderText(value) {
-  return ({ female: "女性", male: "男性", private: "其他／不透露" }[value] || "未填寫");
+  return ({ female: "生理女", male: "生理男", private: "其他／不透露" }[value] || "未填寫");
+}
+
+function rocBirthday(value) {
+  const match = String(value || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return match ? `民國 ${Number(match[1]) - 1911} 年 ${Number(match[2])} 月 ${Number(match[3])} 日` : "尚未填寫";
 }
 
 function parseGender(note) {
@@ -369,7 +375,8 @@ async function openMemberCenter() {
     <div><small>會員名稱</small><b>${esc(profile?.displayName || currentUser.displayName || "—")}</b></div>
     <div><small>Email</small><b>${esc(profile?.email || currentUser.email || "尚未填寫")}</b></div>
     <div><small>電話</small><b>${esc(profile?.phone || "尚未填寫")}</b></div>
-    <div><small>性別</small><b>${esc(genderText(profile?.gender))}</b></div>`;
+    <div><small>生理性別</small><b>${esc(genderText(profile?.gender))}</b></div>
+    <div><small>生日</small><b>${esc(rocBirthday(profile?.birthday))}</b></div>`;
   const history = wrap.querySelector("[data-member-history]");
   history.innerHTML = `<div class="member-history-empty">正在讀取預約紀錄…</div>`;
   wrap.hidden = false;
@@ -429,10 +436,11 @@ function applyProfileToBooking() {
   fillFieldOnce(root.querySelector('[name="phoneCountry"]'), currentProfile.phoneCountry || "Taiwan", { force: true });
   fillFieldOnce(root.querySelector('[name="phone"]'), currentProfile.phone || "");
   fillFieldOnce(root.querySelector('[name="gender"]'), currentProfile.gender || "");
+  fillFieldOnce(root.querySelector('[name="birthday"]'), currentProfile.birthday || "");
 
   const note = root.querySelector('[data-step="3"] > .muted');
   if (note && note.dataset.memberCopy !== "1") {
-    note.textContent = "已從會員資料帶入姓名、電話、Email 與性別；需要時可以直接修改。";
+    note.textContent = "已從會員資料帶入姓名、電話、Email、生理性別與生日；需要時可以直接修改。";
     note.dataset.memberCopy = "1";
   }
 }
@@ -447,6 +455,7 @@ async function saveBookingProfile() {
     phone: root.querySelector('[name="phone"]')?.value.trim() || currentProfile?.phone || "",
     phoneCountry: root.querySelector('[name="phoneCountry"]')?.value || currentProfile?.phoneCountry || "Taiwan",
     gender: root.querySelector('[name="gender"]')?.value || currentProfile?.gender || "",
+    birthday: root.querySelector('[name="birthday"]')?.value || currentProfile?.birthday || "",
     lastBookingAt: serverTimestamp(),
   });
   syncMemberButtons();

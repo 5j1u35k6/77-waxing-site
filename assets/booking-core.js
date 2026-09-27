@@ -36,7 +36,9 @@ const taipeiToday = () => {
 const addMinutesToTime = (time, minutesToAdd) => { const [hours, minutes] = time.split(":").map(Number); const total = hours * 60 + minutes + minutesToAdd; return `${pad(Math.floor(total / 60) % 24)}:${pad(total % 60)}`; };
 const blockTimes = (time, blockMinutes) => { const [hours, minutes] = time.split(":").map(Number); const start = hours * 60 + minutes; return Array.from({ length: blockMinutes / 30 }, (_, index) => { const point = start + index * 30; return `${pad(Math.floor(point / 60) % 24)}:${pad(point % 60)}`; }); };
 const lockId = (date, time) => `${date}_${time.replace(":", "")}`;
-const blockMinutesFor = (durationMinutes) => (Math.floor(Number(durationMinutes || 90) / 30) + 1) * 30;
+// A booking occupies [start, end): a 90 minute booking starting at 18:30
+// locks 18:30, 19:00 and 19:30, but never the 20:00 slot.
+const blockMinutesFor = (durationMinutes) => Math.max(30, Math.ceil(Number(durationMinutes || 90) / 30) * 30);
 
 
 const PHONE_COUNTRIES = [
@@ -171,9 +173,9 @@ function bookingMarkup(catalog) {
   return `<div class="steps"><span class="on">1 服務</span><span>2 日期時段</span><span>3 資料</span><span>4 確認</span></div>
     <section class="step on" data-step="1"><h2>選擇服務項目</h2><p class="muted booking-prefill-note" data-booking-prefill-note hidden></p><div class="booking-service-picker"><aside class="booking-service-categories" aria-label="服務分類">${catalog.map((category, index) => `<button type="button" data-booking-category="${esc(category.key)}" class="${index === 0 ? "on" : ""}">${esc(category.name)}</button>`).join("")}</aside><div class="booking-service-items" data-booking-items></div></div><div class="booking-service-note muted" data-booking-service-note></div><div class="actions"><button class="btn dark" type="button" data-next disabled>下一步</button></div></section>
     <section class="step" data-step="2"><h2>選擇日期與時段</h2><p class="muted">先從月曆選日期，再從下方 7 天中選擇實際預約日與時段。</p><div class="flight-calendar"><div class="calbar"><button type="button" data-month-prev>←</button><b data-month-label></b><button type="button" data-month-next>→</button></div><div class="calweek">${"日一二三四五六".split("").map((weekday) => `<span>${weekday}</span>`).join("")}</div><div class="calgrid" data-calgrid></div></div><div class="slotlegend"><span><i class="free"></i>可選</span><span><i class="hold"></i>其他顧客預約中</span><span><i class="pick"></i>你的選擇</span></div><div class="booking-sync" data-booking-sync>正在確認可預約時段…</div><div class="dayrail" data-dayrail></div><div class="actions"><button class="btn" type="button" data-prev>上一步</button><button class="btn dark" type="button" data-next>下一步</button></div></section>
-    <section class="step" data-step="3"><h2>留下聯絡方式</h2><p class="muted">不用建立會員帳號，填寫資料後即可送出預約需求。</p><div class="fields"><label>姓名<input name="name" autocomplete="name"></label><label class="phone-label">手機<div class="phone-composite"><select name="phoneCountry" aria-label="國際冠碼">${phoneCountryOptions()}</select><input name="phone" inputmode="numeric" autocomplete="tel-national" pattern="[0-9]*" aria-describedby="phone-rule"></div><small class="phone-rule" id="phone-rule" data-phone-rule></small></label><label>Email<input name="email" type="email" autocomplete="email" placeholder="用於接收預約確認信"></label><label>LINE ID<input name="line"></label><label>第一次來店？<select name="first"><option value="yes">是</option><option value="no">曾經來過</option></select></label></div><label class="full">備註<textarea name="note" rows="3"></textarea></label><p><label><input style="width:auto" type="checkbox" name="ok"> 同意 77美學工作室為處理本次預約使用我填寫的聯絡資料。</label></p><div class="actions"><button class="btn" type="button" data-prev>上一步</button><button class="btn dark" type="button" data-next>確認內容</button></div></section>
+    <section class="step" data-step="3"><h2>留下聯絡方式</h2><p class="muted">不用建立會員帳號，填寫資料後即可送出預約需求。</p><div class="fields booking-contact-fields"><label class="booking-contact-field booking-field-name">姓名<input name="name" autocomplete="name"></label><label class="booking-contact-field booking-field-gender">生理性別<select name="gender" required><option value="">請選擇</option><option value="female">生理女</option><option value="male">生理男</option></select></label><label class="booking-contact-field booking-field-phone phone-label">手機<div class="phone-composite"><select name="phoneCountry" aria-label="國際冠碼">${phoneCountryOptions()}</select><input name="phone" inputmode="numeric" autocomplete="tel-national" pattern="[0-9]*" aria-describedby="phone-rule"></div><small class="phone-rule" id="phone-rule" data-phone-rule></small></label><label class="booking-contact-field booking-field-birthday">生日<input name="birthday" type="date" autocomplete="bday"><small data-roc-birthday>選擇日期後將以民國年顯示</small></label><label class="booking-contact-field booking-field-email">Email<input name="email" type="email" autocomplete="email" placeholder="用於接收預約確認信"></label><label class="booking-contact-field booking-field-line">LINE ID<input name="line"></label><label class="booking-contact-field booking-field-first">第一次來店？<select name="first"><option value="yes">是</option><option value="no">曾經來過</option></select></label></div><label class="full">備註<textarea name="note" rows="3"></textarea></label><p><label><input style="width:auto" type="checkbox" name="ok"> 同意 77美學工作室為處理本次預約使用我填寫的聯絡資料。</label></p><div class="actions"><button class="btn" type="button" data-prev>上一步</button><button class="btn dark" type="button" data-next>確認內容</button></div></section>
     <section class="step" data-step="4"><h2>確認預約需求</h2><div class="summary"></div><div class="notice"><b>送出後先保留</b><p>成功送出後，對應時段會先變成「保留中」，等待 77 後台確認。</p></div><div class="actions"><button class="btn" type="button" data-prev>上一步</button><button class="btn dark" type="button" data-submit>送出預約需求</button></div></section>
-    <section class="success"><h2>預約需求已建立</h2><p>預約需求已送出，該時段已暫時保留，等待 77 確認。</p><div class="btns" style="justify-content:center"><a class="btn" href="${B}/booking/">回到預約頁面</a></div></section>`;
+    <section class="success"><h2>預約需求已建立</h2><p>預約需求已送出，該時段已暫時保留，等待 77 確認。</p><p class="email-delivery-note">77waxing 信件可能被判定為垃圾郵件；若超過 5 分鐘仍未收到信件，請與我們聯絡。</p><div class="btns" style="justify-content:center"><a class="btn" href="${B}/booking/">回到預約頁面</a></div></section>`;
 }
 
 function currentBookingRoot() {
@@ -240,6 +242,16 @@ async function mount(root) {
   phoneInput?.addEventListener("input", syncPhoneField);
   phoneInput?.addEventListener("blur", syncPhoneField);
   syncPhoneField();
+  const birthdayInput = root.querySelector('[name="birthday"]');
+  const birthdayHint = root.querySelector('[data-roc-birthday]');
+  const formatRocBirthday = (value) => {
+    const match = String(value || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    return match ? `民國 ${Number(match[1]) - 1911} 年 ${Number(match[2])} 月 ${Number(match[3])} 日` : "選擇日期後將以民國年顯示";
+  };
+  const syncBirthday = () => { if (birthdayHint) birthdayHint.textContent = formatRocBirthday(birthdayInput?.value); };
+  birthdayInput?.addEventListener("input", syncBirthday);
+  birthdayInput?.addEventListener("change", syncBirthday);
+  syncBirthday();
 
   const syncPrefillNote = () => {
     if (!prefillNote) return;
@@ -341,12 +353,14 @@ async function mount(root) {
         const name = root.querySelector('[name="name"]').value.trim();
         const phone = phoneState(root);
         const email = root.querySelector('[name="email"]').value.trim();
+        const birthday = birthdayInput?.value || "";
+        const gender = root.querySelector('[name="gender"]').value;
         const accepted = root.querySelector('[name="ok"]').checked;
-        if (!name || !phone.local || !email || !accepted) return alert("請填寫姓名、手機、Email 並勾選同意。");
+        if (!name || !phone.local || !email || !birthday || !gender || !accepted) return alert("請填寫姓名、生理性別、生日、手機、Email 並勾選同意。");
         if (!phone.valid) { syncPhoneField(); phoneInput?.focus(); return alert(phoneRuleText(phone.country)); }
         if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return alert("請確認 Email 格式。");
         const endTime = addMinutesToTime(selectedTime, selectedItem.durationMinutes);
-        const summary = { 服務分類: selectedCategory.name, 服務項目: selectedItem.name, 施作時間: selectedItem.durationLabel, 日期: selectedDate, 開始時間: selectedTime, 結束時間: `${endTime}（${selectedItem.durationLabel}）`, 姓名: name, 手機: `${phone.country.name} (${phone.country.dial}) ${phone.local}`, Email: email, 來店: root.querySelector('[name="first"]').value === "yes" ? "第一次" : "回訪" };
+        const summary = { 服務分類: selectedCategory.name, 服務項目: selectedItem.name, 施作時間: selectedItem.durationLabel, 日期: selectedDate, 開始時間: selectedTime, 結束時間: `${endTime}（${selectedItem.durationLabel}）`, 姓名: name, 生理性別: gender === "female" ? "生理女" : "生理男", 生日: formatRocBirthday(birthday), 手機: `${phone.country.name} (${phone.country.dial}) ${phone.local}`, Email: email, 來店: root.querySelector('[name="first"]').value === "yes" ? "第一次" : "回訪" };
         root.querySelector(".summary").innerHTML = Object.entries(summary).map(([key, value]) => `<div><small>${esc(key)}</small><b>${esc(value)}</b></div>`).join("");
       }
       show(Math.min(4, step + 1));
@@ -365,6 +379,8 @@ async function mount(root) {
       if (!phone.valid) { syncPhoneField(); show(3); phoneInput?.focus(); throw new Error("INVALID_PHONE"); }
       const email = root.querySelector('[name="email"]').value.trim().toLowerCase();
       const lineId = root.querySelector('[name="line"]').value.trim();
+      const gender = root.querySelector('[name="gender"]').value;
+      const birthday = birthdayInput?.value || "";
       const note = root.querySelector('[name="note"]').value.trim();
       const firstVisit = root.querySelector('[name="first"]').value === "yes";
       const lockTimes = blockTimes(selectedTime, selectedItem.blockMinutes);
@@ -375,7 +391,7 @@ async function mount(root) {
       const compatibilityNote = [note, phoneMetadataNote].filter(Boolean).join("\n").slice(0, 1000) || null;
       const writeBooking = async (includePhoneMetadata) => runTransaction(db, async (transaction) => {
         for (const lockRef of lockRefs) { const snapshot = await transaction.get(lockRef); if (snapshot.exists()) throw new Error("SLOT_CONFLICT"); }
-        const bookingData = { ownerUid: user.uid, customerName: name, customerPhone: phone.local, customerEmail: email, customerLineId: lineId || null, serviceName: `${selectedCategory.name}｜${selectedItem.name}`, preferredDate: selectedDate, preferredTime: selectedTime, status: "pending_confirmation", isFirstVisit: firstVisit, depositRequired: null, depositAmount: null, paymentStatus: "not_requested", durationMinutes: selectedItem.durationMinutes, bufferMinutes: selectedItem.blockMinutes - selectedItem.durationMinutes, lockIds, lockTimes, note: includePhoneMetadata ? (note || null) : compatibilityNote, createdAt: serverTimestamp(), updatedAt: serverTimestamp() };
+        const bookingData = { ownerUid: user.uid, customerName: name, customerPhone: phone.local, customerEmail: email, customerLineId: lineId || null, customerGender: gender, customerBirthday: birthday, serviceName: `${selectedCategory.name}｜${selectedItem.name}`, preferredDate: selectedDate, preferredTime: selectedTime, status: "pending_confirmation", isFirstVisit: firstVisit, depositRequired: null, depositAmount: null, paymentStatus: "not_requested", durationMinutes: selectedItem.durationMinutes, bufferMinutes: selectedItem.blockMinutes - selectedItem.durationMinutes, lockIds, lockTimes, note: includePhoneMetadata ? (note || null) : compatibilityNote, createdAt: serverTimestamp(), updatedAt: serverTimestamp() };
         if (includePhoneMetadata) {
           bookingData.customerPhoneCountry = phone.country.name;
           bookingData.customerPhoneDialCode = phone.country.dial;

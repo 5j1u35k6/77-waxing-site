@@ -26,7 +26,7 @@ function selectedBlockMinutes() {
   for (const category of catalog) {
     for (const group of category.groups || []) {
       const item = (group.items || []).find((entry) => entry.id === id);
-      if (item) return Number(item.blockMinutes || ((Math.floor(Number(item.durationMinutes || 90) / 30) + 1) * 30));
+      if (item) return Number(item.blockMinutes || (Math.max(30, Math.ceil(Number(item.durationMinutes || 90) / 30) * 30)));
     }
   }
   return 120;

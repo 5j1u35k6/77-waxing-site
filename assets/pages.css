@@ -5,3 +5,8 @@
 
 /* Homepage section-title scale */
 .home-section-title{font-size:clamp(30px,4vw,48px)!important;line-height:1.25!important}
+/* Shared warm wood finish: restrained contrast keeps long-form copy readable. */
+body{background-color:#fbf7ef;background-image:linear-gradient(135deg,rgba(157,111,70,.035),transparent 42%),repeating-linear-gradient(0deg,rgba(123,82,48,.018) 0 1px,transparent 1px 7px)}
+.section,.panel,.notice,.flight-calendar{border-color:rgba(124,83,48,.18)!important;box-shadow:0 12px 30px rgba(93,61,34,.055)}
+.section:nth-child(even),.admin-v2-workspace{background-color:rgba(255,250,241,.72)}
+.btn.dark,.header .book{background:#654630!important;color:#fffaf3!important}.btn.dark:hover,.header .book:hover{background:#4f3524!important}

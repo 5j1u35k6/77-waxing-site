@@ -1,5 +1,5 @@
 (()=>{
-  const genderText=value=>({female:'女性',male:'男性',private:'其他／不透露'}[value]||'未填寫');
+  const genderText=value=>({female:'生理女',male:'生理男'}[value]||'未填寫');
   const root=()=>document.querySelector('#booking');
 
   const decorateContactLayout=booking=>{
@@ -35,7 +35,7 @@
         const label=document.createElement('label');
         label.dataset.genderField='1';
         label.className='booking-contact-field booking-field-gender';
-        label.innerHTML='性別<select name="gender"><option value="">請選擇</option><option value="female">女性</option><option value="male">男性</option><option value="private">其他／不透露</option></select>';
+        label.innerHTML='生理性別<select name="gender"><option value="">請選擇</option><option value="female">生理女</option><option value="male">生理男</option></select>';
         nameLabel.insertAdjacentElement('afterend',label);
       }
     }
