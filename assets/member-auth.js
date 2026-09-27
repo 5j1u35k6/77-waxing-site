@@ -1,6 +1,7 @@
 import {
   browserLocalPersistence,
   getRedirectResult,
+  getIdTokenResult,
   OAuthProvider,
   onAuthStateChanged,
   setPersistence,
@@ -186,6 +187,11 @@ function fallbackProfile(user) {
   const lineProvider = user?.providerData?.find((provider) => String(provider?.providerId || "").toLowerCase().includes("line"));
   const email = String(user?.email || firstProvider.email || "").trim();
   const displayName = String(user?.displayName || firstProvider.displayName || email.split("@")[0] || "").trim();
+  const claims = user?.__77MemberClaims || {};
+  // LINE is linked through the site's identity service rather than a Firebase
+  // OAuth provider.  Its stable LINE subject therefore arrives as a custom
+  // token claim, not in providerData.
+  const linkedLineId = String(claims.lineUserId || lineProvider?.uid || "").trim();
   return {
     uid: user?.uid || "",
     displayName,
@@ -194,13 +200,19 @@ function fallbackProfile(user) {
     phoneCountry: "Taiwan",
     gender: "",
     birthday: "",
-    lineId: String(lineProvider?.uid || "").trim(),
+    lineId: linkedLineId,
     provider: providerLabel(user),
   };
 }
 
 async function loadProfile(user) {
   if (!isMember(user)) return null;
+  try {
+    const tokenResult = await getIdTokenResult(user, true);
+    user.__77MemberClaims = tokenResult?.claims || {};
+  } catch (error) {
+    console.warn("member token claims unavailable", error);
+  }
   const fallback = fallbackProfile(user);
   try {
     const ref = doc(db, PROFILE_COLLECTION, user.uid);
