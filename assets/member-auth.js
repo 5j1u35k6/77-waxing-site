@@ -183,6 +183,7 @@ async function beginProviderLogin(kind) {
 
 function fallbackProfile(user) {
   const firstProvider = user?.providerData?.find(Boolean) || {};
+  const lineProvider = user?.providerData?.find((provider) => String(provider?.providerId || "").toLowerCase().includes("line"));
   const email = String(user?.email || firstProvider.email || "").trim();
   const displayName = String(user?.displayName || firstProvider.displayName || email.split("@")[0] || "").trim();
   return {
@@ -193,6 +194,7 @@ function fallbackProfile(user) {
     phoneCountry: "Taiwan",
     gender: "",
     birthday: "",
+    lineId: String(lineProvider?.uid || "").trim(),
     provider: providerLabel(user),
   };
 }
@@ -203,7 +205,14 @@ async function loadProfile(user) {
   try {
     const ref = doc(db, PROFILE_COLLECTION, user.uid);
     const snap = await getDoc(ref);
-    if (snap.exists()) return { ...fallback, ...snap.data(), uid: user.uid };
+    if (snap.exists()) {
+      const profile = { ...fallback, ...snap.data(), uid: user.uid };
+      if (fallback.lineId && !profile.lineId) {
+        await setDoc(ref, { uid: user.uid, lineId: fallback.lineId, updatedAt: serverTimestamp() }, { merge: true });
+        profile.lineId = fallback.lineId;
+      }
+      return profile;
+    }
     const initial = {
       ...fallback,
       uid: user.uid,
@@ -422,7 +431,7 @@ function applyProfileToBooking() {
 
   const lineInput = root.querySelector('[name="line"]');
   if (lineInput && lineInput.dataset.memberHidden !== "1") {
-    lineInput.value = "";
+    lineInput.value = currentProfile.lineId || "";
     const label = lineInput.closest("label");
     lineInput.remove();
     if (label) label.remove();
@@ -430,6 +439,7 @@ function applyProfileToBooking() {
     lineInput.dataset.memberHidden = "1";
     root.appendChild(lineInput);
   }
+  if (lineInput) lineInput.value = currentProfile.lineId || lineInput.value || "";
 
   fillFieldOnce(root.querySelector('[name="name"]'), currentProfile.displayName || currentUser.displayName || "");
   fillFieldOnce(root.querySelector('[name="email"]'), currentProfile.email || currentUser.email || "");
@@ -456,6 +466,7 @@ async function saveBookingProfile() {
     phoneCountry: root.querySelector('[name="phoneCountry"]')?.value || currentProfile?.phoneCountry || "Taiwan",
     gender: root.querySelector('[name="gender"]')?.value || currentProfile?.gender || "",
     birthday: root.querySelector('[name="birthday"]')?.value || currentProfile?.birthday || "",
+    lineId: currentProfile?.lineId || fallbackProfile(currentUser).lineId || "",
     lastBookingAt: serverTimestamp(),
   });
   syncMemberButtons();

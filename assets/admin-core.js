@@ -11,7 +11,7 @@ const monthTitle = (date)=>`${date.getFullYear()} 年 ${date.getMonth()+1} 月`;
 const dayTitle = (date)=>`${date.getFullYear()} 年 ${date.getMonth()+1} 月 ${date.getDate()} 日`;
 const statusText=(status)=>({pending_confirmation:"待確認",pending_payment:"待付款",confirmed:"已確認",cancelled:"已取消",completed:"已完成",no_show:"未到店"}[status]||status||"—");
 
-let db=null,auth=null,bookings=[],settings={};
+let db=null,auth=null,bookings=[],settings={},memberProfiles=new Map();
 let currentView="dashboard";
 let calendarMode="week";
 let calendarDate=new Date();
@@ -65,10 +65,11 @@ function renderCalendar(){
   w.querySelectorAll("[data-calendar-date]").forEach(btn=>btn.onclick=()=>{calendarDate=new Date(`${btn.dataset.calendarDate}T00:00:00`);calendarMode="day";renderCalendar();});
 }
 
+function linkedLineId(booking){return booking.customerLineId||memberProfiles.get(booking.ownerUid)?.lineId||"";}
 function renderCustomers(){
   const w=ensureWorkspace();if(!w)return;setBaseVisibility(false);
   const map=new Map();
-  bookings.forEach((b)=>{const key=customerKey(b);if(!key)return;const current=map.get(key)||{key,name:b.customerName||"未命名",phone:b.customerPhone||"",birthday:b.customerBirthday||"",lineId:b.customerLineId||"",email:b.customerEmail||"",count:0,last:"",services:new Set()};current.count+=1;if(`${b.preferredDate||""} ${b.preferredTime||""}`>current.last)current.last=`${b.preferredDate||""} ${b.preferredTime||""}`;["name","phone","birthday","lineId","email"].forEach(field=>{const source={name:b.customerName,phone:b.customerPhone,birthday:b.customerBirthday,lineId:b.customerLineId,email:b.customerEmail}[field];if(source)current[field]=source;});if(b.serviceName)current.services.add(b.serviceName);map.set(key,current);});
+  bookings.forEach((b)=>{const key=customerKey(b);if(!key)return;const lineId=linkedLineId(b);const current=map.get(key)||{key,name:b.customerName||"未命名",phone:b.customerPhone||"",birthday:b.customerBirthday||"",lineId,email:b.customerEmail||"",count:0,last:"",services:new Set()};current.count+=1;if(`${b.preferredDate||""} ${b.preferredTime||""}`>current.last)current.last=`${b.preferredDate||""} ${b.preferredTime||""}`;["name","phone","birthday","lineId","email"].forEach(field=>{const source={name:b.customerName,phone:b.customerPhone,birthday:b.customerBirthday,lineId,email:b.customerEmail}[field];if(source)current[field]=source;});if(b.serviceName)current.services.add(b.serviceName);map.set(key,current);});
   const rows=[...map.values()].sort((a,b)=>b.last.localeCompare(a.last));
   w.innerHTML=`<div class="admin-view-head"><div><span class="tag">CUSTOMERS</span><h3>顧客資料</h3></div><button class="btn dark" type="button" data-paper-import>＋ 新增紙本轉電子紀錄</button></div><p class="muted">可依姓名、手機或 LINE ID 尋找顧客；點擊姓名可查看完整預約歷史。</p><label class="customer-search">搜尋顧客<input type="search" data-customer-search placeholder="姓名、手機或 LINE ID"></label><div class="customer-table-wrap"><table><thead><tr><th>姓名</th><th>手機號碼</th><th>生日</th><th>LINEID</th><th>信箱</th><th>預約次數</th><th>最近預約時間</th><th>曾預約服務操作</th></tr></thead><tbody data-customer-rows></tbody></table></div><div class="paper-import-note" data-paper-note hidden>紙本轉電子入口已建立；下一步會補上紙本欄位與匯入表單。</div>`;
   const body=w.querySelector('[data-customer-rows]');const draw=(term='')=>{const q=term.trim().toLowerCase();const visible=rows.filter(r=>!q||[r.name,r.phone,r.lineId].some(v=>String(v||'').toLowerCase().includes(q)));body.innerHTML=visible.map((r,i)=>`<tr><td><button class="admin-customer-link" data-customer-index="${i}">${escapeHtml(r.name)}</button></td><td>${escapeHtml(r.phone||"—")}</td><td>${escapeHtml(rocBirthday(r.birthday))}</td><td>${escapeHtml(r.lineId||"—")}</td><td>${escapeHtml(r.email||"—")}</td><td>${r.count} 次</td><td>${escapeHtml(r.last||"—")}</td><td>${escapeHtml([...r.services].join("、")||"—")}</td></tr>`).join('')||"<tr><td colspan='8' class='muted'>找不到符合的顧客資料。</td></tr>";body.querySelectorAll('[data-customer-index]').forEach(btn=>btn.onclick=()=>customerModal(visible[Number(btn.dataset.customerIndex)]));};draw();w.querySelector('[data-customer-search]').oninput=e=>draw(e.target.value);
@@ -161,6 +162,7 @@ function bindSidebar(){
 function startData(){
   if(unsubBookings)return;
   unsubBookings=onSnapshot(query(collection(db,"bookings"),orderBy("preferredDate","asc")),snap=>{bookings=snap.docs.map(d=>({id:d.id,...d.data()}));if(currentView==="calendar")renderCalendar();if(currentView==="customers")renderCustomers();});
+  onSnapshot(collection(db,"memberProfiles"),snap=>{memberProfiles=new Map(snap.docs.map(d=>[d.id,d.data()]));if(currentView==="customers")renderCustomers();});
   onSnapshot(doc(db,"settings","general"),snap=>{settings=snap.exists()?snap.data():{};});
 }
 

@@ -6,7 +6,7 @@
 
 (()=>{
   const source=document.currentScript?.src||location.href;
-  const memberUrl=new URL('./member-auth.js?v=20260915-member2',source).href;
+  const memberUrl=new URL('./member-auth.js?v=20260927-line-profile',source).href;
   const googleUrl=new URL('./google-auth-ui.js?v=20260915-google5-linked',source).href;
   const popupFixUrl=new URL('./member-auth-popup-fix.js?v=20260915-line-custom6-linked',source).href;
   const accountLinkUrl=new URL('./account-linking.js?v=20260915-account-link2-diagnostics',source).href;

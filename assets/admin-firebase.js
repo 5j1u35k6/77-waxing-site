@@ -205,6 +205,7 @@ function renderAdminLogin(root) {
         await signOut(auth);
         throw new Error("NOT_ADMIN");
       }
+      history.replaceState(null, "", `${location.pathname}#dashboard`);
       await showAdminDashboard(root);
     } catch (error) {
       console.error(error);
