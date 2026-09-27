@@ -65,7 +65,7 @@ function renderCalendar(){
   w.querySelectorAll("[data-calendar-date]").forEach(btn=>btn.onclick=()=>{calendarDate=new Date(`${btn.dataset.calendarDate}T00:00:00`);calendarMode="day";renderCalendar();});
 }
 
-function linkedLineId(booking){return booking.customerLineId||memberProfiles.get(booking.ownerUid)?.lineId||"";}
+function linkedLineId(booking){const profile=memberProfiles.get(booking.ownerUid)||{};return booking.customerLineId||profile.lineId||profile.lineUserId||"";}
 function renderCustomers(){
   const w=ensureWorkspace();if(!w)return;setBaseVisibility(false);
   const map=new Map();
