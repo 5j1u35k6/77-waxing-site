@@ -24,6 +24,7 @@ const { auth, db } = getPublicFirebase();
 const VERSION = "20260915-member2";
 const PENDING_TARGET_KEY = "77waxing_member_pending_target";
 const PROFILE_COLLECTION = "memberProfiles";
+const IDENTITY_STATUS_URL = "https://77waxing-line-auth-proxy.max19450.workers.dev/";
 const runtimeConfig = window.__77_MEMBER_AUTH_CONFIG__ || {};
 const providerConfig = {
   line: {
@@ -212,6 +213,26 @@ async function loadProfile(user) {
     user.__77MemberClaims = tokenResult?.claims || {};
   } catch (error) {
     console.warn("member token claims unavailable", error);
+  }
+  // A member may have signed in with Google after linking LINE.  In that
+  // case the LINE subject belongs to the secured identity-link service, not
+  // Firebase's providerData/custom token.  Ask that service only for the
+  // current signed-in member's linked LINE identifier.
+  try {
+    const firebaseIdToken = await user.getIdToken();
+    const response = await fetch(IDENTITY_STATUS_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "omit",
+      cache: "no-store",
+      body: JSON.stringify({ action: "identity_status", firebaseIdToken }),
+    });
+    const identity = await response.json();
+    if (response.ok && identity?.ok && identity.lineUserId) {
+      user.__77MemberClaims = { ...(user.__77MemberClaims || {}), lineUserId: String(identity.lineUserId) };
+    }
+  } catch (error) {
+    console.warn("linked LINE identity unavailable", error);
   }
   const fallback = fallbackProfile(user);
   try {
