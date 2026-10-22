@@ -11,7 +11,9 @@ const status=(message)=>{if(dialog?.open)dialog.querySelector('[data-record-stat
 async function request(action,body={}) {
   const user=getAuth(getApp()).currentUser;
   if(!user || user.isAnonymous)throw new Error("請先登入管理後台。");
-  return recordRequest(endpoint,action,{idToken:await user.getIdToken(),sessionId:session?.sessionId,...body});
+  // Capture before token refresh yields: close() clears the active session immediately.
+  const sessionId=session?.sessionId, target=endpoint;
+  return recordRequest(target,action,{idToken:await user.getIdToken(),sessionId,...body});
 }
 function releaseFiles(){for(const url of urls.values())URL.revokeObjectURL(url);urls.clear();}
 function renderFiles(files) {
