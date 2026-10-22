@@ -83,6 +83,10 @@ function debugFooterAsset() {
 function doPost(e) {
   try {
     const payload = JSON.parse((e && e.postData && e.postData.contents) || '{}');
+    if (typeof routeCustomerRecordsPost_ === 'function') {
+      const recordResponse = routeCustomerRecordsPost_(payload);
+      if (recordResponse) return recordResponse;
+    }
     if (String(payload.kind || '').trim() === 'shop_order') return handleShopOrderPost_(payload);
     return handleBookingPost_(payload);
   } catch (err) {
