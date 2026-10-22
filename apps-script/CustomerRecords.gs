@@ -48,7 +48,9 @@ function recordPublicFiles_(files) {return files.map(f=>({id:f.id,name:f.name,si
 function recordAction_(p) {
   const uid=p.action==='record_upload'?null:recordAdmin_(p);
   const lock=LockService.getScriptLock();
-  if(!lock.tryLock(10000))throw new Error('busy');
+  // Polling/reading must not queue behind uploads or starve OCR requests.
+  const needsLock=['record_create','record_upload','record_close'].indexOf(p.action)>=0;
+  if(needsLock && !lock.tryLock(10000))throw new Error('busy');
   let session, file;
   try {
     if(p.action==='record_create') {
@@ -80,7 +82,7 @@ function recordAction_(p) {
     if(p.action==='record_close'){session.data.closed=true;session.manifest.setContent(JSON.stringify(session.data));return {closed:true};}
     file=session.data.files.find(f=>f.id===p.fileId);
     if(!file)throw new Error('file_missing');
-  } finally {lock.releaseLock();}
+  } finally {if(needsLock)lock.releaseLock();}
   if(p.action==='record_download')return {file:{name:file.name,mime:file.mime,data:Utilities.base64Encode(DriveApp.getFileById(file.id).getBlob().getBytes())}};
   if(p.action==='record_scan')return {text:recordScan_(file,session.folder)};
   throw new Error('unsupported');
@@ -94,7 +96,10 @@ function recordScan_(file,folder) {
   const header=Utilities.newBlob('--'+boundary+'\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n'+meta+'\r\n--'+boundary+'\r\nContent-Type: '+file.mime+'\r\n\r\n').getBytes();
   const bytes=header.concat(original.getBytes(),Utilities.newBlob('\r\n--'+boundary+'--').getBytes());
   const result=UrlFetchApp.fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&ocrLanguage=zh-TW&fields=id',{method:'post',headers:{Authorization:'Bearer '+ScriptApp.getOAuthToken()},contentType:'multipart/related; boundary='+boundary,payload:bytes,muteHttpExceptions:true});
-  if(result.getResponseCode()>=300)throw new Error('ocr_failed');
+  if(result.getResponseCode()>=300){
+    console.error('record OCR conversion failed',result.getResponseCode(),result.getContentText().slice(0,500));
+    throw new Error('ocr_failed');
+  }
   const id=JSON.parse(result.getContentText()).id;
   try {
     const response=UrlFetchApp.fetch('https://www.googleapis.com/drive/v3/files/'+encodeURIComponent(id)+'/export?mimeType=text%2Fplain',{headers:{Authorization:'Bearer '+ScriptApp.getOAuthToken()},muteHttpExceptions:true});
