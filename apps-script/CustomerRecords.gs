@@ -95,7 +95,8 @@ function recordScan_(file,folder) {
   const meta=JSON.stringify({name:'OCR '+file.name,mimeType:'application/vnd.google-apps.document',parents:[folder.getId()]});
   const header=Utilities.newBlob('--'+boundary+'\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n'+meta+'\r\n--'+boundary+'\r\nContent-Type: '+file.mime+'\r\n\r\n').getBytes();
   const bytes=header.concat(original.getBytes(),Utilities.newBlob('\r\n--'+boundary+'--').getBytes());
-  const result=UrlFetchApp.fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&ocrLanguage=zh-TW&fields=id',{method:'post',headers:{Authorization:'Bearer '+ScriptApp.getOAuthToken()},contentType:'multipart/related; boundary='+boundary,payload:bytes,muteHttpExceptions:true});
+  // Let Drive detect the source language; unsupported hints reject the upload.
+  const result=UrlFetchApp.fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id',{method:'post',headers:{Authorization:'Bearer '+ScriptApp.getOAuthToken()},contentType:'multipart/related; boundary='+boundary,payload:bytes,muteHttpExceptions:true});
   if(result.getResponseCode()>=300){
     console.error('record OCR conversion failed',result.getResponseCode(),result.getContentText().slice(0,500));
     throw new Error('ocr_failed');
