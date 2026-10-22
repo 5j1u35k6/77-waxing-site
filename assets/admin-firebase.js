@@ -227,6 +227,8 @@ async function mountAdmin(root) {
     return;
   }
 
+  await authPersistenceReady;
+  await auth.authStateReady();
   const currentUser = auth.currentUser;
   if (currentUser && await verifyAdmin(currentUser)) {
     await showAdminDashboard(root);
