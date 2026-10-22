@@ -59,7 +59,9 @@ async function ensureSession() {
   if(session && session.expiresAt>Date.now())return;
   const turn=generation;
   const settings=await getDoc(doc(getFirestore(getApp()),'settings','general'));
-  endpoint=settings.exists()?(settings.data().customerRecordUploadUrl || settings.data().appsScriptEmailUrl || DEFAULT_RECORD_ENDPOINT):DEFAULT_RECORD_ENDPOINT;
+  const configured=settings.exists()?String(settings.data().customerRecordUploadUrl || settings.data().appsScriptEmailUrl || '').trim():'';
+  // Match email-dispatch's migration from the retired deployment.
+  endpoint=!configured || configured==='https://script.google.com/macros/s/AKfycby1y-oojBtmNsT8T1UPMydCTPkaZIjRss7QvxXkWi2duOs4mKI8p3tbIzvhi2xwd_Zb/exec'?DEFAULT_RECORD_ENDPOINT:configured;
   const created=await request('record_create');
   if(turn!==generation){await request('record_close',{sessionId:created.sessionId}).catch(()=>{});throw new Error('視窗已關閉。');}
   session=created;
