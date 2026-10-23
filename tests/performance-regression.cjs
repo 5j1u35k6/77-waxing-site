@@ -18,11 +18,14 @@ function context(code,values={}){const c=vm.createContext({console,Promise,Map,S
     user,isMember:u=>!!u,db:{},PROFILE_COLLECTION:'memberProfiles',IDENTITY_STATUS_URL:'https://example.invalid/',
     getIdTokenResult:async(_u,force)=>{if(force)forced++;return delayed({claims:{}});},
     fetch:async()=>delayed({ok:true,json:async()=>({ok:true,lineUserId:'line-subject'})}),
-    doc:(_db,collection,id)=>({collection,id}),getDoc:async()=>delayed(snap({displayName:'測試',phone:'0900000000',birthday:'2001-07-28',lineId:''})),
+    doc:(_db,collection,id)=>({collection,id}),getDoc:async()=>delayed(snap({displayName:'測試',phone:'0900000000',birthday:'2001-07-28',lineId:'line-subject'})),
     setDoc:async(_r,data)=>profileWrites.push(data),serverTimestamp:()=>1,AbortSignal,
     fallbackProfile:u=>({uid:u.uid,lineId:u.__77MemberClaims?.lineUserId||''}),
   });
-  const profile=await member.loadProfile(user);assert.equal(peak,3);assert.equal(forced,0);assert.equal(profile.lineId,'line-subject');assert.equal(profile.birthday,'2001-07-28');assert.equal(profileWrites.length,1);
+  const profile=await member.loadProfile(user);assert.equal(peak,3);assert.equal(forced,0);assert.equal(profile.lineId,'line-subject');assert.equal(profile.birthday,'2001-07-28');assert.equal(profileWrites.length,0);
+  member.getDoc=async()=>snap(null);const createdProfile=await member.loadProfile({uid:'new-member',getIdToken:async()=> 'valid-token'});assert.equal(createdProfile.lineId,'line-subject');assert.equal(profileWrites.length,1);
+  let finishProfile;const stale=context("let currentUser={uid:'A'},currentProfile=null,profilePromise=null;"+part('assets/member-auth.js','async function ensureProfile(','async function saveProfile(')+";this.switchUser=()=>{currentUser={uid:'B'};};this.profile=()=>currentProfile;",{isMember:()=>true,loadProfile:()=>new Promise(resolve=>{finishProfile=resolve;}),window:{dispatchEvent:()=>{throw Error('stale member event');}},CustomEvent:class{}});
+  const staleRead=stale.ensureProfile();stale.switchUser();finishProfile({uid:'A'});assert.equal(await staleRead,null);assert.equal(stale.profile(),null);
 
   const variants=read('shop/admin-order-variants.js');
   const code=part('shop/admin-order-variants.js','function normalizeVariants(','async function audit(')+part('shop/admin-order-variants.js','async function confirmVariantOrder(','function polishOrderUi(');
