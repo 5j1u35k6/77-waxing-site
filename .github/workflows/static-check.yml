@@ -49,6 +49,8 @@ jobs:
           set -euo pipefail
           cp apps-script/Code.gs /tmp/apps-script-code.js
           node --check /tmp/apps-script-code.js
+      - name: Check service care content and booking email regression
+        run: node tests/service-care.cjs
       - name: Check admin Firebase bootstrap
         shell: bash
         run: |
