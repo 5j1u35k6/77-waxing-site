@@ -2,10 +2,12 @@ import { getApp } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.
 import { getAuth } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
 import { getFirestore, getDoc, doc } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
 import { DEFAULT_RECORD_ENDPOINT, recordRequest, encodeRecordFile } from "./customer-record-upload-api.js?v=20261022";
-import { recordFields } from "./customer-record-fields.js?v=20261022";
+import { recordFields } from "./customer-record-fields.js?v=20261023-paper";
+import { createRecordForm } from "./customer-record-form.js?v=20261023-paper";
 
 let dialog=null, endpoint=DEFAULT_RECORD_ENDPOINT, session=null, generation=0, pollTimer=null, polling=false, busy=false;
-let opener=null;
+let opener=null, recordEditor=null;
+function openRecordEditor(){if(!recordEditor)recordEditor=createRecordForm();recordEditor.open();return recordEditor;}
 const urls=new Map();
 const status=(message)=>{if(dialog?.open)dialog.querySelector('[data-record-status]').textContent=message;};
 async function request(action,body={}) {
@@ -46,14 +48,8 @@ async function scanFile(file,button) {
   try{
     const result=await request('record_scan',{fileId:file.id});
     if(turn!==generation)return;
-    dialog.querySelector('[data-record-text]').textContent=result.text||'未辨識到文字。';
-    const values=recordFields(result.text), fields=dialog.querySelector('[data-record-fields]');
-    for(const [key,value] of Object.entries(values)){
-      const input=fields.elements.namedItem(key);
-      if(value && input && !input.value)input.value=value;
-    }
-    dialog.querySelector('[data-record-review]').hidden=false;
-    status(result.text?'辨識完成，請核對下方表格。已有內容的欄位會保留；未辨識到的欄位可自行補齊。':'沒有辨識到文字，請換用較清晰的照片或自行補齊下方表格。');
+    const editor=openRecordEditor();editor.apply(recordFields(result.text),result.text);
+    status(result.text?'辨識完成，已開啟完整顧客資料表。請核對文字與勾選項目；人工修改會保留。':'沒有辨識到文字，已開啟完整顧客資料表供手動補齊。');
   }catch(error){if(turn===generation)status(error.message);}
   finally{busy=false;button.disabled=false;}
 }
@@ -117,19 +113,20 @@ async function upload(files) {
 function openImport(button) {
   if(dialog?.open)return;
   opener=button;generation++;session=null;busy=false;
-  dialog?.remove();releaseFiles();
+  dialog?.remove();recordEditor?.remove();recordEditor=null;releaseFiles();
   dialog=document.createElement('dialog');dialog.className='record-modal';dialog.setAttribute('aria-labelledby','record-title');
-  dialog.innerHTML=`<header class="record-head"><h2 id="record-title">新增紀錄</h2><button type="button" data-record-close aria-label="關閉">×</button></header><div class="record-methods"><button type="button">手動輸入</button><button type="button" data-record-direct>直接上傳</button><button type="button" data-record-device>透過其他裝置上傳</button></div><input type="file" multiple hidden data-record-picker><p>可上傳任何格式的檔案或照片，每個檔案最多 5 MB，最多 8 個。照片、PDF、Word 與文字檔可嘗試辨識；辨識結果請核對後使用。</p><p class="record-status" role="status" aria-live="polite" data-record-status></p><div class="record-qr" data-record-qr hidden></div><ul class="record-files" data-record-files></ul><section class="record-review" data-record-review hidden><h3>手動輸入表格</h3><p>辨識資料已帶入以下草稿，可直接修改。目前尚未儲存為顧客紀錄。</p><form class="record-fields" data-record-fields><label>姓名<input name="name" maxlength="80"></label><label>手機號碼<input name="phone" type="tel" maxlength="30"></label><label>生日<input name="birthday" type="date"></label><label>信箱<input name="email" type="email" maxlength="160"></label><label class="record-wide">服務項目<input name="service" maxlength="120"></label><label class="record-wide">備註<textarea name="note" rows="3" maxlength="1000"></textarea></label></form><details><summary>查看辨識原文</summary><pre data-record-text></pre></details></section>`;
+  dialog.innerHTML=`<header class="record-head"><h2 id="record-title">新增紀錄</h2><button type="button" data-record-close aria-label="關閉">×</button></header><div class="record-methods"><button type="button" data-record-manual>手動輸入</button><button type="button" data-record-direct>直接上傳</button><button type="button" data-record-device>透過其他裝置上傳</button></div><input type="file" multiple hidden data-record-picker><p>可上傳任何格式的檔案或照片，每個檔案最多 5 MB，最多 8 個。照片、PDF、Word 與文字檔可嘗試辨識；辨識後會開啟完整顧客資料表供核對。</p><p class="record-status" role="status" aria-live="polite" data-record-status></p><div class="record-qr" data-record-qr hidden></div><ul class="record-files" data-record-files></ul>`;
   document.body.appendChild(dialog);
   const picker=dialog.querySelector('[data-record-picker]');
+  dialog.querySelector('[data-record-manual]').onclick=openRecordEditor;
   dialog.querySelector('[data-record-direct]').onclick=()=>picker.click();
   picker.onchange=()=>{const files=Array.from(picker.files||[]);picker.value='';upload(files);};
   dialog.querySelector('[data-record-device]').onclick=showQR;
   dialog.querySelector('[data-record-close]').onclick=()=>dialog.close();
-  dialog.querySelector('form').onsubmit=e=>e.preventDefault();
   dialog.addEventListener('cancel',event=>{event.preventDefault();dialog.close();});
   dialog.addEventListener('close',()=>{
     generation++;clearInterval(pollTimer);releaseFiles();
+    recordEditor?.remove();recordEditor=null;
     if(session)request('record_close').catch(()=>{});
     session=null;opener?.focus();
   },{once:true});
