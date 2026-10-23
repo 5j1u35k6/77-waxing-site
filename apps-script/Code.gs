@@ -1,7 +1,7 @@
 const PROJECT_ID = 'waxing-86909';
 const FIRESTORE_BASE = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
 const STORE_EMAIL = '77waxing.mail@gmail.com';
-const SCRIPT_VERSION = '2026-10-23-service-care-v36';
+const SCRIPT_VERSION = '2026-10-23-taiwan-copy-v37';
 const WEBSITE_URL = 'https://5j1u35k6.github.io/77-waxing-site/';
 const SHOP_URL = 'https://5j1u35k6.github.io/77select/';
 const EMAIL_FOOTER_IMAGE = 'https://5j1u35k6.github.io/77-waxing-site/assets/email-footer-77waxing-v25.jpg?v=20260911-0035';
@@ -444,7 +444,7 @@ function bookingInfo_(b) {
 function bookingCareBefore_(booking) {
   const care = globalThis.WaxingServiceCare;
   const guides = care.forBooking(booking);
-  return `<div style="margin:24px 0;padding:18px 20px;border:1px solid #dbc7af;border-radius:14px;background:#fbf4e8;color:#44362b"><h2 style="font-size:20px;margin:0 0 14px">施作前注意事項</h2>${guides.map(guide => `<h3 style="font-size:16px">${esc_(guide.title)}</h3><ul style="padding-left:22px">${guide.before.map(text => `<li style="margin:8px 0;line-height:1.8">${esc_(text)}</li>`).join('')}</ul>`).join('')}<p style="font-size:12px;line-height:1.8;color:#776654">${esc_(care.safety)}</p><p><a href="${WEBSITE_URL}services/" style="color:#765137">查看完整施作前、中、後注意事項</a></p></div>`;
+  return `<div style="margin:24px 0;padding:18px 20px;border:1px solid #dbc7af;border-radius:14px;background:#fbf4e8;color:#44362b"><h2 style="font-size:20px;margin:0 0 14px">施作前注意事項</h2>${guides.map(guide => `<h3 style="font-size:16px">${esc_(guide.title)}</h3><ul style="padding-left:22px">${guide.before.map(text => `<li style="margin:8px 0;line-height:1.8">${esc_(text)}</li>`).join('')}</ul>`).join('')}<p style="font-size:12px;line-height:1.8;color:#776654">${esc_(care.safety)}</p><p><a href="${WEBSITE_URL}services/" style="color:#765137">檢視完整施作前、中、後注意事項</a></p></div>`;
 }
 
 function infoLine_(label, value) {

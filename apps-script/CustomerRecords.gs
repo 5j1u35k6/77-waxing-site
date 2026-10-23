@@ -12,10 +12,10 @@ function routeCustomerRecordsPost_(payload) {
     const messages = {
       admin_required:'請以管理員帳號重新登入。', session_expired:'上傳連結已失效，請重新產生 QR Code。',
       invalid_file:'檔案內容有誤，或已超過 5 MB。', file_limit:'此連結最多可上傳 8 個檔案。',
-      file_missing:'找不到這個檔案。', unsupported:'這個格式已保存，但目前無法辨識文字。',
+      file_missing:'找不到這個檔案。', unsupported:'這個格式已儲存，但目前無法辨識文字。',
       busy:'上傳服務忙碌中，請稍後再試。'
     };
-    return json_({ok:false, service:'customer-records-v1', message:messages[error.message] || '處理失敗，請稍後重試；若持續發生，請檢查上傳服務的 Drive 授權與部署版本。'});
+    return json_({ok:false, service:'customer-records-v1', message:messages[error.message] || '處理失敗，請稍後再試；若持續發生，請檢查上傳服務的 Drive 授權與部署版本。'});
   }
 }
 
