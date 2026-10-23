@@ -13,9 +13,11 @@ function routeCustomerRecordsPost_(payload) {
       admin_required:'請以管理員帳號重新登入。', session_expired:'上傳連結已失效，請重新產生 QR Code。',
       invalid_file:'檔案內容有誤，或已超過 5 MB。', file_limit:'此連結最多可上傳 8 個檔案。',
       file_missing:'找不到這個檔案。', unsupported:'這個格式已儲存，但目前無法辨識文字。',
-      busy:'上傳服務忙碌中，請稍後再試。'
+      busy:'上傳服務忙碌中，請稍後再試。',
+      ocr_failed:'原檔已上傳，但文字辨識暫時失敗；請按「重新辨識」，不必重傳原檔。',
+      ocr_empty:'原檔已保留，但未辨識到文字。請確認照片清晰、方向正確，或手動填寫。'
     };
-    return json_({ok:false, service:'customer-records-v1', message:messages[error.message] || '處理失敗，請稍後再試；若持續發生，請檢查上傳服務的 Drive 授權與部署版本。'});
+    return json_({ok:false, service:'customer-records-v1', code:messages[error.message]?error.message:'processing_failed', message:messages[error.message] || '處理失敗，請稍後再試；若持續發生，請檢查上傳服務的 Drive 授權與部署版本。'});
   }
 }
 
@@ -46,7 +48,7 @@ function recordLoad_(id) {
 }
 function recordPublicFiles_(files) {return files.map(f=>({id:f.id,name:f.name,size:f.size,mime:f.mime}));}
 function recordAction_(p) {
-  const uid=p.action==='record_upload'?null:recordAdmin_(p);
+  const uid=p.action==='record_upload'&&!p.idToken?null:recordAdmin_(p);
   const lock=LockService.getScriptLock();
   // Polling/reading must not queue behind uploads or starve OCR requests.
   const needsLock=['record_create','record_upload','record_close'].indexOf(p.action)>=0;
@@ -68,22 +70,34 @@ function recordAction_(p) {
     }
     session=recordLoad_(p.sessionId);
     if(p.action==='record_upload') {
+      if(uid&&session.data.uid!==uid)throw new Error('admin_required');
       if(!/^[\da-f]{64}$/.test(String(p.uploadKey||'')) || recordDigest_(p.uploadKey)!==session.data.uploadHash)throw new Error('session_expired');
       const f=p.file||{};
       if(!/^[\da-f-]{36}$/.test(String(f.requestId||'')))throw new Error('invalid_file');
       const duplicate=session.data.files.find(x=>x.requestId===f.requestId);
-      if(duplicate)return {uploaded:true};
+      if(duplicate)return uid?{uploaded:true,file:recordPublicFiles_([duplicate])[0]}:{uploaded:true};
       if(session.data.files.length>=8)throw new Error('file_limit');
       if(typeof f.data!=='string' || f.data.length>Math.ceil(RECORD_MAX_BYTES/3)*4 || !/^[A-Za-z0-9+/]+={0,2}$/.test(f.data))throw new Error('invalid_file');
       const bytes=Utilities.base64Decode(f.data);
       if(!bytes.length || bytes.length>RECORD_MAX_BYTES)throw new Error('invalid_file');
+      let ocrBytes=null;
+      if(f.ocr){
+        if(!/^image\/(jpeg|png)$/.test(String(f.mime||'')))throw new Error('invalid_file');
+        if(f.ocr.mime!=='image/jpeg'||typeof f.ocr.data!=='string'||f.ocr.data.length>2400000||!/^[A-Za-z0-9+/]+={0,2}$/.test(f.ocr.data))throw new Error('invalid_file');
+        ocrBytes=Utilities.base64Decode(f.ocr.data);
+        if(!ocrBytes.length||ocrBytes.length>1800000||(ocrBytes[0]+256)%256!==255||(ocrBytes[1]+256)%256!==216)throw new Error('invalid_file');
+      }
       const name=String(f.name||'file').replace(/[\x00-\x1f/\\]/g,'_').slice(0,160);
       const mime=/^[\w.+-]+\/[\w.+-]+$/.test(String(f.mime||''))?f.mime:'application/octet-stream';
       const saved=session.folder.createFile(Utilities.newBlob(bytes,mime,'upload-'+Utilities.getUuid()+'-'+name));
-      session.data.files.push({id:saved.getId(),name,mime,size:bytes.length,requestId:f.requestId});
-      try{session.manifest.setContent(JSON.stringify(session.data));}catch(error){saved.setTrashed(true);throw error;}
+      let ocrFile;
+      const entry={id:saved.getId(),name,mime,size:bytes.length,requestId:f.requestId};
+      try{
+        if(ocrBytes){ocrFile=session.folder.createFile(Utilities.newBlob(ocrBytes,'image/jpeg','ocr-source-'+saved.getId()+'.jpg'));entry.ocrId=ocrFile.getId();}
+        session.data.files.push(entry);session.manifest.setContent(JSON.stringify(session.data));
+      }catch(error){saved.setTrashed(true);if(ocrFile)ocrFile.setTrashed(true);throw error;}
       // Upload-only capability never returns other customers' files or Drive IDs.
-      return {uploaded:true};
+      return uid?{uploaded:true,file:recordPublicFiles_([entry])[0]}:{uploaded:true};
     }
     if(session.data.uid!==uid)throw new Error('admin_required');
     if(p.action==='record_list')return {files:recordPublicFiles_(session.data.files),expiresAt:session.data.expiresAt};
@@ -96,24 +110,35 @@ function recordAction_(p) {
   throw new Error('unsupported');
 }
 function recordScan_(file,folder) {
+  const cached=folder.getFilesByName('ocr-result-'+file.id+'.txt');
+  if(cached.hasNext())return cached.next().getBlob().getDataAsString('UTF-8').slice(0,50000);
   const original=DriveApp.getFileById(file.id).getBlob();
   if(/^text\//.test(file.mime) || /\.(txt|csv|json|md)$/i.test(file.name))return original.getDataAsString('UTF-8').slice(0,50000);
   if(!/^(image\/(jpeg|png|gif|bmp)|application\/pdf|application\/msword|application\/vnd.openxmlformats-officedocument.wordprocessingml.document)$/.test(file.mime))throw new Error('unsupported');
   const boundary='record_'+Utilities.getUuid();
   const meta=JSON.stringify({name:'OCR '+file.name,mimeType:'application/vnd.google-apps.document',parents:[folder.getId()]});
-  const header=Utilities.newBlob('--'+boundary+'\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n'+meta+'\r\n--'+boundary+'\r\nContent-Type: '+file.mime+'\r\n\r\n').getBytes();
-  const bytes=header.concat(original.getBytes(),Utilities.newBlob('\r\n--'+boundary+'--').getBytes());
+  const source=file.ocrId?DriveApp.getFileById(file.ocrId).getBlob():original;
+  const header=Utilities.newBlob('--'+boundary+'\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n'+meta+'\r\n--'+boundary+'\r\nContent-Type: '+(file.ocrId?'image/jpeg':file.mime)+'\r\n\r\n').getBytes();
+  const bytes=header.concat(source.getBytes(),Utilities.newBlob('\r\n--'+boundary+'--').getBytes());
   // Let Drive detect the source language; unsupported hints reject the upload.
   const result=UrlFetchApp.fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id',{method:'post',headers:{Authorization:'Bearer '+ScriptApp.getOAuthToken()},contentType:'multipart/related; boundary='+boundary,payload:bytes,muteHttpExceptions:true});
   if(result.getResponseCode()>=300){
-    console.error('record OCR conversion failed',result.getResponseCode(),result.getContentText().slice(0,500));
+    console.error('record OCR conversion failed',result.getResponseCode());
     throw new Error('ocr_failed');
   }
   const id=JSON.parse(result.getContentText()).id;
   try {
-    const response=UrlFetchApp.fetch('https://www.googleapis.com/drive/v3/files/'+encodeURIComponent(id)+'/export?mimeType=text%2Fplain',{headers:{Authorization:'Bearer '+ScriptApp.getOAuthToken()},muteHttpExceptions:true});
-    if(response.getResponseCode()!==200)throw new Error('ocr_failed');
-    return response.getContentText().slice(0,50000);
+    for(let attempt=0;attempt<3;attempt++){
+      const response=UrlFetchApp.fetch('https://www.googleapis.com/drive/v3/files/'+encodeURIComponent(id)+'/export?mimeType=text%2Fplain',{headers:{Authorization:'Bearer '+ScriptApp.getOAuthToken()},muteHttpExceptions:true});
+      const code=response.getResponseCode(),text=code===200?response.getContentText().slice(0,50000):'';
+      if(code===200&&text.trim()){
+        // Private, short-lived result; every read still passes fresh admin/session validation.
+        try{folder.createFile('ocr-result-'+file.id+'.txt',text,MimeType.PLAIN_TEXT);}catch(error){console.warn('record OCR result cache unavailable');}
+        return text;
+      }
+      if(attempt<2&&(code===200||[404,429,500,502,503,504].indexOf(code)>=0)){Utilities.sleep(attempt?750:250);continue;}
+      throw new Error(code===200?'ocr_empty':'ocr_failed');
+    }
   } finally {DriveApp.getFileById(id).setTrashed(true);}
 }
 // Install a daily trigger after authorization. Removes expired staging files only.
@@ -132,4 +157,3 @@ function setupCustomerRecordUploads() {
   recordRoot_();
   if(!ScriptApp.getProjectTriggers().some(t=>t.getHandlerFunction()==='cleanupCustomerRecordUploads'))ScriptApp.newTrigger('cleanupCustomerRecordUploads').timeBased().everyDays(1).create();
 }
-

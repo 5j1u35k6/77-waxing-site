@@ -1,7 +1,7 @@
 const PROJECT_ID = 'waxing-86909';
 const FIRESTORE_BASE = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
 const STORE_EMAIL = '77waxing.mail@gmail.com';
-const SCRIPT_VERSION = '2026-10-23-performance-v39';
+const SCRIPT_VERSION = '2026-10-23-upload-v40';
 const WEBSITE_URL = 'https://5j1u35k6.github.io/77-waxing-site/';
 const SHOP_URL = 'https://5j1u35k6.github.io/77select/';
 const EMAIL_FOOTER_IMAGE = 'https://5j1u35k6.github.io/77-waxing-site/assets/email-footer-77waxing-v25.jpg?v=20260911-0035';
@@ -528,4 +528,3 @@ function esc_(value) {
 function json_(obj) {
   return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
 }
-
