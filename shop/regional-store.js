@@ -665,7 +665,8 @@ async function refreshCartProducts() {
   const refreshed = snapshots.filter(row => row.exists() && row.data().active === true)
     .map(row => ({ id: row.id, ...row.data() }));
   const selected = new Set(ids);
-  products = [...products.filter(row => !selected.has(row.id)), ...refreshed];
+  products = [...products.filter(row => !selected.has(row.id)), ...refreshed]
+    .sort((a,b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0) || String(a.name || '').localeCompare(String(b.name || ''),'zh-Hant'));
 }
 
 async function loadProducts({ render = true } = {}) {
