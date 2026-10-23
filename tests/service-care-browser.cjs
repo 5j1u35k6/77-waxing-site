@@ -3,6 +3,27 @@ const root=path.resolve(__dirname,'..');
 const store=fs.readFileSync(path.join(root,'assets/service-catalog-store.js'),'utf8');
 const catalogCtx=vm.createContext({});vm.runInContext(store.slice(store.indexOf('const serviceItem ='),store.indexOf('function ',store.indexOf('export const DEFAULT_CATALOG'))).replace('export const DEFAULT_CATALOG','globalThis.catalog'),catalogCtx);
 const catalog=JSON.parse(JSON.stringify(catalogCtx.catalog));
+async function assertFrozenHeading(page) {
+  const dialog=page.locator('dialog[open]');
+  for(const viewport of [{width:1440,height:900},{width:390,height:844},{width:844,height:390}]){
+    await page.setViewportSize(viewport);
+    await dialog.evaluate(el=>{el.scrollTop=0;});
+    const before=await dialog.locator('.care-dialog-head').boundingBox();
+    const title=await dialog.locator('h2').textContent();
+    await dialog.evaluate(el=>{el.scrollTop=el.scrollHeight;});
+    await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+    const after=await dialog.locator('.care-dialog-head').boundingBox();
+    assert.ok(await dialog.evaluate(el=>el.scrollTop>0),'long care dialog actually scrolled');
+    assert.ok(Math.abs(before.y-after.y)<2,'full heading remains frozen while scrolling');
+    assert.equal(await dialog.locator('h2').textContent(),title);
+    assert.equal(await dialog.locator('.care-dialog-head').evaluate(el=>getComputedStyle(el).position),'sticky');
+    const close=await dialog.locator('.care-close').boundingBox();
+    assert.ok(close.y>=after.y&&close.y+close.height<=after.y+after.height,'close button remains in the frozen heading');
+    assert.equal(await dialog.evaluate(el=>el.scrollWidth<=el.clientWidth+1),true);
+  }
+  await page.setViewportSize({width:1440,height:1000});
+  await dialog.evaluate(el=>{el.scrollTop=0;});
+}
 let writes=[];
 const server=http.createServer((req,res)=>{
   const url=new URL(req.url,'http://test');let route=url.pathname.replace(/^\/77-waxing-site/,'');
@@ -30,11 +51,13 @@ const server=http.createServer((req,res)=>{
     const page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));
     await page.goto(origin+'/booking/');await page.locator('[data-booking-item="women-private"]').click();
     assert.equal(await page.locator('dialog[open]').count(),1);assert.match(await page.locator('dialog').innerText(),/0.5 公分/);assert.equal(await page.locator('dialog details').first().getAttribute('open'),'');assert.equal(await page.locator('dialog details').nth(1).getAttribute('open'),null);
+    await assertFrozenHeading(page);
     await page.getByRole('button',{name:'關閉提醒，繼續預約'}).click();await page.locator('[data-step="1"] [data-next]').click();await page.locator('[data-slot-time="10:00"]').first().click();await page.locator('[data-step="2"] [data-next]').click();
     for(const [name,value] of [['name','功能測試'],['phone','0900000000'],['email','test@example.invalid'],['birthday','2001-07-28']])await page.locator(`[name="${name}"]`).fill(value);
     await page.locator('[name="gender"]').selectOption('male');await page.locator('[name="ok"]').check();await page.locator('[data-step="3"] [data-next]').click();assert.match(await page.locator('[data-care-confirmation]').innerText(),/0.5 公分/);await page.locator('[data-submit]').click();await page.locator('.success.on').waitFor();assert.match(await page.locator('.success .care-reminder').innerText(),/0.5 公分/);assert.equal(await page.evaluate(()=>window.testWrites.filter(row=>row.ref.collection==='bookings').length),1);
     await page.goto('about:blank');await page.goto(origin+'/booking/#category=bust&item='+encodeURIComponent('基礎美胸'));await page.locator('dialog[open]').waitFor();assert.match(await page.locator('dialog').innerText(),/隆乳/);assert.doesNotMatch(await page.locator('dialog').innerText(),/0.5 公分/);assert.match(await page.locator('[data-booking-prefill-note]').textContent(),/基礎美胸/);await page.locator('.care-close').click();await page.locator('[data-booking-category="men"]').click();assert.equal(await page.locator('[data-booking-care] .care-reminder').count(),0);await page.locator('[data-booking-item="men-private"]').click();assert.match(await page.locator('dialog').innerText(),/熱蠟除毛/);
     await page.goto(origin+'/77-waxing-site/services/skin-care/');await page.locator('[data-service-item-id="skin-massage-basic"] .service-care-trigger').click();assert.equal(await page.locator('dialog .care-guide').count(),2);assert.match(await page.locator('dialog').innerText(),/請勿空腹或過飽/);
+    await assertFrozenHeading(page);
     for(const width of [1440,390]){await page.setViewportSize({width,height:900});assert.equal(await page.locator('dialog').evaluate(el=>el.scrollWidth<=el.clientWidth+1),true);assert.ok((await page.locator('dialog').boundingBox()).width<=width);}
     await page.setViewportSize({width:1200,height:1000});await page.screenshot({path:path.join(root,'artifacts/service-care-preview.png')});await page.keyboard.press('Escape');assert.equal(await page.locator('dialog[open]').count(),0);assert.equal(await page.locator('[data-service-item-id="skin-massage-basic"] .service-care-trigger').evaluate(el=>el===document.activeElement),true);
     assert.deepEqual(errors,[]);console.log('PASS: service-card modal; before/during/after; immediate item selection + price prefill; category clearing; confirmation and successful booking reminders; 1440/390px and Escape/focus restoration. Firebase mocked; no real bookings or email.');
