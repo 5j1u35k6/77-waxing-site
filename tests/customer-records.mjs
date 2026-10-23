@@ -39,7 +39,7 @@ class Folder {
   getFoldersByName(name){return iter(this.children.filter(f=>f.name===name&&!f.trashed));}
   getFolders(){return iter(this.children.filter(f=>!f.trashed));}
   getFilesByName(name){return iter(this.files.filter(f=>f.name===name&&!f.trashed));}
-  createFile(arg,text,mime){const b=typeof arg==='string'?blob(text,mime,arg):arg;const f={id:'file-'+(++count),name:b.name,data:b,getId(){return this.id;},getBlob(){return this.data;},setContent(s){this.data=blob(s);},setTrashed(v){this.trashed=v;}};this.files.push(f);files.set(f.id,f);return f;}
+  createFile(arg,text,mime){const b=typeof arg==='string'?blob(text,mime,arg):arg;const f={id:'file-'+(++count),name:b.name,data:b,getId(){return this.id;},getBlob(){return this.data;},getSize(){return this.data.getBytes().length;},isTrashed(){return !!this.trashed;},setContent(s){this.data=blob(s);},setTrashed(v){this.trashed=v;}};this.files.push(f);files.set(f.id,f);return f;}
   setTrashed(v){this.trashed=v;}
 }
 const ctx=vm.createContext({console,Date:class extends Date {static now(){return now;}},
@@ -96,6 +96,18 @@ assert.equal(run('record_upload',{...access,file:{...content,requestId:randomUUI
 const exp=run('record_create',{idToken:'admin'});now+=21*60*1000;
 assert.equal(run('record_list',{idToken:'admin',sessionId:exp.sessionId}).ok,false);
 ctx.cleanupCustomerRecordUploads();assert.equal(held,false);
+// Single authenticated submission; lost replies may replay without another folder or file.
+const submission={idToken:'admin',requestId:randomUUID(),uploadKey:'c'.repeat(64),file:{...content,requestId:randomUUID()}};
+const submitted=run('record_submit',submission);assert.equal(submitted.ok,true);assert.equal(submitted.uploaded,true);assert.equal(submitted.verified,true);assert.equal(submitted.bytes,Buffer.from('姓名：王小明').length);
+assert.equal(submitted.sessionId,submission.requestId);const counts=[folders.size,files.size];
+assert.equal(run('record_submit',submission).file.id,submitted.file.id);assert.deepEqual([folders.size,files.size],counts);
+assert.equal(run('record_submit',{...submission,idToken:'customer'}).ok,false);
+assert.equal(run('record_submit',{...submission,idToken:''}).ok,false);
+assert.equal(run('record_submit',{...submission,file:{...submission.file,data:Buffer.from('different bytes').toString('base64')}}).ok,false);
+const stored=files.get(submitted.file.id),storedBlob=stored.data;stored.data=blob('short');
+assert.equal(run('record_submit',submission).code,'verify_failed','never acknowledge truncated storage');stored.data=storedBlob;
+stored.trashed=true;assert.equal(run('record_submit',submission).verified,undefined,'never acknowledge missing original');stored.trashed=false;
+assert.equal(run('record_submit',submission).verified,true,'same request can recover after a lost verification');
 // Direct uploads can return only the verified owner's accepted file; phone links remain upload-only.
 const direct=run('record_create',{idToken:'admin'}),directAccess={sessionId:direct.sessionId,uploadKey:direct.uploadKey};
 const imageFile={name:'large.jpg',mime:'image/jpeg',data:Buffer.from('original image bytes').toString('base64'),requestId:randomUUID(),ocr:{mime:'image/jpeg',data:Buffer.from([255,216,255,217]).toString('base64')}};
