@@ -3,6 +3,7 @@ import { collection, doc, getDocsFromServer, query, runTransaction, serverTimest
 import { firebaseConfigured } from "./firebase-config.js";
 import { getPublicFirebase } from "./public-firebase.js?v=20260912-1330";
 import { loadCatalog, publicCatalog } from "./service-catalog-store.js?v=20260912-1330";
+import { beforeCareMarkup, showServiceCare } from './service-care-ui.js?v=20261023-care1';
 
 const REPO_BASE = "/77-waxing-site";
 const B = location.hostname.endsWith("github.io") ? REPO_BASE : "";
@@ -218,6 +219,20 @@ async function mount(root) {
   let availability = { windowDates: [], locksByDate: new Map() };
   const nextButton = root.querySelector('[data-step="1"] [data-next]');
   const prefillNote = root.querySelector('[data-booking-prefill-note]');
+  const carePanel = document.createElement('div');
+  carePanel.dataset.bookingCare = '1';
+  root.querySelector('[data-booking-service-note]').after(carePanel);
+  const chosenAddons = () => [...root.querySelectorAll('[data-booking-addons][data-category="'+CSS.escape(selectedCategory.key)+'"] [data-booking-addon-option]:checked')].map(input=>input.value);
+  const drawCare = () => {
+    carePanel.innerHTML = beforeCareMarkup(selectedCategory, selectedItem, chosenAddons());
+    if (selectedItem) {
+      const review = document.createElement('button');
+      review.type='button'; review.className='btn care-review-button'; review.textContent='查看完整注意事項';
+      review.onclick=()=>showServiceCare(selectedCategory,selectedItem,{addons:chosenAddons()});
+      carePanel.append(review);
+    }
+  };
+  root.addEventListener('change', event=>{if(event.target.matches('[data-booking-addon-option]'))drawCare();});
 
   const phoneCountrySelect = root.querySelector('[name="phoneCountry"]');
   const phoneInput = root.querySelector('[name="phone"]');
@@ -276,8 +291,11 @@ async function mount(root) {
         drawItems();
         nextButton.disabled = !selectedItem;
         if (prefillNote) { prefillNote.hidden = true; prefillNote.textContent = ""; }
+        root.querySelector('[data-booking-item].on')?.focus({preventScroll:true});
+        showServiceCare(selectedCategory, selectedItem, {beforeOnly:true});
       };
     });
+    drawCare();
   };
 
   root.querySelectorAll("[data-booking-category]").forEach((button) => {
@@ -362,6 +380,11 @@ async function mount(root) {
         const endTime = addMinutesToTime(selectedTime, selectedItem.durationMinutes);
         const summary = { 服務分類: selectedCategory.name, 服務項目: selectedItem.name, 施作時間: selectedItem.durationLabel, 日期: selectedDate, 開始時間: selectedTime, 結束時間: `${endTime}（${selectedItem.durationLabel}）`, 姓名: name, 生理性別: gender === "female" ? "生理女" : "生理男", 生日: formatRocBirthday(birthday), 手機: `${phone.country.name} (${phone.country.dial}) ${phone.local}`, Email: email, 來店: root.querySelector('[name="first"]').value === "yes" ? "第一次" : "回訪" };
         root.querySelector(".summary").innerHTML = Object.entries(summary).map(([key, value]) => `<div><small>${esc(key)}</small><b>${esc(value)}</b></div>`).join("");
+        root.querySelector('[data-care-confirmation]')?.remove();
+        const reminder = document.createElement('div');
+        reminder.dataset.careConfirmation='1';
+        reminder.innerHTML=beforeCareMarkup(selectedCategory,selectedItem,chosenAddons());
+        root.querySelector('.summary').after(reminder);
       }
       show(Math.min(4, step + 1));
     };
@@ -408,6 +431,9 @@ async function mount(root) {
         await writeBooking(false);
       }
       window.dispatchEvent(new CustomEvent("77waxing:booking-created", { detail: { bookingId: bookingRef.id } }));
+      const reminder = document.createElement('div');
+      reminder.innerHTML=beforeCareMarkup(selectedCategory,selectedItem,chosenAddons());
+      root.querySelector('.success .email-delivery-note').after(reminder);
       root.querySelectorAll(".step").forEach((element) => element.classList.remove("on"));
       root.querySelector(".steps").style.display = "none";
       root.querySelector(".success").classList.add("on");
@@ -431,6 +457,10 @@ async function mount(root) {
   drawItems();
   nextButton.disabled = !selectedItem;
   syncPrefillNote();
+  if(selectedItem){
+    root.querySelector('[data-booking-item].on')?.focus({preventScroll:true});
+    showServiceCare(selectedCategory,selectedItem,{beforeOnly:true});
+  }
   drawCalendar();
   window.dispatchEvent(new CustomEvent("77waxing:booking-category", { detail: selectedCategory }));
 }
