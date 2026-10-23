@@ -5,7 +5,7 @@ import { firebaseConfig } from './firebase-config.js';
 import { mountRecordForm } from './customer-record-page-form.js?v=20261023-tw1';
 import { recordFields } from './customer-record-fields.js?v=20261023-paper';
 import { saveCustomerRecord, loadCustomerRecord } from './customer-record-store.js?v=20261023-tw1';
-import { DEFAULT_RECORD_ENDPOINT, recordRequest } from './customer-record-upload-api.js?v=20261022';
+import { DEFAULT_RECORD_ENDPOINT, recordRequest } from './customer-record-upload-api.js?v=20261023-perf2';
 
 const status=document.querySelector('[data-page-status]'),host=document.querySelector('[data-record-page]'),params=new URLSearchParams(location.search);
 const app=getApps().find(a=>a.name==='[DEFAULT]')||initializeApp(firebaseConfig),auth=getAuth(app),db=getFirestore(app);

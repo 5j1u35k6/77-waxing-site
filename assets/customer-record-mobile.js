@@ -1,4 +1,4 @@
-import { recordRequest, encodeRecordFile, validRecordEndpoint } from "./customer-record-upload-api.js?v=20261022";
+import { recordRequest, encodeRecordFile, validRecordEndpoint } from "./customer-record-upload-api.js?v=20261023-perf2";
 const args = new URLSearchParams(location.hash.slice(1));
 history.replaceState(null,"",location.pathname);
 const endpoint=args.get("endpoint"), sessionId=args.get("session"), uploadKey=args.get("key");
@@ -14,3 +14,4 @@ else button.onclick=async()=>{
   catch(error){status.textContent=`已上傳 ${completed} 個。${error.message} 尚未成功的檔案可重新選取後再試。`;}
   finally{button.disabled=false;input.disabled=false;}
 };
+
