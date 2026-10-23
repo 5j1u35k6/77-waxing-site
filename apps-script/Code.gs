@@ -1,7 +1,7 @@
 const PROJECT_ID = 'waxing-86909';
 const FIRESTORE_BASE = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
 const STORE_EMAIL = '77waxing.mail@gmail.com';
-const SCRIPT_VERSION = '2026-10-23-taiwan-copy-v37';
+const SCRIPT_VERSION = '2026-10-23-performance-v38';
 const WEBSITE_URL = 'https://5j1u35k6.github.io/77-waxing-site/';
 const SHOP_URL = 'https://5j1u35k6.github.io/77select/';
 const EMAIL_FOOTER_IMAGE = 'https://5j1u35k6.github.io/77-waxing-site/assets/email-footer-77waxing-v25.jpg?v=20260911-0035';
@@ -10,7 +10,9 @@ function senderStatus_() {
   const effectiveEmail = String(Session.getEffectiveUser().getEmail() || '').trim().toLowerCase();
   let aliases = [];
   try {
-    aliases = GmailApp.getAliases().map(v => String(v || '').trim().toLowerCase()).filter(Boolean);
+    if (effectiveEmail !== STORE_EMAIL.toLowerCase()) {
+      aliases = GmailApp.getAliases().map(v => String(v || '').trim().toLowerCase()).filter(Boolean);
+    }
   } catch (err) {
     aliases = [];
   }
@@ -87,8 +89,12 @@ function debugFooterAsset() {
 }
 
 function doPost(e) {
+  const started = Date.now();
+  let requestKind = 'booking_email';
   try {
     const payload = JSON.parse((e && e.postData && e.postData.contents) || '{}');
+    const recordAction = String(payload.action || '');
+    requestKind = ['record_create','record_upload','record_list','record_download','record_scan','record_close'].includes(recordAction) ? recordAction : payload.kind === 'shop_order' ? 'shop_email' : 'booking_email';
     if (typeof routeCustomerRecordsPost_ === 'function') {
       const recordResponse = routeCustomerRecordsPost_(payload);
       if (recordResponse) return recordResponse;
@@ -98,6 +104,8 @@ function doPost(e) {
   } catch (err) {
     console.error(err && err.stack ? err.stack : String(err));
     return json_({ ok:false, error:String(err && err.message || err), version:SCRIPT_VERSION });
+  } finally {
+    console.info(JSON.stringify({event:'request_timing',kind:requestKind,elapsedMs:Date.now()-started}));
   }
 }
 
@@ -107,8 +115,11 @@ function handleBookingPost_(payload) {
   console.log(JSON.stringify({ event: 'email_request', bookingId, hasToken: Boolean(idToken), version: SCRIPT_VERSION }));
   if (!bookingId || !idToken) return json_({ ok:false, error:'missing_data', version:SCRIPT_VERSION });
 
-  const booking = fetchDoc_(`bookings/${encodeURIComponent(bookingId)}`, idToken, false);
-  const settings = fetchDoc_('settings/general', idToken, true) || {};
+  const [booking, settingsDoc] = fetchDocs_([
+    {path:`bookings/${encodeURIComponent(bookingId)}`, allowMissing:false},
+    {path:'settings/general', allowMissing:true},
+  ], idToken);
+  const settings = settingsDoc || {};
   if (!booking) return json_({ ok:false, error:'booking_not_found', version:SCRIPT_VERSION });
 
   const key = dispatchKey_(bookingId, booking.status);
@@ -127,8 +138,11 @@ function handleShopOrderPost_(payload) {
   console.log(JSON.stringify({ event:'shop_email_request', orderId, hasToken:Boolean(idToken), version:SCRIPT_VERSION }));
   if (!orderId || !idToken) return json_({ ok:false, error:'missing_shop_data', version:SCRIPT_VERSION });
 
-  const order = fetchDoc_(`shopOrders/${encodeURIComponent(orderId)}`, idToken, false);
-  const settings = fetchDoc_('shopSettings/public', idToken, true) || {};
+  const [order, settingsDoc] = fetchDocs_([
+    {path:`shopOrders/${encodeURIComponent(orderId)}`, allowMissing:false},
+    {path:'shopSettings/public', allowMissing:true},
+  ], idToken);
+  const settings = settingsDoc || {};
   if (!order) return json_({ ok:false, error:'shop_order_not_found', version:SCRIPT_VERSION });
 
   const key = shopDispatchKey_(orderId, order.status);
@@ -361,12 +375,25 @@ function shopPaymentText_(value) {
   return value || '—';
 }
 
+// Keep Firestore authorization on every request; no token/permission/data cache.
+function fetchDocs_(entries, idToken) {
+  const responses = UrlFetchApp.fetchAll(entries.map(entry => ({
+    url:`${FIRESTORE_BASE}/${entry.path}`, method:'get',
+    headers:{Authorization:`Bearer ${idToken}`}, muteHttpExceptions:true,
+  })));
+  return responses.map((response,index) => decodeDocResponse_(response,entries[index].allowMissing));
+}
+
 function fetchDoc_(path, idToken, allowMissing) {
   const response = UrlFetchApp.fetch(`${FIRESTORE_BASE}/${path}`, {
     method:'get',
     headers:{ Authorization:`Bearer ${idToken}` },
     muteHttpExceptions:true,
   });
+  return decodeDocResponse_(response, allowMissing);
+}
+
+function decodeDocResponse_(response, allowMissing) {
   const code = response.getResponseCode();
   if (code === 404 && allowMissing) return null;
   if (code !== 200) {
@@ -501,3 +528,4 @@ function esc_(value) {
 function json_(obj) {
   return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
 }
+
