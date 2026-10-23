@@ -17,14 +17,18 @@ try {
   count=0;globalThis.fetch=async()=>{count++;throw new TypeError('network');};
   await assert.rejects(recordRequest(endpoint,'record_list'),/連線/);assert.equal(count,2,'bounded retry');
   count=0;globalThis.fetch=async()=>{count++;return new Response('',{status:503});};
-  await assert.rejects(recordRequest(endpoint,'record_scan'),/連線/);assert.equal(count,1,'do not repeat expensive OCR automatically');
+  await assert.rejects(recordRequest(endpoint,'record_scan'),/連線/);assert.equal(count,2,'one bounded retry; server lease prevents duplicate OCR');
+  count=0;globalThis.fetch=async()=>{count++;return new Response(JSON.stringify({ok:false,service:'customer-records-v1',code:'ocr_busy',message:'仍在辨識'}));};
+  await assert.rejects(recordRequest(endpoint,'record_scan'),/仍在辨識/);assert.equal(count,1,'never repeat a known running conversion');
   const upload=[];globalThis.fetch=async(_url,options)=>{upload.push(options.body);return upload.length===1?new Response('',{status:502}):ok();};
   await recordRequest(endpoint,'record_upload',{file:{requestId:'same-file-request',data:'dGVzdA=='}});
   assert.equal(upload.length,2);assert.equal(upload[0],upload[1]);
   const states=[];globalThis.fetch=async()=>ok();await recordRequest(endpoint,'record_upload',{}, {onState:state=>states.push(state)});
   assert.deepEqual(states,['sending','accepted']);
+  const scanBodies=[];globalThis.fetch=async(_url,options)=>{scanBodies.push(options.body);return scanBodies.length===1?new Response('',{status:404}):ok();};
+  await recordRequest(endpoint,'record_scan',{sessionId:'same-session',fileId:'same-file'});assert.equal(scanBodies.length,2);assert.equal(scanBodies[0],scanBodies[1],'404 recovery uses the same server-protected file');
   const previousReader=globalThis.FileReader,progress=[];
   globalThis.FileReader=class{readAsDataURL(){this.onprogress({lengthComputable:true,loaded:2,total:4});this.result='data:text/plain;base64,dGVzdA==';this.onload();}};
   try{const encoded=await encodeRecordFile({name:'test.txt',size:4,type:'text/plain'},{onProgress:(loaded,total)=>progress.push([loaded,total])});assert.equal(encoded.data,'dGVzdA==');assert.deepEqual(progress,[[2,4],[4,4]]);}finally{globalThis.FileReader=previousReader;}
-  console.log('PASS: one bounded transport retry, same secure creation/upload identifiers, shared timeout, no retry of authorization/business errors or OCR.');
+  console.log('PASS: one bounded transport retry with server-protected OCR, same secure identifiers, real read progress, shared timeout, no retry of authorization/business/running-job errors.');
 } finally {globalThis.fetch=previousFetch;}
