@@ -96,5 +96,24 @@ assert.equal(run('record_upload',{...access,file:{...content,requestId:randomUUI
 const exp=run('record_create',{idToken:'admin'});now+=21*60*1000;
 assert.equal(run('record_list',{idToken:'admin',sessionId:exp.sessionId}).ok,false);
 ctx.cleanupCustomerRecordUploads();assert.equal(held,false);
+// Direct uploads can return only the verified owner's accepted file; phone links remain upload-only.
+const direct=run('record_create',{idToken:'admin'}),directAccess={sessionId:direct.sessionId,uploadKey:direct.uploadKey};
+const imageFile={name:'large.jpg',mime:'image/jpeg',data:Buffer.from('original image bytes').toString('base64'),requestId:randomUUID(),ocr:{mime:'image/jpeg',data:Buffer.from([255,216,255,217]).toString('base64')}};
+const directUpload=run('record_upload',{...directAccess,idToken:'admin',file:imageFile});assert.equal(directUpload.ok,true);assert.equal(directUpload.file.name,'large.jpg');assert.equal(directUpload.file.ocrId,undefined);
+assert.equal(run('record_upload',{...directAccess,idToken:'admin',file:imageFile}).file.id,directUpload.file.id);
+assert.equal(run('record_upload',{...directAccess,file:imageFile}).file,undefined);
+ctx.identityAdminGetDoc_=(_c,id)=>['admin','admin2'].includes(id)?{}:null;
+assert.equal(run('record_upload',{...directAccess,idToken:'admin2',file:imageFile}).ok,false);
+assert.equal(run('record_upload',{...directAccess,file:{...imageFile,requestId:randomUUID(),ocr:{mime:'image/jpeg',data:'aW52YWxpZA=='}}}).ok,false);
+assert.equal(run('record_download',{sessionId:direct.sessionId,idToken:'admin',fileId:directUpload.file.id}).file.data,imageFile.data,'original download is byte-identical');
+let convertCount=0,exportCount=0,sleeps=[];ctx.Utilities.sleep=ms=>sleeps.push(ms);
+ctx.UrlFetchApp={fetch:(url,options)=>{
+  if(url.includes('/upload/')){convertCount++;assert.ok(Buffer.from(options.payload).includes(Buffer.from([255,216,255,217])),'OCR uses smaller companion');return {getResponseCode:()=>200,getContentText:()=>JSON.stringify({id:'ocr-test-doc'})};}
+  exportCount++;return {getResponseCode:()=>exportCount===1?503:200,getContentText:()=>'姓名：副本測試'};
+}};
+const scanArgs={sessionId:direct.sessionId,idToken:'admin',fileId:directUpload.file.id};
+assert.equal(run('record_scan',scanArgs).text,'姓名：副本測試');assert.equal(convertCount,1);assert.equal(exportCount,2);assert.deepEqual(sleeps,[250]);
+assert.equal(run('record_scan',scanArgs).text,'姓名：副本測試');assert.equal(convertCount,1,'repeat scan reads authorized private result, no repeat conversion');
+assert.equal(run('record_scan',{...scanArgs,idToken:'admin2'}).ok,false,'cached text never bypasses ownership');
+run('record_close',{sessionId:direct.sessionId,idToken:'admin'});assert.equal(run('record_scan',scanArgs).ok,false,'cached text never bypasses closed session');
 console.log('PASS: labelled field extraction, ROC/leap dates, admin checks, upload-only token, safe manifest filenames, idempotency, count cap, invalid input, closed/expired sessions and cleanup.');
-

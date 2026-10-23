@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 const source=fs.readFileSync(new URL('../assets/customer-record-upload-api.js',import.meta.url),'utf8');
-const {recordRequest}=await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'));
+const {recordRequest,encodeRecordFile}=await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'));
 const endpoint='https://script.google.com/macros/s/test/exec',previousFetch=globalThis.fetch;
 const ok=()=>new Response(JSON.stringify({ok:true,service:'customer-records-v1'}),{status:200,headers:{'Content-Type':'application/json'}});
 try {
@@ -21,6 +21,10 @@ try {
   const upload=[];globalThis.fetch=async(_url,options)=>{upload.push(options.body);return upload.length===1?new Response('',{status:502}):ok();};
   await recordRequest(endpoint,'record_upload',{file:{requestId:'same-file-request',data:'dGVzdA=='}});
   assert.equal(upload.length,2);assert.equal(upload[0],upload[1]);
+  const states=[];globalThis.fetch=async()=>ok();await recordRequest(endpoint,'record_upload',{}, {onState:state=>states.push(state)});
+  assert.deepEqual(states,['sending','accepted']);
+  const previousReader=globalThis.FileReader,progress=[];
+  globalThis.FileReader=class{readAsDataURL(){this.onprogress({lengthComputable:true,loaded:2,total:4});this.result='data:text/plain;base64,dGVzdA==';this.onload();}};
+  try{const encoded=await encodeRecordFile({name:'test.txt',size:4,type:'text/plain'},{onProgress:(loaded,total)=>progress.push([loaded,total])});assert.equal(encoded.data,'dGVzdA==');assert.deepEqual(progress,[[2,4],[4,4]]);}finally{globalThis.FileReader=previousReader;}
   console.log('PASS: one bounded transport retry, same secure creation/upload identifiers, shared timeout, no retry of authorization/business errors or OCR.');
 } finally {globalThis.fetch=previousFetch;}
-
