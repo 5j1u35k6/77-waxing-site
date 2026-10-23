@@ -1,7 +1,7 @@
 const PROJECT_ID = 'waxing-86909';
 const FIRESTORE_BASE = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
 const STORE_EMAIL = '77waxing.mail@gmail.com';
-const SCRIPT_VERSION = '2026-10-23-service-care-v35';
+const SCRIPT_VERSION = '2026-10-23-service-care-v36';
 const WEBSITE_URL = 'https://5j1u35k6.github.io/77-waxing-site/';
 const SHOP_URL = 'https://5j1u35k6.github.io/77select/';
 const EMAIL_FOOTER_IMAGE = 'https://5j1u35k6.github.io/77-waxing-site/assets/email-footer-77waxing-v25.jpg?v=20260911-0035';
@@ -49,6 +49,7 @@ function doGet(e) {
     ok: true,
     service: '77waxing-email',
     version: SCRIPT_VERSION,
+    serviceCareVersion: globalThis.WaxingServiceCare?.version || null,
     storeEmail: STORE_EMAIL,
     effectiveSender: sender.effectiveEmail || null,
     canSendAsStore: sender.canSendAsStore,

@@ -23,7 +23,7 @@ Source: four owner-supplied reference images (face care, care intervals, waxing,
 
 Update the existing `77waxing Email` project as the store account. Add `ServiceCare.gs` and modify only the three booking email templates and the `bookingCareBefore_` helper in the existing code. Preserve production LINE OAuth GET routing, identity POST routing, customer upload routing, shop behavior and deployment settings.
 
-Deployment 35: description `服務須知：預約需求、定金與確認通知加入施作前提醒`.
+Deployment 36: description `服務須知：依正式目錄對應臉部、鬆筋及胸部放鬆`.
 The original web-app URL, execution identity, access and OAuth scopes are unchanged. No authorization change is necessary.
 The repository's shop URL and the pre-existing deployed shop URL differ; this release deliberately does not replace the deployed value. Only the booking templates/helper and script version were changed in the live Code file; other source files were not replaced.
 
