@@ -1,5 +1,5 @@
 import { loadCatalog, publicCatalog, watchCatalog } from "./service-catalog-store.js?v=20260912-1330";
-import { bindServiceCareCards } from './service-care-ui.js?v=20261023-care-header1';
+import { bindServiceCareCards } from './service-care-ui.js?v=20261023-tw1';
 
 const B = "/77-waxing-site";
 const CACHE_KEY = "77waxing-public-catalog-v1";
@@ -64,7 +64,7 @@ function renderService(service) {
   root.dataset.catalogPath = normalizedPath();
   root.dataset.dynamicCatalog = "1";
   const groups = service.groups.filter((group) => group.items.length);
-  root.innerHTML = `<div class="catalog-page" data-catalog-page="service"><section class="catalog-hero"><div class="wrap"><span class="tag">${esc(service.en)}</span><h1>${esc(service.name)}</h1><p class="lead muted">${esc(service.intro)}</p>${serviceSwitcher(service.key)}</div></section><section class="service-detail-section"><div class="wrap">${groups.map((group) => `<div class="service-group" data-service-group="${esc(group.id)}" data-service-kind="${esc(group.kind)}"><div class="service-group-head"><div><span class="tag">${group.kind === "addon" ? "ADD ON" : "SERVICE"}</span><h2>${esc(group.title)}</h2></div>${group.desc ? `<p class="muted">${esc(group.desc)}</p>` : ""}</div><div class="service-item-grid">${group.items.map((item) => `<article class="service-item-card" data-service-item-id="${esc(item.id)}"><h3>${esc(item.name)}</h3>${item.description ? `<p>${esc(item.description)}</p>` : ""}${item.durationLabel ? `<span class="duration">${esc(item.durationLabel)}</span>` : ""}</article>`).join("")}</div></div>`).join("")}<div class="catalog-actions"><a class="btn dark" href="${B}/booking/">立即預約</a><a class="btn" href="${B}/menu/" data-catalog-link>查看價目</a></div></div></section></div>`;
+  root.innerHTML = `<div class="catalog-page" data-catalog-page="service"><section class="catalog-hero"><div class="wrap"><span class="tag">${esc(service.en)}</span><h1>${esc(service.name)}</h1><p class="lead muted">${esc(service.intro)}</p>${serviceSwitcher(service.key)}</div></section><section class="service-detail-section"><div class="wrap">${groups.map((group) => `<div class="service-group" data-service-group="${esc(group.id)}" data-service-kind="${esc(group.kind)}"><div class="service-group-head"><div><span class="tag">${group.kind === "addon" ? "ADD ON" : "SERVICE"}</span><h2>${esc(group.title)}</h2></div>${group.desc ? `<p class="muted">${esc(group.desc)}</p>` : ""}</div><div class="service-item-grid">${group.items.map((item) => `<article class="service-item-card" data-service-item-id="${esc(item.id)}"><h3>${esc(item.name)}</h3>${item.description ? `<p>${esc(item.description)}</p>` : ""}${item.durationLabel ? `<span class="duration">${esc(item.durationLabel)}</span>` : ""}</article>`).join("")}</div></div>`).join("")}<div class="catalog-actions"><a class="btn dark" href="${B}/booking/">立即預約</a><a class="btn" href="${B}/menu/" data-catalog-link>檢視價目</a></div></div></section></div>`;
   bindServiceCareCards(root, service);
   markHeader();
   rendering = false;
@@ -118,7 +118,7 @@ function syncHomeCards() {
     skin: "臉部、粉刺、撥筋與身體肌膚保養",
     bust: "依時間與需求選擇不同美胸保養流程",
   };
-  grid.innerHTML = catalog.map((service, index) => `<article class="card"><div class="num">${String(index + 1).padStart(2, "0")}</div><h3>${esc(service.name)}</h3><p>${esc(known[service.key] || service.intro || "查看服務項目與內容")}</p><a href="${servicePath(service)}" data-catalog-link>了解服務 →</a></article>`).join("");
+  grid.innerHTML = catalog.map((service, index) => `<article class="card"><div class="num">${String(index + 1).padStart(2, "0")}</div><h3>${esc(service.name)}</h3><p>${esc(known[service.key] || service.intro || "檢視服務項目與內容")}</p><a href="${servicePath(service)}" data-catalog-link>了解服務 →</a></article>`).join("");
   grid.dataset.dynamicCatalog = "1";
 }
 

@@ -146,7 +146,7 @@ function openLogin({ required = false, reason = "", targetUrl = "" } = {}) {
     ? "登入後會直接進入預約畫面；若你從價目表進來，剛剛選好的服務會保留。"
     : reason === "checkout"
       ? "登入後即可繼續訂購，姓名、電話與 Email 會優先從會員資料帶入。"
-      : "登入後即可查看預約、施作與訂單紀錄。";
+      : "登入後即可檢視預約、施作與訂單紀錄。";
   if (copy.textContent !== copyText) copy.textContent = copyText;
   setLoginStatus("");
   wrap.hidden = false;

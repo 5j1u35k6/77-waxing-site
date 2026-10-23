@@ -25,7 +25,7 @@ export function createRecordForm() {
       <section class="paper-terms"><h3>熱蠟除毛服務聲明及避免事項</h3><ol>${recordTerms.map(term=>`<li>${term}</li>`).join('')}</ol></section>
       <section class="paper-consent"><p>本人在此聲明此份公開表格完全為我本人並以我最佳的健康狀態和認知狀況所填寫且同意接受熱蠟除毛服務。</p><label class="paper-agreement"><input type="checkbox" name="consent">本人同意以上所列條款</label><p class="paper-hint">以下勾選、簽名與日期須由本人確認，掃描不會自動填入。此處尚未送出或儲存。</p><div class="paper-two">${input('本人簽名（正楷姓名）','signatureName')}${input('日期','signatureDate','date')}</div><label class="record-field">手寫簽名（可選，亦可填寫上方正楷姓名）<canvas width="1000" height="220" data-paper-signature aria-label="手寫簽名區"></canvas></label><button class="record-button" type="button" data-clear-signature>清除手寫簽名</button></section>
       <details class="paper-supplement"><summary>補充資料</summary><div class="paper-two">${input('信箱','email','email','maxlength="160"')}${input('服務項目','service')}</div><label class="record-field">備註<textarea name="note" maxlength="1000" rows="3"></textarea></label></details>
-      <details><summary>查看辨識原文</summary><pre data-record-text>尚未掃描檔案。</pre></details>
+      <details><summary>檢視辨識原文</summary><pre data-record-text>尚未掃描檔案。</pre></details>
       <p class="paper-hint">掃描的手寫文字與勾選狀態可能不完整，請對照原始檔逐項核對。沒有辨識到的內容請手動補齊。</p>
       <footer class="paper-actions"><button type="button" class="record-button" data-paper-back>返回上傳選項</button></footer>
     </form>`;

@@ -78,13 +78,13 @@ async function showQR() {
   try {
     await ensureSession();
     // The QR is generated locally; the secret link is never sent to a QR service.
-    if(!window.qrcode)await new Promise((resolve,reject)=>{const script=document.createElement('script');script.src='../assets/vendor/qrcode-generator.js';script.onload=resolve;script.onerror=()=>reject(new Error('QR Code 載入失敗，請稍後重試。'));document.head.appendChild(script);});
+    if(!window.qrcode)await new Promise((resolve,reject)=>{const script=document.createElement('script');script.src='../assets/vendor/qrcode-generator.js';script.onload=resolve;script.onerror=()=>reject(new Error('QR Code 載入失敗，請稍後再試。'));document.head.appendChild(script);});
     if(turn!==generation)return;
     const url=new URL('./record-upload.html',location.href);url.hash=new URLSearchParams({session:session.sessionId,key:session.uploadKey,endpoint}).toString();
     const code=window.qrcode(0,'M');code.addData(url.href);code.make();
     const box=dialog.querySelector('[data-record-qr]');box.replaceChildren();
     const graphic=document.createElement('div');graphic.innerHTML=code.createSvgTag({cellSize:4,margin:4,scalable:true});
-    const caption=document.createElement('p');caption.textContent='使用其他裝置掃碼上傳；20 分鐘內有效，關閉此視窗即失效。';
+    const caption=document.createElement('p');caption.textContent='使用其他裝置掃描 QR Code 上傳；20 分鐘內有效，關閉此視窗即失效。';
     box.append(graphic,caption);box.hidden=false;status('等待其他裝置上傳…');
   }catch(error){if(turn===generation)status(error.message);}finally{busy=false;}
 }

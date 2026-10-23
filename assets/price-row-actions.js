@@ -35,7 +35,7 @@
       row.tabIndex=0;
       row.setAttribute('role','button');
       row.setAttribute('aria-expanded','false');
-      row.setAttribute('aria-label',`${name}，點擊查看操作`);
+      row.setAttribute('aria-label',`${name}，點選檢視操作`);
 
       const actions=document.createElement('div');
       actions.className='price-row-actions';

@@ -84,7 +84,7 @@ import { loadCatalog, publicCatalog, watchCatalog } from "./service-catalog-stor
     const services=publicCatalog(categories);
     serviceHost.innerHTML=services.length
       ? services.map((service)=>`<a href="${B}/services/${encodeURIComponent(service.slug)}/">${esc(service.name)}</a>`).join('')
-      : `<a href="${B}/services/">查看服務項目</a>`;
+      : `<a href="${B}/services/">檢視服務項目</a>`;
   };
 
   const socialWrap=footer.querySelector('.footer-v2-socials');
@@ -110,7 +110,7 @@ import { loadCatalog, publicCatalog, watchCatalog } from "./service-catalog-stor
       await watchCatalog(renderFooterServices);
     }catch(error){
       console.warn('77waxing footer service catalog unavailable',error);
-      if(serviceHost)serviceHost.innerHTML=`<a href="${B}/services/">查看服務項目</a>`;
+      if(serviceHost)serviceHost.innerHTML=`<a href="${B}/services/">檢視服務項目</a>`;
     }
   })();
 

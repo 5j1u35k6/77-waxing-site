@@ -2,9 +2,9 @@ import { getApps, initializeApp } from 'https://www.gstatic.com/firebasejs/12.18
 import { getAuth, setPersistence, browserLocalPersistence, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js';
 import { doc, getDoc, getFirestore } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 import { firebaseConfig } from './firebase-config.js';
-import { mountRecordForm } from './customer-record-page-form.js?v=20261023-record-page';
+import { mountRecordForm } from './customer-record-page-form.js?v=20261023-tw1';
 import { recordFields } from './customer-record-fields.js?v=20261023-paper';
-import { saveCustomerRecord, loadCustomerRecord } from './customer-record-store.js?v=20261023-record-page';
+import { saveCustomerRecord, loadCustomerRecord } from './customer-record-store.js?v=20261023-tw1';
 import { DEFAULT_RECORD_ENDPOINT, recordRequest } from './customer-record-upload-api.js?v=20261022';
 
 const status=document.querySelector('[data-page-status]'),host=document.querySelector('[data-record-page]'),params=new URLSearchParams(location.search);
@@ -37,10 +37,10 @@ async function save(){
   if(saving||saved)return;saving=true;editor.setBusy(true);message('正在寫入並向伺服器確認…');
   try{
     const record=await saveCustomerRecord(db,user,recordId,editor.data(),editor.signature);
-    saved=true;dirty=false;editor.load(record);message('已正式儲存，重新整理後仍可查看。顧客資料清單與歷史紀錄已同步。');
+    saved=true;dirty=false;editor.load(record);message('已正式儲存，重新整理後仍可檢視。顧客資料清單與歷史紀錄已同步。');
     const url=new URL(location.href);url.search='';url.searchParams.set('record',record.id);history.replaceState(null,'',url);
     await closeSource();document.querySelector('[data-source-panel]').hidden=true;
-  }catch(error){message(error.message||'儲存失敗，資料仍保留在本頁，請重試。');}
+  }catch(error){message(error.message||'儲存失敗，資料仍保留在本頁，請再試一次。');}
   finally{saving=false;editor.setBusy(false);}
 }
 async function boot(){

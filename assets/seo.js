@@ -2,7 +2,7 @@
   const SITE='https://5j1u35k6.github.io/77-waxing-site';
   const BASE='/77-waxing-site';
   const HOME_TITLE='77美學工作室｜基隆熱蠟除毛・清粉刺・肌膚管理｜77waxing';
-  const HOME_DESCRIPTION='基隆 77美學工作室，提供女性與男性熱蠟除毛、手工清粉刺、肌膚管理與美胸保養。線上查看價目與預約服務。';
+  const HOME_DESCRIPTION='基隆 77美學工作室，提供女性與男性熱蠟除毛、手工清粉刺、肌膚管理與美胸保養。線上檢視價目與預約服務。';
   const BUSINESS_ID=`${SITE}/#business`;
   const MAP_URL='https://www.google.com/maps/search/?api=1&query=%E5%9F%BA%E9%9A%86%E5%B8%82%E4%B8%AD%E6%AD%A3%E5%8D%80%E7%BE%A9%E4%B8%80%E8%B7%AF56%E8%99%9F2%E6%A8%93';
 
@@ -44,12 +44,12 @@
     },
     '/menu/':{
       title:'基隆熱蠟除毛價目｜女性・男性除毛價格｜77waxing',
-      description:'查看 77waxing 基隆熱蠟除毛與美容保養價目，包含女性、男性熱蠟除毛、清粉刺、肌膚管理與美胸保養。',
+      description:'檢視 77waxing 基隆熱蠟除毛與美容保養價目，包含女性、男性熱蠟除毛、清粉刺、肌膚管理與美胸保養。',
       type:'WebPage'
     },
     '/space/':{
       title:'77美學工作室空間｜基隆一對一預約制美容工作室｜77waxing',
-      description:'查看基隆 77美學工作室空間。77waxing 採預約制一對一服務，提供更自在與安心的熱蠟除毛及美容保養環境。',
+      description:'檢視基隆 77美學工作室空間。77waxing 採預約制一對一服務，提供更自在與安心的熱蠟除毛及美容保養環境。',
       type:'WebPage'
     },
     '/courses/':{

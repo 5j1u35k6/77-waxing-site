@@ -3,7 +3,7 @@ import { collection, doc, getDocsFromServer, query, runTransaction, serverTimest
 import { firebaseConfigured } from "./firebase-config.js";
 import { getPublicFirebase } from "./public-firebase.js?v=20260912-1330";
 import { loadCatalog, publicCatalog } from "./service-catalog-store.js?v=20260912-1330";
-import { beforeCareMarkup, showServiceCare } from './service-care-ui.js?v=20261023-care-header1';
+import { beforeCareMarkup, showServiceCare } from './service-care-ui.js?v=20261023-tw1';
 
 const REPO_BASE = "/77-waxing-site";
 const B = location.hostname.endsWith("github.io") ? REPO_BASE : "";
@@ -170,7 +170,7 @@ function slotState(locksByDate, date, time, blockMinutes) {
 }
 
 function bookingMarkup(catalog) {
-  if (!catalog.length) return `<div class="notice"><b>目前沒有開放中的服務</b><p>請稍後再回來查看，或直接聯絡 77waxing。</p></div>`;
+  if (!catalog.length) return `<div class="notice"><b>目前沒有開放中的服務</b><p>請稍後再回來檢視，或直接聯絡 77waxing。</p></div>`;
   return `<div class="steps"><span class="on">1 服務</span><span>2 日期時段</span><span>3 資料</span><span>4 確認</span></div>
     <section class="step on" data-step="1"><h2>選擇服務項目</h2><p class="muted booking-prefill-note" data-booking-prefill-note hidden></p><div class="booking-service-picker"><aside class="booking-service-categories" aria-label="服務分類">${catalog.map((category, index) => `<button type="button" data-booking-category="${esc(category.key)}" class="${index === 0 ? "on" : ""}">${esc(category.name)}</button>`).join("")}</aside><div class="booking-service-items" data-booking-items></div></div><div class="booking-service-note muted" data-booking-service-note></div><div class="actions"><button class="btn dark" type="button" data-next disabled>下一步</button></div></section>
     <section class="step" data-step="2"><h2>選擇日期與時段</h2><p class="muted">先從月曆選日期，再從下方 7 天中選擇實際預約日與時段。</p><div class="flight-calendar"><div class="calbar"><button type="button" data-month-prev>←</button><b data-month-label></b><button type="button" data-month-next>→</button></div><div class="calweek">${"日一二三四五六".split("").map((weekday) => `<span>${weekday}</span>`).join("")}</div><div class="calgrid" data-calgrid></div></div><div class="slotlegend"><span><i class="free"></i>可選</span><span><i class="hold"></i>其他顧客預約中</span><span><i class="pick"></i>你的選擇</span></div><div class="booking-sync" data-booking-sync>正在確認可預約時段…</div><div class="dayrail" data-dayrail></div><div class="actions"><button class="btn" type="button" data-prev>上一步</button><button class="btn dark" type="button" data-next>下一步</button></div></section>
@@ -227,7 +227,7 @@ async function mount(root) {
     carePanel.innerHTML = beforeCareMarkup(selectedCategory, selectedItem, chosenAddons());
     if (selectedItem) {
       const review = document.createElement('button');
-      review.type='button'; review.className='btn care-review-button'; review.textContent='查看完整注意事項';
+      review.type='button'; review.className='btn care-review-button'; review.textContent='檢視完整注意事項';
       review.onclick=()=>showServiceCare(selectedCategory,selectedItem,{addons:chosenAddons()});
       carePanel.append(review);
     }

@@ -49,7 +49,7 @@
       <div class="home-video-showcase">
         <div class="home-video-stage-meta"><span data-video-frame>FRAME 01</span><span data-video-count>01 / 16</span></div>
         <div class="home-video-stage" data-video-stage tabindex="0" aria-label="77waxing Instagram 影片輪播"></div>
-        <div class="home-video-caption"><a data-video-original target="_blank" rel="noreferrer">查看 Instagram 原文 ↗</a></div>
+        <div class="home-video-caption"><a data-video-original target="_blank" rel="noreferrer">檢視 Instagram 原文 ↗</a></div>
         <div class="home-video-controls">
           <button type="button" data-video-prev aria-label="上一支影片">‹</button>
           <div class="home-video-dots" data-video-dots aria-label="影片分頁"></div>

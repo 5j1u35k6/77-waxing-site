@@ -1,12 +1,12 @@
 (()=>{
   const source=document.currentScript?.src||location.href;
-  const seoUrl=new URL('./seo.js?v=20260922-no-static-service-catalog1',source).href;
+  const seoUrl=new URL('./seo.js?v=20261023-tw1',source).href;
   import(seoUrl).catch(error=>console.warn('77waxing SEO layer unavailable',error));
 })();
 
 (()=>{
   const source=document.currentScript?.src||location.href;
-  const memberUrl=new URL('./member-auth.js?v=20260927-line-claims',source).href;
+  const memberUrl=new URL('./member-auth.js?v=20261023-tw1',source).href;
   const googleUrl=new URL('./google-auth-ui.js?v=20260915-google5-linked',source).href;
   const popupFixUrl=new URL('./member-auth-popup-fix.js?v=20260915-line-custom6-linked',source).href;
   const accountLinkUrl=new URL('./account-linking.js?v=20260915-account-link2-diagnostics',source).href;
@@ -140,6 +140,7 @@
 
 (()=>{
   const source=document.currentScript?.src||location.href;
-  const footerUrl=new URL('./footer-enhancements.js?v=20260922-footer-live1',source).href;
+  const footerUrl=new URL('./footer-enhancements.js?v=20261023-tw1',source).href;
   import(footerUrl).catch(error=>console.warn('77waxing footer unavailable',error));
 })();
+

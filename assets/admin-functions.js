@@ -140,7 +140,7 @@ function enhanceBookingRows() {
     const customerTypeCell = cells[5];
     if (customerCell && customerCell.dataset.customerQuickId !== row.id) {
       customerCell.dataset.customerQuickId = row.id;
-      customerCell.innerHTML = `<button type="button" class="admin-customer-link" data-customer-quick="${esc(row.id)}" aria-label="查看 ${esc(row.customerName || "顧客")} 聯絡資訊與過去預約紀錄">${esc(row.customerName || "未命名")}</button>`;
+      customerCell.innerHTML = `<button type="button" class="admin-customer-link" data-customer-quick="${esc(row.id)}" aria-label="檢視 ${esc(row.customerName || "顧客")} 聯絡資訊與過去預約紀錄">${esc(row.customerName || "未命名")}</button>`;
     }
     if (customerTypeCell) {
       const text = row.isFirstVisit ? "新" : "舊";

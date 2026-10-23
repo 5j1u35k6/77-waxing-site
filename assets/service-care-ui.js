@@ -43,8 +43,8 @@ export function bindServiceCareCards(root, category) {
     const button = document.createElement('button');
     button.type='button'; button.className='service-care-trigger';
     button.setAttribute('aria-haspopup','dialog');
-    button.setAttribute('aria-label',`${item.name}：查看施作前、中、後注意事項`);
-    button.textContent='查看施作前・中・後注意事項 →';
+    button.setAttribute('aria-label',`${item.name}：檢視施作前、中、後注意事項`);
+    button.textContent='檢視施作前・中・後注意事項 →';
     button.onclick=()=>showServiceCare(category,item);
     card.append(button);
     card.addEventListener('click',event=>{if(!event.target.closest('button,a'))showServiceCare(category,item);});

@@ -26,7 +26,7 @@ if(typeof document!=='undefined')document.addEventListener('click',event=>{
   if(!related.length){const empty=document.createElement('p');empty.textContent='目前沒有已儲存的顧客資料表。';section.appendChild(empty);}
   for(const record of related.sort((a,b)=>(Number(b.createdAt?.seconds)||0)-(Number(a.createdAt?.seconds)||0))){
     if(!/^paper_[\da-f-]{36}$/.test(record.id))continue;
-    const row=document.createElement('p'),link=document.createElement('a');link.href='./customer-record.html?record='+encodeURIComponent(record.id);link.textContent=`${record.consultationDate||'未填諮詢日期'} · 查看顧客資料表`;const state=document.createElement('small');state.textContent=record.confirmationStatus==='customer_confirmed'?'（本人確認欄位齊全）':'（未完成本人確認）';row.append(link,state);section.appendChild(row);
+    const row=document.createElement('p'),link=document.createElement('a');link.href='./customer-record.html?record='+encodeURIComponent(record.id);link.textContent=`${record.consultationDate||'未填諮詢日期'} · 檢視顧客資料表`;const state=document.createElement('small');state.textContent=record.confirmationStatus==='customer_confirmed'?'（本人確認欄位齊全）':'（未完成本人確認）';row.append(link,state);section.appendChild(row);
   }
   modal.appendChild(section);
 });

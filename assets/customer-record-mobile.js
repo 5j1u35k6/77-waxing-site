@@ -10,7 +10,7 @@ else button.onclick=async()=>{
   if(files.length>8){status.textContent="一次最多選取 8 個檔案。";return;}
   button.disabled=true;input.disabled=true;
   let completed=0;
-  try { for(const file of files){status.textContent=`正在上傳 ${file.name}（${completed+1}/${files.length}）…`;await recordRequest(endpoint,"record_upload",{sessionId,uploadKey,file:await encodeRecordFile(file)});completed++;} status.textContent="上傳完成，請回到原本裝置查看並辨識檔案。";input.value=""; }
-  catch(error){status.textContent=`已上傳 ${completed} 個。${error.message} 尚未成功的檔案可重新選取後重試。`;}
+  try { for(const file of files){status.textContent=`正在上傳 ${file.name}（${completed+1}/${files.length}）…`;await recordRequest(endpoint,"record_upload",{sessionId,uploadKey,file:await encodeRecordFile(file)});completed++;} status.textContent="上傳完成，請回到原本裝置檢視並辨識檔案。";input.value=""; }
+  catch(error){status.textContent=`已上傳 ${completed} 個。${error.message} 尚未成功的檔案可重新選取後再試。`;}
   finally{button.disabled=false;input.disabled=false;}
 };
