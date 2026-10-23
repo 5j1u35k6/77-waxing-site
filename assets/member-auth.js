@@ -208,12 +208,17 @@ function fallbackProfile(user) {
 
 async function loadProfile(user) {
   if (!isMember(user)) return null;
+  // Start independent reads together; Firebase refreshes expired tokens itself.
+  const profileRead = getDoc(doc(db, PROFILE_COLLECTION, user.uid)).then(snap => ({ snap }), error => ({ error }));
+  const claimsRead = (async () => {
   try {
-    const tokenResult = await getIdTokenResult(user, true);
-    user.__77MemberClaims = tokenResult?.claims || {};
+    const tokenResult = await getIdTokenResult(user);
+    user.__77MemberClaims = { ...(tokenResult?.claims || {}), ...(user.__77MemberClaims || {}) };
   } catch (error) {
     console.warn("member token claims unavailable", error);
   }
+  })();
+  const identityRead = (async () => {
   // A member may have signed in with Google after linking LINE.  In that
   // case the LINE subject belongs to the secured identity-link service, not
   // Firebase's providerData/custom token.  Ask that service only for the
@@ -225,6 +230,7 @@ async function loadProfile(user) {
       headers: { "Content-Type": "application/json" },
       credentials: "omit",
       cache: "no-store",
+      signal: AbortSignal.timeout(12000),
       body: JSON.stringify({ action: "identity_status", firebaseIdToken }),
     });
     const identity = await response.json();
@@ -234,10 +240,14 @@ async function loadProfile(user) {
   } catch (error) {
     console.warn("linked LINE identity unavailable", error);
   }
+  })();
+  await Promise.all([claimsRead, identityRead]);
   const fallback = fallbackProfile(user);
   try {
     const ref = doc(db, PROFILE_COLLECTION, user.uid);
-    const snap = await getDoc(ref);
+    const result = await profileRead;
+    if (result.error) throw result.error;
+    const snap = result.snap;
     if (snap.exists()) {
       const profile = { ...fallback, ...snap.data(), uid: user.uid };
       if (fallback.lineId && !profile.lineId) {
@@ -264,13 +274,16 @@ async function ensureProfile() {
   if (!isMember()) return null;
   if (currentProfile?.uid === currentUser.uid) return currentProfile;
   if (!profilePromise) {
-    profilePromise = loadProfile(currentUser)
+    const user = currentUser;
+    const pending = loadProfile(user)
       .then((profile) => {
+        if (currentUser?.uid !== user.uid) return null;
         currentProfile = profile;
         window.dispatchEvent(new CustomEvent("77waxing:member-ready", { detail: { user: currentUser, profile } }));
         return profile;
       })
-      .finally(() => { profilePromise = null; });
+      .finally(() => { if (profilePromise === pending) profilePromise = null; });
+    profilePromise = pending;
   }
   return profilePromise;
 }
@@ -614,8 +627,10 @@ onAuthStateChanged(auth, async (user) => {
   profilePromise = null;
 
   if (isMember(user)) {
-    await ensureProfile();
     closeLogin();
+    syncMemberButtons();
+    await ensureProfile();
+    if (currentUser?.uid !== user.uid) return;
     syncMemberButtons();
     applyProfileToBooking();
     applyProfileToShop();
@@ -635,3 +650,4 @@ window.__77_MEMBER__ = {
   openMemberCenter,
   saveProfile,
 };
+

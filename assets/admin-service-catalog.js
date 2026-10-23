@@ -1,6 +1,6 @@
 import { getApp, getApps } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
-import { DEFAULT_CATALOG, loadCatalog, makeCatalogId, makeSlug, saveCatalog, watchCatalog } from "./service-catalog-store.js?v=20260912-1330";
+import { DEFAULT_CATALOG, loadCatalog, makeCatalogId, makeSlug, saveCatalog, watchCatalog } from "./service-catalog-store.js?v=20261023-perf1";
 
 const VERSION = "20260912-1350";
 let catalog = JSON.parse(JSON.stringify(DEFAULT_CATALOG));
@@ -351,3 +351,4 @@ document.addEventListener("click", async (event) => {
 
 new MutationObserver(enhanceGroupEditors).observe(document.querySelector("#app") || document.body, { childList: true, subtree: true });
 enhanceGroupEditors();
+

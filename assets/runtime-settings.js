@@ -49,10 +49,6 @@ function waitForExistingSignIn(timeout=900){
 async function ensureSignedIn(){
   if(typeof auth.authStateReady==='function')await auth.authStateReady();
   if(auth.currentUser)return auth.currentUser;
-  if(location.pathname.includes('/booking')){
-    const existing=await waitForExistingSignIn();
-    if(existing)return existing;
-  }
   if(!window.__77_PUBLIC_ANON_AUTH_PROMISE__){
     window.__77_PUBLIC_ANON_AUTH_PROMISE__=signInAnonymously(auth)
       .then(credential=>credential.user)

@@ -259,12 +259,20 @@ async function ensureSignedIn() {
 }
 
 
+let catalogRead = null;
 export async function loadCatalog() {
   await ensureSignedIn();
-  const ref = doc(db, "services", CATALOG_DOC_ID);
-  const snap = await getDoc(ref);
-  if (snap.exists() && Array.isArray(snap.data()?.categories)) return normalizeCatalog(snap.data().categories);
-  return normalizeCatalog(clone(DEFAULT_CATALOG));
+  const user = auth.currentUser;
+  if (!catalogRead || catalogRead.db !== db || catalogRead.uid !== user?.uid) {
+    const read = { db, uid: user?.uid };
+    read.promise = getDoc(doc(db, "services", CATALOG_DOC_ID)).then(snap =>
+      snap.exists() && Array.isArray(snap.data()?.categories)
+        ? normalizeCatalog(snap.data().categories) : normalizeCatalog(clone(DEFAULT_CATALOG))
+    ).finally(() => { if (catalogRead === read) catalogRead = null; });
+    catalogRead = read;
+  }
+  // Only coalesce concurrent reads, never keep a stale catalog or share mutable data.
+  return clone(await catalogRead.promise);
 }
 
 export async function saveCatalog(categories) {
@@ -304,3 +312,4 @@ export function publicCatalog(categories) {
       })),
     }));
 }
+

@@ -1,4 +1,4 @@
-import { loadCatalog, publicCatalog, watchCatalog } from "./service-catalog-store.js?v=20260912-1330";
+import { loadCatalog, publicCatalog, watchCatalog } from "./service-catalog-store.js?v=20261023-perf1";
 
 (()=>{
   const footer=document.querySelector('.site-footer');
@@ -116,3 +116,4 @@ import { loadCatalog, publicCatalog, watchCatalog } from "./service-catalog-stor
 
   document.dispatchEvent(new CustomEvent('77footerready'));
 })();
+

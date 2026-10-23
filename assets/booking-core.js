@@ -2,7 +2,7 @@ import { signInAnonymously } from "https://www.gstatic.com/firebasejs/12.18.0/fi
 import { collection, doc, getDocsFromServer, query, runTransaction, serverTimestamp, where } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
 import { firebaseConfigured } from "./firebase-config.js";
 import { getPublicFirebase } from "./public-firebase.js?v=20260912-1330";
-import { loadCatalog, publicCatalog } from "./service-catalog-store.js?v=20260912-1330";
+import { loadCatalog, publicCatalog } from "./service-catalog-store.js?v=20261023-perf1";
 import { beforeCareMarkup, showServiceCare } from './service-care-ui.js?v=20261023-tw1';
 
 const REPO_BASE = "/77-waxing-site";
@@ -413,7 +413,8 @@ async function mount(root) {
       const phoneMetadataNote = `[手機國際資訊] ${phone.country.name} ${phone.country.dial}｜${phone.international}`;
       const compatibilityNote = [note, phoneMetadataNote].filter(Boolean).join("\n").slice(0, 1000) || null;
       const writeBooking = async (includePhoneMetadata) => runTransaction(db, async (transaction) => {
-        for (const lockRef of lockRefs) { const snapshot = await transaction.get(lockRef); if (snapshot.exists()) throw new Error("SLOT_CONFLICT"); }
+        const lockSnapshots = await Promise.all(lockRefs.map(lockRef => transaction.get(lockRef)));
+        if (lockSnapshots.some(snapshot => snapshot.exists())) throw new Error("SLOT_CONFLICT");
         const bookingData = { ownerUid: user.uid, customerName: name, customerPhone: phone.local, customerEmail: email, customerLineId: lineId || null, customerGender: gender, customerBirthday: birthday, serviceName: `${selectedCategory.name}｜${selectedItem.name}`, preferredDate: selectedDate, preferredTime: selectedTime, status: "pending_confirmation", isFirstVisit: firstVisit, depositRequired: null, depositAmount: null, paymentStatus: "not_requested", durationMinutes: selectedItem.durationMinutes, bufferMinutes: selectedItem.blockMinutes - selectedItem.durationMinutes, lockIds, lockTimes, note: includePhoneMetadata ? (note || null) : compatibilityNote, createdAt: serverTimestamp(), updatedAt: serverTimestamp() };
         if (includePhoneMetadata) {
           bookingData.customerPhoneCountry = phone.country.name;
@@ -476,3 +477,4 @@ const appRoot = document.querySelector("#app");
 if (appRoot) new MutationObserver(() => queueMicrotask(tryMount)).observe(appRoot, { childList: true, subtree: true });
 window.addEventListener("popstate", () => setTimeout(tryMount, 0));
 setTimeout(tryMount, 0);
+

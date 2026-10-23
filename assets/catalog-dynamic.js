@@ -1,4 +1,4 @@
-import { loadCatalog, publicCatalog, watchCatalog } from "./service-catalog-store.js?v=20260912-1330";
+import { loadCatalog, publicCatalog, watchCatalog } from "./service-catalog-store.js?v=20261023-perf1";
 import { bindServiceCareCards } from './service-care-ui.js?v=20261023-tw1';
 
 const B = "/77-waxing-site";
@@ -191,3 +191,4 @@ new MutationObserver(() => schedule()).observe(document.querySelector("#app") ||
 addEventListener("popstate", () => setTimeout(() => renderCurrent(true), 0));
 addEventListener("hashchange", () => schedule());
 start().catch((error) => console.error("77waxing dynamic catalog failed", error));
+

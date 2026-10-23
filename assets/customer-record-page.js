@@ -59,9 +59,13 @@ async function boot(){
       const settings=await getDoc(doc(db,'settings','general')),data=settings.exists()?settings.data():{};
       const configured=String(data.customerRecordUploadUrl||data.appsScriptEmailUrl||'').trim();
       endpoint=!configured||configured==='https://script.google.com/macros/s/AKfycby1y-oojBtmNsT8T1UPMydCTPkaZIjRss7QvxXkWi2duOs4mKI8p3tbIzvhi2xwd_Zb/exec'?DEFAULT_RECORD_ENDPOINT:configured;
-      document.querySelector('[data-source-panel]').hidden=false;await listSources();pollTimer=setInterval(listSources,5000);
-      const file=params.get('file');if(file&&/^[\w-]{1,160}$/.test(file))await scanSource(file);
+      document.querySelector('[data-source-panel]').hidden=false;
+      const listing=listSources();pollTimer=setInterval(listSources,5000);
+      const file=params.get('file');
+      // Scanning validates its own file/session; listing need not block it.
+      await Promise.all([listing,file&&/^[\w-]{1,160}$/.test(file)?scanSource(file):Promise.resolve()]);
     }
   }catch(error){host.hidden=true;status.hidden=false;status.replaceChildren();const text=document.createElement('p');text.textContent=error.message||'無法載入顧客資料表。';const back=document.createElement('a');back.href='./#customers';back.textContent='返回管理後台';status.append(text,back);}
 }
 boot();
+

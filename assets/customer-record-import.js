@@ -49,11 +49,13 @@ function scanFile(file){if(!busy)openRecordPage(file.id);}
 async function ensureSession() {
   if(session && session.expiresAt>Date.now())return;
   const turn=generation;
-  const settings=await getDoc(doc(getFirestore(getApp()),'settings','general'));
+  const user=getAuth(getApp()).currentUser;
+  if(!user||user.isAnonymous)throw new Error('請先登入管理後台。');
+  const [settings,idToken]=await Promise.all([getDoc(doc(getFirestore(getApp()),'settings','general')),user.getIdToken()]);
   const configured=settings.exists()?String(settings.data().customerRecordUploadUrl || settings.data().appsScriptEmailUrl || '').trim():'';
   // Match email-dispatch's migration from the retired deployment.
   endpoint=!configured || configured==='https://script.google.com/macros/s/AKfycby1y-oojBtmNsT8T1UPMydCTPkaZIjRss7QvxXkWi2duOs4mKI8p3tbIzvhi2xwd_Zb/exec'?DEFAULT_RECORD_ENDPOINT:configured;
-  const created=await request('record_create');
+  const created=await recordRequest(endpoint,'record_create',{idToken});
   if(turn!==generation){await request('record_close',{sessionId:created.sessionId}).catch(()=>{});throw new Error('視窗已關閉。');}
   session=created;
   clearInterval(pollTimer);
@@ -132,3 +134,4 @@ document.addEventListener('click',event=>{
 },true);
 function renameEntry(){document.querySelectorAll('[data-paper-import]').forEach(button=>{if(button.textContent!=='新增紀錄')button.textContent='新增紀錄';});}
 new MutationObserver(renameEntry).observe(document.body,{childList:true,subtree:true});renameEntry();
+

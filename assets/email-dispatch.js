@@ -33,9 +33,8 @@ async function dispatchBooking(user,db,bookingId){
   if(inFlight.has(flightKey))return false;
   inFlight.add(flightKey);
   try{
-    const url=await emailUrl(db);
+    const [url,idToken]=await Promise.all([emailUrl(db),user.getIdToken()]);
     if(!url)return false;
-    const idToken=await user.getIdToken();
     console.info('[77 email] dispatch',DISPATCH_VERSION,bookingId,url);
     await fetch(url,{method:'POST',mode:'no-cors',cache:'no-store',keepalive:true,headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({bookingId,idToken})});
     return true;
@@ -139,3 +138,4 @@ function start(){
   if(auth.currentUser)startForUser(auth.currentUser);
 }
 start();
+
