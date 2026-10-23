@@ -12,7 +12,8 @@ export async function recordRequest(endpoint, action, payload = {}, {onState=()=
     data.uploadKey ||= Array.from(crypto.getRandomValues(new Uint8Array(32)), n => n.toString(16).padStart(2,"0")).join("");
   }
   const body = JSON.stringify({action, ...data});
-  const retryable = ["record_create","record_upload","record_list","record_download","record_close"].includes(action);
+  // OCR is now protected by a server-side per-file lease and completed-result reuse.
+  const retryable = ["record_create","record_upload","record_list","record_download","record_close","record_scan"].includes(action);
   const signal = AbortSignal.timeout(120000);
   for (let attempt=0; attempt<2; attempt++) {
     onState(attempt ? 'retrying' : 'sending');

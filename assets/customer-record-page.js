@@ -5,7 +5,7 @@ import { firebaseConfig } from './firebase-config.js';
 import { mountRecordForm } from './customer-record-page-form.js?v=20261023-tw1';
 import { recordFields } from './customer-record-fields.js?v=20261023-paper';
 import { saveCustomerRecord, loadCustomerRecord } from './customer-record-store.js?v=20261023-tw1';
-import { DEFAULT_RECORD_ENDPOINT, recordRequest } from './customer-record-upload-api.js?v=20261023-upload3';
+import { DEFAULT_RECORD_ENDPOINT, recordRequest } from './customer-record-upload-api.js?v=20261023-upload4';
 
 const status=document.querySelector('[data-page-status]'),host=document.querySelector('[data-record-page]'),params=new URLSearchParams(location.search);
 // Older cached HTML remains usable while the new page and module deploy separately.
@@ -33,7 +33,7 @@ function setScanning(value){
 async function scanSource(fileId){
   if(scanning||saved)return;activeFile=fileId;setScanning(true);sourceStatus('原檔已上傳，正在辨識並套用；不必重複上傳…');
   try{
-    const text=recognized.has(fileId)?recognized.get(fileId):(await sourceRequest('record_scan',{fileId})).text;
+    const text=recognized.has(fileId)?recognized.get(fileId):(await recordRequest(endpoint,'record_scan',{idToken:await user.getIdToken(),sessionId:sourceSession,fileId},{onState:state=>{if(state==='retrying')sourceStatus('辨識連線暫時中斷，正在重新連接；原檔已保留…');}})).text;
     if(!String(text||'').trim())throw new Error('原檔已保留，但未辨識到文字。請換一張清晰照片或手動填寫。');
     recognized.set(fileId,text);lastFailedFile='';
     if(!saved){editor.apply(recordFields(text),text);sourceStatus('辨識完成。請核對資料；人工修改、同意及簽名不會被自動覆蓋。');}
