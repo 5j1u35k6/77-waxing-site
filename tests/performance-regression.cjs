@@ -46,10 +46,11 @@ function context(code,values={}){const c=vm.createContext({console,Promise,Map,S
   await assert.rejects(inventory.cancelVariantOrder({},'o',''),/原因/);
 
   const cartCode=part('shop/regional-store.js','async function refreshCartProducts(','async function loadProducts(');
-  const requested=[];const cartContext=context("let cart=[{productId:'p1'},{productId:'p1'},{productId:'p2'}];let products=[{id:'p1',price:1},{id:'unrelated',price:9}];"+cartCode+";this.getProducts=()=>products;",{
-    db:{},doc:(_d,_c,id)=>({id}),getDocFromServer:async ref=>{requested.push(ref.id);return {id:ref.id,...snap(ref.id==='p1'?{active:true,price:100}:null)};},
+  const requested=[];const cartContext=context("let cart=[{productId:'p1'},{productId:'p1'},{productId:'p2'}];let products=[{id:'p1',name:'A',price:1},{id:'unrelated',name:'B',price:9}];"+cartCode+";this.getProducts=()=>products;",{
+    db:{},doc:(_d,_c,id)=>({id}),getDocFromServer:async ref=>{requested.push(ref.id);return {id:ref.id,...snap(ref.id==='p1'?{active:true,name:'A',price:100}:null)};},
   });
   await cartContext.refreshCartProducts();assert.equal(requested.join(','),'p1,p2');assert.equal(cartContext.getProducts().find(p=>p.id==='p1').price,100);assert.equal(cartContext.getProducts().some(p=>p.id==='p2'),false);assert.equal(cartContext.getProducts().some(p=>p.id==='unrelated'),true);
+  assert.equal(cartContext.getProducts().map(p=>p.id).join(','),'p1,unrelated','checkout refresh preserves catalog ordering');
 
   let batches=0;const ok=fields=>({getResponseCode:()=>200,getContentText:()=>JSON.stringify({fields})});
   let responses=[ok({status:{stringValue:'pending_confirmation'}}),{getResponseCode:()=>404,getContentText:()=>''}];
