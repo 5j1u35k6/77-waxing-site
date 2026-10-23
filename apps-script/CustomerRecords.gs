@@ -54,7 +54,15 @@ function recordAction_(p) {
   let session, file;
   try {
     if(p.action==='record_create') {
-      const sessionId=Utilities.getUuid(),uploadKey=recordKey_(),folder=recordRoot_().createFolder(sessionId),expiresAt=Date.now()+RECORD_TTL_MS;
+      const supplied=Boolean(p.requestId||p.uploadKey);
+      if(supplied&&(!/^[\da-f-]{36}$/.test(String(p.requestId||''))||!/^[\da-f]{64}$/.test(String(p.uploadKey||''))))throw new Error('invalid_file');
+      const sessionId=supplied?String(p.requestId):Utilities.getUuid(),uploadKey=supplied?String(p.uploadKey):recordKey_(),root=recordRoot_();
+      if(supplied&&root.getFoldersByName(sessionId).hasNext()) {
+        const existing=recordLoad_(sessionId);
+        if(existing.data.uid!==uid||existing.data.uploadHash!==recordDigest_(uploadKey))throw new Error('session_expired');
+        return {sessionId,uploadKey,expiresAt:existing.data.expiresAt,files:recordPublicFiles_(existing.data.files)};
+      }
+      const folder=root.createFolder(sessionId),expiresAt=Date.now()+RECORD_TTL_MS;
       folder.createFile('session.json',JSON.stringify({uid,expiresAt,uploadHash:recordDigest_(uploadKey),files:[]}),MimeType.PLAIN_TEXT);
       return {sessionId,uploadKey,expiresAt,files:[]};
     }
@@ -124,3 +132,4 @@ function setupCustomerRecordUploads() {
   recordRoot_();
   if(!ScriptApp.getProjectTriggers().some(t=>t.getHandlerFunction()==='cleanupCustomerRecordUploads'))ScriptApp.newTrigger('cleanupCustomerRecordUploads').timeBased().everyDays(1).create();
 }
+
