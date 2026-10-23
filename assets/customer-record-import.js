@@ -1,14 +1,17 @@
 import { getApp } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";
 import { getAuth } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
 import { getFirestore, getDoc, doc } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
-import { DEFAULT_RECORD_ENDPOINT, recordRequest, encodeRecordFile } from "./customer-record-upload-api.js?v=20261023-upload4";
+import { DEFAULT_RECORD_ENDPOINT, recordRequest, encodeRecordFile, recordCapability } from "./customer-record-upload-api.js?v=20261023-auto5";
 import { showUploadQueue } from "./customer-record-progress.js?v=20261023-upload4";
 
 let dialog=null,endpoint=DEFAULT_RECORD_ENDPOINT,session=null,generation=0,pollTimer=null,polling=false,busy=false,opener=null,prepared=null,creating=null,qrLoading=null,watching=false,watchStarted=0;
+let transfer=null,navigating=false;
 const urls=new Map();
 const status=message=>{if(dialog?.open)dialog.querySelector('[data-record-status]').textContent=message;};
 function setBusy(value){busy=value;if(dialog){dialog.setAttribute('aria-busy',String(value));dialog.querySelectorAll('[data-record-manual],[data-record-direct],[data-record-device],.record-scan').forEach(button=>button.disabled=value);}}
 function openRecordPage(fileId=''){
+  if(transfer&&transfer.completed<transfer.jobs.length&&!confirm('仍有未確認的檔案，離開後無法繼續傳送。確定先開啟表格？'))return;
+  if(navigating)return;navigating=true;watching=false;clearTimeout(pollTimer);
   const url=new URL('./customer-record.html',location.href);
   if(session&&session.expiresAt>Date.now())url.searchParams.set('session',session.sessionId);
   if(fileId)url.searchParams.set('file',fileId);
@@ -78,7 +81,10 @@ async function poll(){
   try{
     const result=await request('record_list');if(turn!==generation)return;
     const before=dialog.querySelector('[data-record-files]').children.length;renderFiles(result.files);
-    if(result.files.length>before&&!busy)status('已收到上傳檔案，可按「辨識並套用」。');
+    if(result.files.length>before&&!busy){
+      status('檔案已確認保存，正在自動開啟表格並辨識…');
+      if(watching)openRecordPage(result.files[0].id);
+    }
   }catch(error){if(turn===generation&&!busy)status(error.message);}
   finally{polling=false;schedulePoll(turn);}
 }
@@ -102,50 +108,61 @@ async function showQR(){
 async function upload(files){
   if(busy||!files.length)return;
   if(files.length>8){status('一次最多選取 8 個檔案。');return;}
-  const turn=generation;setBusy(true);
   const queue=showUploadQueue(dialog.querySelector('[data-upload-queue]'),files);
+  transfer={turn:generation,capability:recordCapability(),jobs:files.map(file=>({file,encoded:null,accepted:false})),queue,completed:0};
+  return continueUpload();
+}
+async function continueUpload(){
+  if(!transfer||busy)return;
+  const batch=transfer,turn=batch.turn,{jobs,queue}=batch;setBusy(true);dialog.querySelector('[data-upload-retry]').hidden=true;
+  const files=jobs.map(job=>job.file);
   status('已選取 '+files.length+' 個檔案，正在準備上傳…');
-  // Start local reading while the authenticated staging session is being created.
-  const connected=ensureSession();connected.catch(()=>{});
-  let completed=0,needsList=false;
+  // One authenticated request creates/reuses staging and saves the original; no separate create round trip.
+  const connected=prepare();connected.catch(()=>{});
   try{
-    for(let index=0;index<files.length;index++){
+    for(let index=0;index<jobs.length;index++){
       if(turn!==generation)return;
-      queue.update(index,'reading');
-      const encoded=await encodeRecordFile(files[index],{onProgress:(loaded,total)=>{if(turn===generation)queue.update(index,'reading','',loaded,total);},onState:state=>{if(turn===generation)queue.update(index,state);}});
-      queue.update(index,'ready');await connected;if(turn!==generation)return;
-      const result=await request('record_upload',{uploadKey:session.uploadKey,file:encoded},{onState:state=>{if(turn===generation)queue.update(index,state);}});
-      if(turn!==generation)return;
-      queue.update(index,'accepted');completed++;
-      // New server returns only this admin's accepted file; legacy servers use one fallback list.
-      if(result.file)renderFiles([result.file]);else needsList=true;
+      const job=jobs[index];if(job.accepted)continue;
+      if(!job.encoded){queue.update(index,'reading');job.encoded=await encodeRecordFile(job.file,{onProgress:(loaded,total)=>{if(turn===generation)queue.update(index,'reading','',loaded,total);},onState:state=>{if(turn===generation)queue.update(index,state);}});}
+      queue.update(index,'ready');const ready=await connected;if(turn!==generation)return;endpoint=ready.endpoint;
+      const user=getAuth(getApp()).currentUser;if(!user||user.isAnonymous)throw new Error('請先登入管理後台。');
+      const result=await recordRequest(endpoint,'record_submit',{idToken:await user.getIdToken(),...batch.capability,file:job.encoded},{onState:state=>{if(turn===generation&&state!=='accepted')queue.update(index,state);}});
+      if(turn!==generation){recordRequest(endpoint,'record_close',{idToken:await user.getIdToken(),sessionId:result.sessionId}).catch(()=>{});return;}
+      if(!result.uploaded||!result.verified||!result.file)throw new Error('尚未取得原檔儲存確認，請按「繼續上傳」。');
+      session=result;job.accepted=true;job.serverFile=result.file;job.encoded=null;job.file=null;batch.completed++;
+      queue.update(index,'accepted');renderFiles([result.file]);
     }
-    if(needsList)await poll();
-    if(turn===generation)status('上傳完成，請按檔案旁的「辨識並套用」。');
-  }catch(error){if(turn===generation){queue.update(completed,'failed',error.message);status('已完成 '+completed+' 個。'+error.message);}}
-  finally{if(turn===generation)setBusy(false);}
+    if(turn===generation){status('檔案已確認保存，正在自動辨識並帶入表格…');openRecordPage(jobs[0].serverFile.id);}
+  }catch(error){if(turn===generation){queue.update(batch.completed,'failed',error.message);status('已確認保存 '+batch.completed+' 個。'+error.message+' 未完成的檔案仍保留在此頁，請按「繼續上傳」；關閉或重新整理會清除尚未確認的檔案。');dialog.querySelector('[data-upload-retry]').hidden=false;}}
+  finally{if(turn===generation&&!navigating)setBusy(false);}
 }
 function openImport(button){
   if(dialog?.open)return;
-  opener=button;generation++;session=null;prepared=null;creating=null;watching=false;polling=false;busy=false;clearTimeout(pollTimer);
+  opener=button;generation++;session=null;prepared=null;creating=null;watching=false;polling=false;busy=false;transfer=null;navigating=false;clearTimeout(pollTimer);
   dialog?.remove();releaseFiles();
   dialog=document.createElement('dialog');dialog.className='record-modal';dialog.setAttribute('aria-labelledby','record-title');
-  dialog.innerHTML='<header class="record-head"><h2 id="record-title">新增紀錄</h2><button type="button" data-record-close aria-label="關閉">×</button></header><div class="record-methods"><button type="button" data-record-manual>手動輸入</button><button type="button" data-record-direct>直接上傳</button><button type="button" data-record-device>透過其他裝置上傳</button></div><input type="file" multiple hidden data-record-picker><p>可上傳任何格式的檔案或照片，每個檔案最多 5 MB，最多 8 個。原始檔案保留不變，大張照片會另外準備辨識用圖片。</p><p class="record-status" role="status" aria-live="polite" data-record-status></p><ul class="record-files" data-upload-queue hidden></ul><div class="record-qr" data-record-qr hidden></div><ul class="record-files" data-record-files></ul>';
+  dialog.innerHTML='<header class="record-head"><h2 id="record-title">新增紀錄</h2><button type="button" data-record-close aria-label="關閉">×</button></header><div class="record-methods"><button type="button" data-record-manual>手動輸入</button><button type="button" data-record-direct>直接上傳</button><button type="button" data-record-device>透過其他裝置上傳</button></div><input type="file" multiple hidden data-record-picker><p>選檔後自動上傳，確認原檔保存後會自動開啟表格、辨識並帶入資料。每個檔案最多 5 MB，最多 8 個；多個檔案會先帶入第一份，其他檔案可在表格中選擇核對。</p><p class="record-status" role="status" aria-live="polite" data-record-status></p><button class="record-button" type="button" data-upload-retry hidden>繼續上傳</button><ul class="record-files" data-upload-queue hidden></ul><div class="record-qr" data-record-qr hidden></div><ul class="record-files" data-record-files></ul>';
   document.body.appendChild(dialog);
   const picker=dialog.querySelector('[data-record-picker]');
   dialog.querySelector('[data-record-manual]').onclick=()=>openRecordPage();
   dialog.querySelector('[data-record-direct]').onclick=()=>picker.click();
-  picker.onchange=()=>{const files=Array.from(picker.files||[]);picker.value='';upload(files);};
+  picker.onchange=()=>{const files=Array.from(picker.files||[]);picker.value='';if(!files.length)return;if(transfer&&transfer.completed<transfer.jobs.length){if(!confirm('改選會結束這批上傳，這批檔案不再帶入新表格。確定改選？'))return;if(session)request('record_close').catch(()=>{});session=null;dialog.querySelector('[data-record-files]').replaceChildren();}upload(files);};
+  dialog.querySelector('[data-upload-retry]').onclick=continueUpload;
   dialog.querySelector('[data-record-device]').onclick=showQR;
-  dialog.querySelector('[data-record-close]').onclick=()=>dialog.close();
-  dialog.addEventListener('cancel',event=>{event.preventDefault();dialog.close();});
+  const close=()=>{if(transfer&&transfer.completed<transfer.jobs.length&&!confirm('仍有未確認的檔案，關閉後無法繼續傳送。確定關閉？'))return;dialog.close();};
+  dialog.querySelector('[data-record-close]').onclick=close;
+  dialog.addEventListener('cancel',event=>{event.preventDefault();close();});
   dialog.addEventListener('close',()=>{
     generation++;watching=false;clearTimeout(pollTimer);releaseFiles();
     if(session)request('record_close').catch(()=>{});
-    session=null;prepared=null;opener?.focus();
+    session=null;prepared=null;transfer=null;opener?.focus();
   },{once:true});
   dialog.showModal();prepare().catch(()=>{});
+  for(const [rel,href] of [['modulepreload','../assets/customer-record-page-form.js?v=20261023-tw1'],['prefetch','./customer-record.html']]){
+    if(!Array.from(document.querySelectorAll('link[href]')).some(link=>link.getAttribute('href')===href)){const link=document.createElement('link');link.rel=rel;link.href=href;document.head.append(link);}
+  }
 }
+window.addEventListener('beforeunload',event=>{if(!navigating&&transfer&&transfer.completed<transfer.jobs.length){event.preventDefault();event.returnValue='';}});
 document.addEventListener('click',event=>{
   const button=event.target.closest?.('[data-paper-import]');if(!button)return;
   event.preventDefault();event.stopImmediatePropagation();openImport(button);
