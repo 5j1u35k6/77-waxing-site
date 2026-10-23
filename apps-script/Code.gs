@@ -1,7 +1,7 @@
 const PROJECT_ID = 'waxing-86909';
 const FIRESTORE_BASE = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
 const STORE_EMAIL = '77waxing.mail@gmail.com';
-const SCRIPT_VERSION = '2026-09-14-email-shop-v28';
+const SCRIPT_VERSION = '2026-10-23-service-care-v35';
 const WEBSITE_URL = 'https://5j1u35k6.github.io/77-waxing-site/';
 const SHOP_URL = 'https://5j1u35k6.github.io/77select/';
 const EMAIL_FOOTER_IMAGE = 'https://5j1u35k6.github.io/77-waxing-site/assets/email-footer-77waxing-v25.jpg?v=20260911-0035';
@@ -38,7 +38,12 @@ function senderOptions_() {
   return options;
 }
 
-function doGet() {
+function doGet(e) {
+  // Preserve the existing production LINE Login / OAuth GET routes.
+  if (typeof routeLineAuthGet_ === 'function') {
+    const lineResponse = routeLineAuthGet_(e);
+    if (lineResponse) return lineResponse;
+  }
   const sender = senderStatus_();
   return json_({
     ok: true,
@@ -159,6 +164,7 @@ function sendForStatus_(b, s) {
       const title = `您好 ${customerName}，已收到你的預約`;
       const body = `<p>你的預約需求已送出，這是您這次的預約明細。</p>
         ${bookingInfo_(b)}
+        ${bookingCareBefore_(b)}
         <p>77waxing確認完成後，我們會再寄一封 Email 通知你。</p>
         <p>若預約資訊需要調整，也可以直接與 77waxing 聯繫。</p>`;
       send_(customerEmail, '77waxing｜已收到你的預約需求', shell_(title, body));
@@ -181,7 +187,8 @@ function sendForStatus_(b, s) {
     const title = `您好 ${customerName}，你的預約可安排｜等待支付定金`;
     const body = `<p>77waxing已確認可以安排這次預約，請依下方資訊完成定金。</p>
       ${bookingInfo_(b)}
-      ${qr}`;
+      ${qr}
+      ${bookingCareBefore_(b)}`;
     send_(customerEmail, '77waxing｜預約已確認，請支付定金', shell_(title, body));
     return true;
   }
@@ -190,6 +197,7 @@ function sendForStatus_(b, s) {
     const title = `您好 ${customerName}，預約已確認`;
     const body = `<p>77waxing已確認可以安排這次預約，無需支付定金。</p>
       ${bookingInfo_(b)}
+      ${bookingCareBefore_(b)}
       <p>好期待到時見到你呀 ♡</p>`;
     send_(customerEmail, '77waxing｜預約已確認', shell_(title, body));
     return true;
@@ -430,6 +438,12 @@ function bookingInfo_(b) {
     ${infoLine_('項目', b.serviceName || '—')}
     ${infoLine_('姓名', b.customerName || '—')}
   </div>`;
+}
+
+function bookingCareBefore_(booking) {
+  const care = globalThis.WaxingServiceCare;
+  const guides = care.forBooking(booking);
+  return `<div style="margin:24px 0;padding:18px 20px;border:1px solid #dbc7af;border-radius:14px;background:#fbf4e8;color:#44362b"><h2 style="font-size:20px;margin:0 0 14px">施作前注意事項</h2>${guides.map(guide => `<h3 style="font-size:16px">${esc_(guide.title)}</h3><ul style="padding-left:22px">${guide.before.map(text => `<li style="margin:8px 0;line-height:1.8">${esc_(text)}</li>`).join('')}</ul>`).join('')}<p style="font-size:12px;line-height:1.8;color:#776654">${esc_(care.safety)}</p><p><a href="${WEBSITE_URL}services/" style="color:#765137">查看完整施作前、中、後注意事項</a></p></div>`;
 }
 
 function infoLine_(label, value) {
