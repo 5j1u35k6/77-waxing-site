@@ -12,6 +12,7 @@ function routeCustomerRecordsPost_(payload) {
     const messages = {
       admin_required:'請以管理員帳號重新登入。', session_expired:'上傳連結已失效，請重新產生 QR Code。',
       invalid_file:'檔案內容有誤，或已超過 5 MB。', file_limit:'此連結最多可上傳 8 個檔案。',
+      verify_failed:'尚未取得完整檔案的儲存確認，請按「繼續上傳」；不要關閉此頁。',
       file_missing:'找不到這個檔案。', unsupported:'這個格式已儲存，但目前無法辨識文字。',
       busy:'上傳服務忙碌中，請稍後再試。',
       ocr_failed:'原檔已上傳，但文字辨識暫時失敗；請按「重新辨識」，不必重傳原檔。',
@@ -48,42 +49,61 @@ function recordLoad_(id) {
   return {folder,manifest,data};
 }
 function recordPublicFiles_(files) {return files.map(f=>({id:f.id,name:f.name,size:f.size,mime:f.mime}));}
+function recordVerifiedUpload_(uid,p,entry,session,submit) {
+  try{const saved=DriveApp.getFileById(entry.id);if(saved.isTrashed()||saved.getSize()!==entry.size)throw new Error('verify_failed');}
+  catch(error){throw new Error('verify_failed');}
+  const result={uploaded:true,verified:true,bytes:entry.size};
+  if(uid)result.file=recordPublicFiles_([entry])[0];
+  if(submit){result.sessionId=String(p.requestId);result.uploadKey=String(p.uploadKey);result.expiresAt=session.data.expiresAt;}
+  return result;
+}
 function recordAction_(p) {
+  const submit=p.action==='record_submit';
   const uid=p.action==='record_upload'&&!p.idToken?null:recordAdmin_(p);
   const lock=LockService.getScriptLock();
   // Polling/reading must not queue behind uploads or starve OCR requests.
-  const needsLock=['record_create','record_upload','record_close'].indexOf(p.action)>=0;
+  const needsLock=['record_create','record_upload','record_submit','record_close'].indexOf(p.action)>=0;
   if(needsLock && !lock.tryLock(10000))throw new Error('busy');
   let session, file;
   try {
-    if(p.action==='record_create') {
+    if(p.action==='record_create'||submit) {
       const supplied=Boolean(p.requestId||p.uploadKey);
+      if(submit&&!supplied)throw new Error('invalid_file');
       if(supplied&&(!/^[\da-f-]{36}$/.test(String(p.requestId||''))||!/^[\da-f]{64}$/.test(String(p.uploadKey||''))))throw new Error('invalid_file');
       const sessionId=supplied?String(p.requestId):Utilities.getUuid(),uploadKey=supplied?String(p.uploadKey):recordKey_(),root=recordRoot_();
       if(supplied&&root.getFoldersByName(sessionId).hasNext()) {
         const existing=recordLoad_(sessionId);
         if(existing.data.uid!==uid||existing.data.uploadHash!==recordDigest_(uploadKey))throw new Error('session_expired');
-        return {sessionId,uploadKey,expiresAt:existing.data.expiresAt,files:recordPublicFiles_(existing.data.files)};
+        if(!submit)return {sessionId,uploadKey,expiresAt:existing.data.expiresAt,files:recordPublicFiles_(existing.data.files)};
+        session=existing;
+      }else{
+        const folder=root.createFolder(sessionId),expiresAt=Date.now()+RECORD_TTL_MS;
+        const data={uid,expiresAt,uploadHash:recordDigest_(uploadKey),files:[]};
+        const manifest=folder.createFile('session.json',JSON.stringify(data),MimeType.PLAIN_TEXT);
+        if(!submit)return {sessionId,uploadKey,expiresAt,files:[]};
+        session={folder,manifest,data};
       }
-      const folder=root.createFolder(sessionId),expiresAt=Date.now()+RECORD_TTL_MS;
-      folder.createFile('session.json',JSON.stringify({uid,expiresAt,uploadHash:recordDigest_(uploadKey),files:[]}),MimeType.PLAIN_TEXT);
-      return {sessionId,uploadKey,expiresAt,files:[]};
     }
-    session=recordLoad_(p.sessionId);
-    if(p.action==='record_upload') {
+    if(!session)session=recordLoad_(p.sessionId);
+    if(p.action==='record_upload'||submit) {
       if(uid&&session.data.uid!==uid)throw new Error('admin_required');
       if(!/^[\da-f]{64}$/.test(String(p.uploadKey||'')) || recordDigest_(p.uploadKey)!==session.data.uploadHash)throw new Error('session_expired');
       const f=p.file||{};
       if(!/^[\da-f-]{36}$/.test(String(f.requestId||'')))throw new Error('invalid_file');
+      if(typeof f.data!=='string' || f.data.length>Math.ceil(RECORD_MAX_BYTES/3)*4 || !/^[A-Za-z0-9+/]+={0,2}$/.test(f.data))throw new Error('invalid_file');
+      const dataHash=recordDigest_(f.data);
       const duplicate=session.data.files.find(x=>x.requestId===f.requestId);
-      if(duplicate)return uid?{uploaded:true,file:recordPublicFiles_([duplicate])[0]}:{uploaded:true};
+      if(duplicate){
+        if(duplicate.dataHash&&duplicate.dataHash!==dataHash)throw new Error('invalid_file');
+        return recordVerifiedUpload_(uid,p,duplicate,session,submit);
+      }
       if(session.data.files.length>=8)throw new Error('file_limit');
       if(typeof f.data!=='string' || f.data.length>Math.ceil(RECORD_MAX_BYTES/3)*4 || !/^[A-Za-z0-9+/]+={0,2}$/.test(f.data))throw new Error('invalid_file');
       const bytes=Utilities.base64Decode(f.data);
       if(!bytes.length || bytes.length>RECORD_MAX_BYTES)throw new Error('invalid_file');
       let ocrBytes=null;
       if(f.ocr){
-        if(!/^image\/(jpeg|png)$/.test(String(f.mime||'')))throw new Error('invalid_file');
+        if(!/^image\/(jpeg|png|webp|avif|heic|heif)$/.test(String(f.mime||'')))throw new Error('invalid_file');
         if(f.ocr.mime!=='image/jpeg'||typeof f.ocr.data!=='string'||f.ocr.data.length>2400000||!/^[A-Za-z0-9+/]+={0,2}$/.test(f.ocr.data))throw new Error('invalid_file');
         ocrBytes=Utilities.base64Decode(f.ocr.data);
         if(!ocrBytes.length||ocrBytes.length>1800000||(ocrBytes[0]+256)%256!==255||(ocrBytes[1]+256)%256!==216)throw new Error('invalid_file');
@@ -92,13 +112,13 @@ function recordAction_(p) {
       const mime=/^[\w.+-]+\/[\w.+-]+$/.test(String(f.mime||''))?f.mime:'application/octet-stream';
       const saved=session.folder.createFile(Utilities.newBlob(bytes,mime,'upload-'+Utilities.getUuid()+'-'+name));
       let ocrFile;
-      const entry={id:saved.getId(),name,mime,size:bytes.length,requestId:f.requestId};
+      const entry={id:saved.getId(),name,mime,size:bytes.length,requestId:f.requestId,dataHash};
       try{
         if(ocrBytes){ocrFile=session.folder.createFile(Utilities.newBlob(ocrBytes,'image/jpeg','ocr-source-'+saved.getId()+'.jpg'));entry.ocrId=ocrFile.getId();}
         session.data.files.push(entry);session.manifest.setContent(JSON.stringify(session.data));
       }catch(error){saved.setTrashed(true);if(ocrFile)ocrFile.setTrashed(true);throw error;}
       // Upload-only capability never returns other customers' files or Drive IDs.
-      return uid?{uploaded:true,file:recordPublicFiles_([entry])[0]}:{uploaded:true};
+      return recordVerifiedUpload_(uid,p,entry,session,submit);
     }
     if(session.data.uid!==uid)throw new Error('admin_required');
     if(p.action==='record_list')return {files:recordPublicFiles_(session.data.files),expiresAt:session.data.expiresAt};
@@ -111,7 +131,7 @@ function recordAction_(p) {
   throw new Error('unsupported');
 }
 function recordScan_(file,folder) {
-  if(!/^(image\/(jpeg|png|gif|bmp)|application\/pdf|application\/msword|application\/vnd.openxmlformats-officedocument.wordprocessingml.document)$/.test(file.mime))return recordConvert_(file,folder);
+  if(!file.ocrId&&!/^(image\/(jpeg|png|gif|bmp)|application\/pdf|application\/msword|application\/vnd.openxmlformats-officedocument.wordprocessingml.document)$/.test(file.mime))return recordConvert_(file,folder);
   const cached=folder.getFilesByName('ocr-result-'+file.id+'.txt');
   if(cached.hasNext())return cached.next().getBlob().getDataAsString('UTF-8').slice(0,50000);
   // Serialize only acquisition of this private file's lease, never the expensive OCR itself.
@@ -133,9 +153,10 @@ function recordScan_(file,folder) {
 function recordConvert_(file,folder) {
   const cached=folder.getFilesByName('ocr-result-'+file.id+'.txt');
   if(cached.hasNext())return cached.next().getBlob().getDataAsString('UTF-8').slice(0,50000);
-  const original=DriveApp.getFileById(file.id).getBlob();
-  if(/^text\//.test(file.mime) || /\.(txt|csv|json|md)$/i.test(file.name))return original.getDataAsString('UTF-8').slice(0,50000);
-  if(!/^(image\/(jpeg|png|gif|bmp)|application\/pdf|application\/msword|application\/vnd.openxmlformats-officedocument.wordprocessingml.document)$/.test(file.mime))throw new Error('unsupported');
+  // When a validated OCR companion exists, do not download the large original again.
+  const original=file.ocrId?null:DriveApp.getFileById(file.id).getBlob();
+  if(!file.ocrId&&(/^text\//.test(file.mime) || /\.(txt|csv|json|md)$/i.test(file.name)))return original.getDataAsString('UTF-8').slice(0,50000);
+  if(!file.ocrId&&!/^(image\/(jpeg|png|gif|bmp)|application\/pdf|application\/msword|application\/vnd.openxmlformats-officedocument.wordprocessingml.document)$/.test(file.mime))throw new Error('unsupported');
   const boundary='record_'+Utilities.getUuid();
   const meta=JSON.stringify({name:'OCR '+file.name,mimeType:'application/vnd.google-apps.document',parents:[folder.getId()]});
   const source=file.ocrId?DriveApp.getFileById(file.ocrId).getBlob():original;
