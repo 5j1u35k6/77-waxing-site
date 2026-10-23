@@ -300,7 +300,7 @@ document.addEventListener("click", async (event) => {
     else await cancelVariantOrder(db, button.dataset.order, cancellationReason);
     await audit(db, auth, `order_${action}_variants`, button.dataset.order, cancellationReason);
     await dispatchShopEmail(db, auth, button.dataset.order);
-    flash(action === "confirm" ? "訂單已接單，規格庫存與數量優惠已重新核對。" : "訂單已取消，原因已保存並同步給客人。 ");
+    flash(action === "confirm" ? "訂單已接單，規格庫存與數量優惠已重新核對。" : "訂單已取消，原因已儲存並同步給客人。 ");
   } catch (error) {
     console.error("77select variant order action failed", error);
     flash(error?.message || "更新訂單失敗。", "error");

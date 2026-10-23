@@ -303,7 +303,7 @@ async function enhanceImageField(db) {
         setStatus(`正在處理 ${file.name}…`);
         const image = await resizeAndConvertToBase64(file);
         if (totalMediaLength() + image.url.length > MAX_MEDIA_TOTAL_LENGTH) {
-          setStatus("商品圖片總量已接近 Firestore 單筆文件上限，請移除一張或改用較小圖片。", true);
+          setStatus("商品圖片總量已接近 Firestore 單筆資料大小上限，請移除一張或改用較小圖片。", true);
           break;
         }
         mediaState.push({ id: mediaId(), url: image.url, variantId: "", sortOrder: mediaState.length, width: image.width, height: image.height });

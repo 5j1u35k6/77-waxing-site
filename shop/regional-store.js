@@ -209,7 +209,7 @@ function galleryMarkup(product, variantId) {
   const first = media[0];
   return `<div class="product-gallery">
     <div class="product-gallery-main"><img data-gallery-main src="${esc(first.url)}" alt="${esc(product.name)}"></div>
-    ${media.length > 1 ? `<div class="product-gallery-thumbs">${media.map((row, index) => `<button type="button" class="gallery-thumb${index === 0 ? " on" : ""}" data-gallery-thumb="${esc(row.id)}" data-gallery-url="${esc(row.url)}" aria-label="查看商品圖片 ${index + 1}"><img src="${esc(row.url)}" alt=""></button>`).join("")}</div>` : ""}
+    ${media.length > 1 ? `<div class="product-gallery-thumbs">${media.map((row, index) => `<button type="button" class="gallery-thumb${index === 0 ? " on" : ""}" data-gallery-thumb="${esc(row.id)}" data-gallery-url="${esc(row.url)}" aria-label="檢視商品圖片 ${index + 1}"><img src="${esc(row.url)}" alt=""></button>`).join("")}</div>` : ""}
   </div>`;
 }
 
@@ -266,7 +266,7 @@ function renderProductDetail() {
   const detailMedia = variantMedia.length > 1 ? variantMedia.slice(1) : [];
   const gallery = detailMedia.length ? `<section class="product-gallery product-detail-media-column" aria-label="商品圖片">
     <div class="product-gallery-main"><img data-gallery-main src="${esc(detailMedia[0].url)}" alt="${esc(selectedProduct.name)}"></div>
-    ${detailMedia.length > 1 ? `<div class="product-gallery-thumbs">${detailMedia.map((row, index) => `<button type="button" class="gallery-thumb${index === 0 ? " on" : ""}" data-gallery-thumb="${esc(row.id)}" data-gallery-url="${esc(row.url)}" aria-label="查看商品圖片 ${index + 1}"><img src="${esc(row.url)}" alt=""></button>`).join("")}</div>` : ""}
+    ${detailMedia.length > 1 ? `<div class="product-gallery-thumbs">${detailMedia.map((row, index) => `<button type="button" class="gallery-thumb${index === 0 ? " on" : ""}" data-gallery-thumb="${esc(row.id)}" data-gallery-url="${esc(row.url)}" aria-label="檢視商品圖片 ${index + 1}"><img src="${esc(row.url)}" alt=""></button>`).join("")}</div>` : ""}
   </section>` : "";
 
   body.innerHTML = `<div class="product-detail regional-product-detail regional-product-detail-v2${detailMedia.length ? "" : " detail-gallery-empty"}">
