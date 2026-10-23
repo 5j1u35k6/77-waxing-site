@@ -50,7 +50,10 @@ jobs:
           cp apps-script/Code.gs /tmp/apps-script-code.js
           node --check /tmp/apps-script-code.js
       - name: Check performance and transactional safety
-        run: node tests/performance-regression.cjs
+        run: |
+          node tests/performance-regression.cjs
+          node tests/customer-record-transport.mjs
+          node tests/customer-records.mjs
       - name: Check Taiwan interface wording
         run: node tests/taiwan-copy.cjs
       - name: Check service care content and booking email regression
