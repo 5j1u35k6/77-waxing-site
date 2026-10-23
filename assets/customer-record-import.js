@@ -2,12 +2,16 @@ import { getApp } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.
 import { getAuth } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
 import { getFirestore, getDoc, doc } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
 import { DEFAULT_RECORD_ENDPOINT, recordRequest, encodeRecordFile } from "./customer-record-upload-api.js?v=20261022";
-import { recordFields } from "./customer-record-fields.js?v=20261023-paper";
-import { createRecordForm } from "./customer-record-form.js?v=20261023-paper";
 
 let dialog=null, endpoint=DEFAULT_RECORD_ENDPOINT, session=null, generation=0, pollTimer=null, polling=false, busy=false;
-let opener=null, recordEditor=null;
-function openRecordEditor(){if(!recordEditor)recordEditor=createRecordForm();recordEditor.open();return recordEditor;}
+let opener=null;
+function openRecordPage(fileId=''){
+  const url=new URL('./customer-record.html',location.href);
+  // Only opaque IDs cross the navigation. No health data, token or upload key in URLs/storage.
+  if(session&&session.expiresAt>Date.now())url.searchParams.set('session',session.sessionId);
+  if(fileId)url.searchParams.set('file',fileId);
+  location.assign(url.href);
+}
 const urls=new Map();
 const status=(message)=>{if(dialog?.open)dialog.querySelector('[data-record-status]').textContent=message;};
 async function request(action,body={}) {
@@ -41,18 +45,7 @@ function renderFiles(files) {
     row.append(name,download,scan);list.append(row);
   }
 }
-async function scanFile(file,button) {
-  if(busy)return;
-  busy=true;button.disabled=true;const turn=generation;
-  status(`正在辨識 ${file.name}…`);
-  try{
-    const result=await request('record_scan',{fileId:file.id});
-    if(turn!==generation)return;
-    const editor=openRecordEditor();editor.apply(recordFields(result.text),result.text);
-    status(result.text?'辨識完成，已開啟完整顧客資料表。請核對文字與勾選項目；人工修改會保留。':'沒有辨識到文字，已開啟完整顧客資料表供手動補齊。');
-  }catch(error){if(turn===generation)status(error.message);}
-  finally{busy=false;button.disabled=false;}
-}
+function scanFile(file){if(!busy)openRecordPage(file.id);}
 async function ensureSession() {
   if(session && session.expiresAt>Date.now())return;
   const turn=generation;
@@ -113,12 +106,12 @@ async function upload(files) {
 function openImport(button) {
   if(dialog?.open)return;
   opener=button;generation++;session=null;busy=false;
-  dialog?.remove();recordEditor?.remove();recordEditor=null;releaseFiles();
+  dialog?.remove();releaseFiles();
   dialog=document.createElement('dialog');dialog.className='record-modal';dialog.setAttribute('aria-labelledby','record-title');
   dialog.innerHTML=`<header class="record-head"><h2 id="record-title">新增紀錄</h2><button type="button" data-record-close aria-label="關閉">×</button></header><div class="record-methods"><button type="button" data-record-manual>手動輸入</button><button type="button" data-record-direct>直接上傳</button><button type="button" data-record-device>透過其他裝置上傳</button></div><input type="file" multiple hidden data-record-picker><p>可上傳任何格式的檔案或照片，每個檔案最多 5 MB，最多 8 個。照片、PDF、Word 與文字檔可嘗試辨識；辨識後會開啟完整顧客資料表供核對。</p><p class="record-status" role="status" aria-live="polite" data-record-status></p><div class="record-qr" data-record-qr hidden></div><ul class="record-files" data-record-files></ul>`;
   document.body.appendChild(dialog);
   const picker=dialog.querySelector('[data-record-picker]');
-  dialog.querySelector('[data-record-manual]').onclick=openRecordEditor;
+  dialog.querySelector('[data-record-manual]').onclick=()=>openRecordPage();
   dialog.querySelector('[data-record-direct]').onclick=()=>picker.click();
   picker.onchange=()=>{const files=Array.from(picker.files||[]);picker.value='';upload(files);};
   dialog.querySelector('[data-record-device]').onclick=showQR;
@@ -126,7 +119,6 @@ function openImport(button) {
   dialog.addEventListener('cancel',event=>{event.preventDefault();dialog.close();});
   dialog.addEventListener('close',()=>{
     generation++;clearInterval(pollTimer);releaseFiles();
-    recordEditor?.remove();recordEditor=null;
     if(session)request('record_close').catch(()=>{});
     session=null;opener?.focus();
   },{once:true});

@@ -43,7 +43,7 @@ async function deleteCustomer(phone,name){
   if(!firestore)return alert('後台資料尚未準備完成。');
   const normalized=normalizePhone(phone);
   const linked=bookings.filter(row=>normalizePhone(row.customerPhone)===normalized);
-  if(!confirm(`確定永久刪除顧客「${name||phone}」？\n\n此操作會同時刪除這位顧客的 ${linked.length} 筆預約紀錄，並釋放相關保留時段。此操作無法復原。`))return;
+  if(!confirm(`確定永久刪除顧客「${name||phone}」？\n\n此操作會同時刪除這位顧客的 ${linked.length} 筆預約紀錄與已儲存的顧客資料表，並釋放相關保留時段。此操作無法復原。`))return;
 
   const refs=[];
   linked.forEach(row=>{
