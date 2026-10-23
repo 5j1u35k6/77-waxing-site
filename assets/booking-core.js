@@ -3,7 +3,7 @@ import { collection, doc, getDocsFromServer, query, runTransaction, serverTimest
 import { firebaseConfigured } from "./firebase-config.js";
 import { getPublicFirebase } from "./public-firebase.js?v=20260912-1330";
 import { loadCatalog, publicCatalog } from "./service-catalog-store.js?v=20260912-1330";
-import { beforeCareMarkup, showServiceCare } from './service-care-ui.js?v=20261023-care2';
+import { beforeCareMarkup, showServiceCare } from './service-care-ui.js?v=20261023-care-header1';
 
 const REPO_BASE = "/77-waxing-site";
 const B = location.hostname.endsWith("github.io") ? REPO_BASE : "";

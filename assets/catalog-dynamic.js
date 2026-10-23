@@ -1,5 +1,5 @@
 import { loadCatalog, publicCatalog, watchCatalog } from "./service-catalog-store.js?v=20260912-1330";
-import { bindServiceCareCards } from './service-care-ui.js?v=20261023-care2';
+import { bindServiceCareCards } from './service-care-ui.js?v=20261023-care-header1';
 
 const B = "/77-waxing-site";
 const CACHE_KEY = "77waxing-public-catalog-v1";

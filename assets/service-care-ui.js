@@ -4,7 +4,7 @@ const care = globalThis.WaxingServiceCare;
 const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const style = document.createElement('link');
 style.rel = 'stylesheet';
-style.href = new URL('./service-care.css?v=20261023-care2', import.meta.url).href;
+style.href = new URL('./service-care.css?v=20261023-care-header1', import.meta.url).href;
 document.head.append(style);
 let modal;
 let opener;
