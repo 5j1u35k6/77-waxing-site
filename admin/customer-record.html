@@ -7,17 +7,16 @@
   <meta name="robots" content="noindex,nofollow">
   <title>77waxing｜顧客資料表</title>
   <link rel="stylesheet" href="../assets/booking.css?v=20260911">
-  <link rel="stylesheet" href="../assets/customer-record-import.css?v=20261023-paper">
+  <link rel="stylesheet" href="../assets/customer-record-import.css?v=20261023-upload3">
   <link rel="stylesheet" href="../assets/customer-record-page.css?v=20261023-record-page">
 <link rel="preconnect" href="https://www.gstatic.com" crossorigin><link rel="preconnect" href="https://firestore.googleapis.com" crossorigin><link rel="preconnect" href="https://identitytoolkit.googleapis.com" crossorigin><link rel="modulepreload" href="https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js" crossorigin><link rel="modulepreload" href="https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js" crossorigin><link rel="modulepreload" href="https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js" crossorigin></head>
 <body class="record-page-body">
   <main class="record-page-container">
     <section data-page-status role="status">正在確認管理員登入…</section>
+    <section class="record-source-summary" data-source-summary hidden><p role="status" aria-live="polite" data-source-summary-text>正在讀取上傳檔案…</p><progress aria-label="文字辨識處理中" data-source-progress hidden></progress><button class="record-button" type="button" data-source-retry hidden>重新辨識</button></section>
     <section class="record-paper-shell" data-record-page hidden></section>
-    <section class="paper-source-panel" data-source-panel hidden><h2>上傳的原始檔案</h2><p>可選擇其他回傳檔案辨識；有人工修改的欄位會保留。辨識結果與同意／簽名分開核對。</p><p role="status" data-source-status></p><ul class="record-files" data-source-files></ul></section>
+    <section class="paper-source-panel" data-source-panel hidden><h2>上傳的原始檔案</h2><p>可選擇其他回傳檔案辨識；有人工修改的欄位會保留。辨識結果與同意／簽名分開核對。</p><p data-source-status></p><p role="status" data-source-list-status></p><ul class="record-files" data-source-files></ul></section>
   </main>
-  <script type="module" src="../assets/customer-record-page.js?v=20261023-perf2"></script>
+  <script type="module" src="../assets/customer-record-page.js?v=20261023-upload3"></script>
 </body>
 </html>
-
-
