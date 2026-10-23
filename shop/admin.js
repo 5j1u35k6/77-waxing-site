@@ -150,6 +150,12 @@ function showView(view) {
   else if (view === "messages") renderMessages();
   else if (view === "settings") renderSettings();
 }
+let renderQueued = false;
+function scheduleRerender() {
+  if (renderQueued) return;
+  renderQueued = true;
+  requestAnimationFrame(() => { renderQueued = false; rerender(); });
+}
 function rerender() {
   if (!$("#admin-view")) return;
   showView(currentView);
@@ -157,15 +163,15 @@ function rerender() {
 function subscribeData() {
   listeners.push(onSnapshot(collection(db, "shopProducts"), (snap) => {
     products = snap.docs.map((row) => ({ id: row.id, ...row.data() })).sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0));
-    if (currentView !== "settings") rerender();
+    if (currentView !== "settings") scheduleRerender();
   }));
   listeners.push(onSnapshot(collection(db, "shopOrders"), (snap) => {
     orders = snap.docs.map((row) => ({ id: row.id, ...row.data() })).sort((a, b) => timestampMillis(b.createdAt) - timestampMillis(a.createdAt));
-    if (currentView !== "settings") rerender();
+    if (currentView !== "settings") scheduleRerender();
   }));
   listeners.push(onSnapshot(collection(db, "shopMessages"), (snap) => {
     messages = snap.docs.map((row) => ({ id: row.id, ...row.data() })).sort((a, b) => timestampMillis(b.createdAt) - timestampMillis(a.createdAt));
-    if (currentView !== "settings") rerender();
+    if (currentView !== "settings") scheduleRerender();
   }));
   listeners.push(onSnapshot(doc(db, "shopSettings", "public"), (snap) => {
     settings = snap.exists() ? { ...DEFAULT_SETTINGS, ...snap.data() } : { ...DEFAULT_SETTINGS };
@@ -270,8 +276,7 @@ async function handleOrderAction(orderId, action) {
       if (!status) return;
       await updateDoc(doc(db, "shopOrders", orderId), { status, updatedAt: serverTimestamp() });
     }
-    await audit(`order_${action}`, orderId);
-    await dispatchShopEmail(orderId);
+    await Promise.all([audit(`order_${action}`, orderId), dispatchShopEmail(orderId)]);
     flash("訂單狀態已更新。");
   } catch (error) {
     console.error(error);
@@ -287,8 +292,7 @@ async function confirmOrder(orderId) {
     if (order.status !== "pending") throw new Error("只有待確認訂單可以確認。");
     const items = Array.isArray(order.items) ? order.items : [];
     const refs = items.map((item) => doc(db, "shopProducts", item.productId));
-    const snaps = [];
-    for (const ref of refs) snaps.push(await tx.get(ref));
+    const snaps = await Promise.all(refs.map(ref => tx.get(ref)));
     let subtotal = 0;
     const finalItems = items.map((item, index) => {
       const productSnap = snaps[index];
@@ -318,8 +322,7 @@ async function cancelOrder(orderId) {
     if (["completed", "cancelled"].includes(order.status)) throw new Error("此訂單目前不可取消。");
     const items = Array.isArray(order.items) ? order.items : [];
     const refs = order.inventoryCommitted ? items.map((item) => doc(db, "shopProducts", item.productId)) : [];
-    const snaps = [];
-    for (const ref of refs) snaps.push(await tx.get(ref));
+    const snaps = await Promise.all(refs.map(ref => tx.get(ref)));
     snaps.forEach((snap, index) => {
       if (!snap.exists()) return;
       tx.update(refs[index], { stock: Number(snap.data().stock || 0) + Number(items[index].quantity || 0), updatedAt: serverTimestamp() });
@@ -398,3 +401,4 @@ onAuthStateChanged(auth, async (user) => {
 });
 window.addEventListener("error", (event) => console.error("[77waxing shop admin]", event.error || event.message));
 window.addEventListener("unhandledrejection", (event) => console.error("[77waxing shop admin promise]", event.reason));
+

@@ -1,5 +1,5 @@
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
-import { collection, doc, getDoc, getDocs, onSnapshot, query, serverTimestamp, setDoc, where } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
+import { collection, doc, getDoc, getDocFromServer, getDocs, onSnapshot, query, serverTimestamp, setDoc, where } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
 import { getPublicFirebase } from "../assets/public-firebase.js?v=20260913-shop2";
 
 const { auth, db } = getPublicFirebase();
@@ -542,7 +542,7 @@ async function submitOrder(event) {
   const button = $("#checkout-submit");
   if (button) button.disabled = true;
   try {
-    await loadProducts();
+    await refreshCartProducts();
     reconcileCart();
     if (!cart.length) throw new Error("購物車內容已失效，請重新選擇商品。");
     for (const row of cart) {
@@ -658,10 +658,23 @@ async function loadSettings() {
   settings = snap?.exists() ? snap.data() : {};
 }
 
-async function loadProducts() {
+// Recheck current cart products from the server; do not download unrelated photos.
+async function refreshCartProducts() {
+  const ids = [...new Set(cart.map(row => row.productId))];
+  const snapshots = await Promise.all(ids.map(id => getDocFromServer(doc(db, "shopProducts", id))));
+  const refreshed = snapshots.filter(row => row.exists() && row.data().active === true)
+    .map(row => ({ id: row.id, ...row.data() }));
+  const selected = new Set(ids);
+  products = [...products.filter(row => !selected.has(row.id)), ...refreshed];
+}
+
+async function loadProducts({ render = true } = {}) {
   const snap = await getDocs(query(collection(db, "shopProducts"), where("active", "==", true)));
   products = snap.docs.map((row) => ({ id: row.id, ...row.data() }))
     .sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0) || String(a.name || "").localeCompare(String(b.name || ""), "zh-Hant"));
+  if (render) renderLoadedCatalog();
+}
+function renderLoadedCatalog() {
   renderFilters();
   renderProducts();
   reconcileCart();
@@ -779,11 +792,15 @@ function keepRegionalViewsAuthoritative() {
   }
 }
 
+// Geography and public catalog/settings are independent network requests.
+const initialCatalog = Promise.all([loadSettings(), loadProducts({ render: false })])
+  .catch(error => console.error("77select regional storefront init failed", error));
 market = await detectMarket();
 ensureMarketBadge();
 bindCaptureHandlers();
 keepRegionalViewsAuthoritative();
-await Promise.all([loadSettings(), loadProducts()]).catch((error) => console.error("77select regional storefront init failed", error));
+await initialCatalog;
+renderLoadedCatalog();
 saveCart();
 
 onAuthStateChanged(auth, (user) => {
@@ -794,3 +811,4 @@ onAuthStateChanged(auth, (user) => {
     renderOrders();
   }, console.error);
 });
+

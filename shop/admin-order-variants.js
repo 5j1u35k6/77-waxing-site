@@ -92,9 +92,8 @@ async function dispatchShopEmail(db, auth, orderId) {
   try {
     const user = auth.currentUser;
     if (!user) return;
-    const settingsSnap = await getDoc(doc(db, "shopSettings", "public")).catch(() => null);
+    const [settingsSnap,idToken] = await Promise.all([getDoc(doc(db, "shopSettings", "public")).catch(() => null),user.getIdToken()]);
     const url = String(settingsSnap?.data?.()?.appsScriptEmailUrl || DEFAULT_EMAIL_URL).trim() || DEFAULT_EMAIL_URL;
-    const idToken = await user.getIdToken();
     await fetch(url, {
       method: "POST",
       mode: "no-cors",
@@ -120,9 +119,10 @@ async function confirmVariantOrder(db, orderId) {
 
     const ids = [...new Set(items.map((item) => String(item.productId || "")).filter(Boolean))];
     const productMap = new Map();
-    for (const productId of ids) {
+    const snapshots = await Promise.all(ids.map(productId => tx.get(doc(db, "shopProducts", productId))));
+    for (const [index, productId] of ids.entries()) {
       const ref = doc(db, "shopProducts", productId);
-      const snap = await tx.get(ref);
+      const snap = snapshots[index];
       if (!snap.exists()) throw new Error(`商品 ${productId} 不存在。`);
       const data = snap.data();
       productMap.set(productId, { ref, data, variants: normalizeVariants(data), legacyStock: int(data.stock) });
@@ -205,9 +205,10 @@ async function cancelVariantOrder(db, orderId, reason) {
     if (order.inventoryCommitted) {
       const ids = [...new Set(items.map((item) => String(item.productId || "")).filter(Boolean))];
       const productMap = new Map();
-      for (const productId of ids) {
+      const snapshots = await Promise.all(ids.map(productId => tx.get(doc(db, "shopProducts", productId))));
+      for (const [index, productId] of ids.entries()) {
         const ref = doc(db, "shopProducts", productId);
-        const snap = await tx.get(ref);
+        const snap = snapshots[index];
         if (!snap.exists()) continue;
         const data = snap.data();
         productMap.set(productId, { ref, data, variants: normalizeVariants(data), legacyStock: int(data.stock) });
@@ -298,8 +299,10 @@ document.addEventListener("click", async (event) => {
   try {
     if (action === "confirm") await confirmVariantOrder(db, button.dataset.order);
     else await cancelVariantOrder(db, button.dataset.order, cancellationReason);
-    await audit(db, auth, `order_${action}_variants`, button.dataset.order, cancellationReason);
-    await dispatchShopEmail(db, auth, button.dataset.order);
+    await Promise.all([
+      audit(db, auth, `order_${action}_variants`, button.dataset.order, cancellationReason),
+      dispatchShopEmail(db, auth, button.dataset.order),
+    ]);
     flash(action === "confirm" ? "訂單已接單，規格庫存與數量優惠已重新核對。" : "訂單已取消，原因已儲存並同步給客人。 ");
   } catch (error) {
     console.error("77select variant order action failed", error);
@@ -324,3 +327,4 @@ const polishObserver = new MutationObserver(() => {
 });
 polishObserver.observe(document.documentElement, { childList: true, subtree: true });
 polishOrderUi();
+
