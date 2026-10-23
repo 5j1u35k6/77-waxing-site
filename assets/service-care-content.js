@@ -1,6 +1,6 @@
 // Shared website / Apps Script content. Tests enforce ServiceCare.gs parity.
 globalThis.WaxingServiceCare = (() => {
-  const version = '20261023-care1';
+  const version = '20261023-care2';
   const safety = '以下為 77waxing 服務提醒，非醫療診斷或療效保證。若有疾病、用藥、懷孕、傷口或持續不適，請先告知店家，必要時諮詢醫師；勿自行停藥。';
   const during = ['開始前會確認服務範圍與當天狀況；施作中如有疼痛、灼熱或其他不適，請立即告知，暫停並評估是否繼續。'];
   const guides = {
@@ -96,10 +96,11 @@ globalThis.WaxingServiceCare = (() => {
     const context = `${category?.name || ''} ${category?.slug || ''} ${group?.id || ''} ${group?.title || ''}`;
     if (/熱蠟|除毛|wax/i.test(name)) return ['wax'];
     if (['women', 'men'].includes(key) || /熱蠟|waxing/i.test(context)) return ['wax'];
-    if (key === 'bust' || /美胸|胸部保養|bust-care/.test(context + name)) return ['bust'];
-    if (/撥筋|臉部按摩/.test(name)) return ['face', 'massage'];
+    if (/胸腹/.test(name)) return ['bust', 'general'];
+    if (key === 'bust' || /美胸|胸部保養|bust-care|胸部放鬆|胸放鬆/.test(context + name)) return ['bust'];
+    if (/撥筋|鬆筋|臉部按摩/.test(name) || /臉部放鬆|massage-price-list/.test(context)) return ['face', 'massage'];
     if (/skin-body|美背|屁屁|肩頸胸|臀部|背部/.test(context + name)) return ['general'];
-    if (key === 'skin' && (group.id === 'skin-face' || /臉部|粉刺|CICA|安瓶|水光|外泌|濃縮原液|矽晶煥膚/.test(name))) return ['face'];
+    if (/臉部保養|facial/.test(context) || (key === 'skin' && (group.id === 'skin-face' || /臉部|粉刺|CICA|安瓶|水光|外泌|濃縮原液|矽晶煥膚/.test(name)))) return ['face'];
     return ['general'];
   }
   function forSelection(category, item, group, addons = []) {
