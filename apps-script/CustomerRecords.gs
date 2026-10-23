@@ -15,6 +15,7 @@ function routeCustomerRecordsPost_(payload) {
       file_missing:'找不到這個檔案。', unsupported:'這個格式已儲存，但目前無法辨識文字。',
       busy:'上傳服務忙碌中，請稍後再試。',
       ocr_failed:'原檔已上傳，但文字辨識暫時失敗；請按「重新辨識」，不必重傳原檔。',
+      ocr_busy:'這份檔案仍在辨識，請稍後再按「重新辨識」；不必重傳原檔。',
       ocr_empty:'原檔已保留，但未辨識到文字。請確認照片清晰、方向正確，或手動填寫。'
     };
     return json_({ok:false, service:'customer-records-v1', code:messages[error.message]?error.message:'processing_failed', message:messages[error.message] || '處理失敗，請稍後再試；若持續發生，請檢查上傳服務的 Drive 授權與部署版本。'});
@@ -110,6 +111,26 @@ function recordAction_(p) {
   throw new Error('unsupported');
 }
 function recordScan_(file,folder) {
+  if(!/^(image\/(jpeg|png|gif|bmp)|application\/pdf|application\/msword|application\/vnd.openxmlformats-officedocument.wordprocessingml.document)$/.test(file.mime))return recordConvert_(file,folder);
+  const cached=folder.getFilesByName('ocr-result-'+file.id+'.txt');
+  if(cached.hasNext())return cached.next().getBlob().getDataAsString('UTF-8').slice(0,50000);
+  // Serialize only acquisition of this private file's lease, never the expensive OCR itself.
+  const lock=LockService.getScriptLock();if(!lock.tryLock(1000))throw new Error('busy');
+  let lease;
+  try{
+    const completed=folder.getFilesByName('ocr-result-'+file.id+'.txt');
+    if(completed.hasNext())return completed.next().getBlob().getDataAsString('UTF-8').slice(0,50000);
+    const pending=folder.getFilesByName('ocr-pending-'+file.id+'.json');
+    if(pending.hasNext()){
+      lease=pending.next();const data=JSON.parse(lease.getBlob().getDataAsString());
+      if(Number(data.expiresAt)>Date.now())throw new Error('ocr_busy');
+      lease.setContent(JSON.stringify({expiresAt:Date.now()+7*60*1000}));
+    }else lease=folder.createFile('ocr-pending-'+file.id+'.json',JSON.stringify({expiresAt:Date.now()+7*60*1000}),MimeType.PLAIN_TEXT);
+  }finally{lock.releaseLock();}
+  try{return recordConvert_(file,folder);}
+  finally{if(lease)try{lease.setTrashed(true);}catch(error){console.warn('record OCR lease cleanup deferred');}}
+}
+function recordConvert_(file,folder) {
   const cached=folder.getFilesByName('ocr-result-'+file.id+'.txt');
   if(cached.hasNext())return cached.next().getBlob().getDataAsString('UTF-8').slice(0,50000);
   const original=DriveApp.getFileById(file.id).getBlob();
@@ -139,7 +160,7 @@ function recordScan_(file,folder) {
       if(attempt<2&&(code===200||[404,429,500,502,503,504].indexOf(code)>=0)){Utilities.sleep(attempt?750:250);continue;}
       throw new Error(code===200?'ocr_empty':'ocr_failed');
     }
-  } finally {DriveApp.getFileById(id).setTrashed(true);}
+  } finally {try{DriveApp.getFileById(id).setTrashed(true);}catch(error){console.warn('record OCR temporary cleanup deferred');}}
 }
 // Install a daily trigger after authorization. Removes expired staging files only.
 function cleanupCustomerRecordUploads() {
