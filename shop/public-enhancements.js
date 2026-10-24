@@ -1,5 +1,5 @@
 import "./seo.js?v=20261023-tw1";
-import "../assets/member-auth.js?v=20261023-perf1";
+import "../assets/member-auth.js?v=20261024-shop-member1";
 import "../assets/google-auth-ui.js?v=20260915-google5-linked";
 import "../assets/member-auth-popup-fix.js?v=20260915-line-custom6-linked";
 import "../assets/account-linking.js?v=20260915-account-link1";
@@ -120,12 +120,6 @@ function applyMemberBranding() {
   const centerTitle = document.querySelector("#member-center-title");
   if (centerTitle && centerTitle.textContent.trim() === "我的紀錄") centerTitle.textContent = "會員中心";
 
-  document.querySelectorAll("#member-center-wrap .member-history-empty").forEach((node) => {
-    const text = node.textContent.trim();
-    if (text === "正在讀取預約紀錄…") node.textContent = "正在讀取訂單紀錄…";
-    if (text === "目前還沒有預約／施作紀錄。") node.textContent = "目前還沒有訂單紀錄。";
-    if (text === "目前無法讀取預約紀錄，請稍後再試。") node.textContent = "目前無法讀取訂單紀錄，請稍後再試。";
-  });
 }
 
 function apply77selectBranding() {
@@ -187,5 +181,3 @@ onAuthStateChanged(auth, (user) => {
 const observer = new MutationObserver(scheduleEnhancements);
 observer.observe(document.documentElement, { childList: true, subtree: true });
 apply77selectBranding();
-
-
