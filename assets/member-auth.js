@@ -47,6 +47,7 @@ let currentProfile = null;
 let loginRequired = false;
 let loginReason = "";
 let profilePromise = null;
+let memberCenterRequest = 0;
 
 const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => ({
   "&": "&amp;",
@@ -71,7 +72,10 @@ function isBookingPage() {
 }
 
 function isShopPage() {
-  return /\/shop\/?$/.test(pagePath());
+  // A <base href> changes asset URLs, not location.pathname on /77select/.
+  return Boolean(document.querySelector(".shop-nav"))
+    || /\/shop(?:\/index\.html)?\/?$/.test(pagePath())
+    || /^\/77select(?:\/index\.html)?\/?$/.test(location.pathname);
 }
 
 function isMember(user = currentUser) {
@@ -105,9 +109,9 @@ function ensureLoginModal() {
     <div class="member-auth-backdrop" data-member-auth-close></div>
     <section class="member-auth-card" role="dialog" aria-modal="true" aria-labelledby="member-auth-title">
       <button class="member-auth-close" type="button" data-member-auth-close aria-label="關閉">×</button>
-      <div class="member-auth-kicker">77waxing MEMBER</div>
+      <div class="member-auth-kicker">${isShopPage() ? "77select" : "77waxing"} MEMBER</div>
       <h2 id="member-auth-title">登入 / 註冊</h2>
-      <p class="member-auth-copy" data-member-auth-copy>登入後即可繼續預約或訂購，並保留你的預約與消費紀錄。</p>
+      <p class="member-auth-copy" data-member-auth-copy>${isShopPage() ? "登入後即可檢視會員資料與商品訂單。" : "登入後即可繼續預約或訂購，並保留你的預約與消費紀錄。"}</p>
       <div class="member-auth-actions">
         <button class="member-provider member-provider-line" type="button" data-member-provider="line"><span>LINE</span><small>使用 LINE 登入</small></button>
         <button class="member-provider member-provider-whatsapp" type="button" data-member-provider="whatsapp"><span>WhatsApp</span><small>使用 WhatsApp 登入</small></button>
@@ -146,7 +150,7 @@ function openLogin({ required = false, reason = "", targetUrl = "" } = {}) {
     ? "登入後會直接進入預約畫面；若你從價目表進來，剛剛選好的服務會保留。"
     : reason === "checkout"
       ? "登入後即可繼續訂購，姓名、電話與 Email 會優先從會員資料帶入。"
-      : "登入後即可檢視預約、施作與訂單紀錄。";
+      : isShopPage() ? "登入後即可檢視會員資料與商品訂單。" : "登入後即可檢視預約、施作與訂單紀錄。";
   if (copy.textContent !== copyText) copy.textContent = copyText;
   setLoginStatus("");
   wrap.hidden = false;
@@ -306,7 +310,7 @@ async function saveProfile(patch) {
 
 function memberButtonLabel() {
   if (!isMember()) return "登入 / 註冊";
-  return currentProfile?.displayName || currentUser.displayName || "會員紀錄";
+  return currentProfile?.displayName || currentUser.displayName || (isShopPage() ? "會員中心" : "會員紀錄");
 }
 
 function ensureMainMemberButton() {
@@ -380,7 +384,8 @@ function formatBookingStatus(status) {
 }
 
 async function loadBookingHistory() {
-  if (!isMember()) return [];
+  // Store membership must never query treatment/appointment history.
+  if (!isMember() || isShopPage()) return [];
   const snap = await getDocs(query(collection(db, "bookings"), where("ownerUid", "==", currentUser.uid)));
   return snap.docs
     .map((row) => ({ id: row.id, ...row.data() }))
@@ -398,11 +403,11 @@ function ensureMemberCenter() {
     <div class="member-auth-backdrop" data-member-center-close></div>
     <section class="member-center-card" role="dialog" aria-modal="true" aria-labelledby="member-center-title">
       <div class="member-center-head">
-        <div><div class="member-auth-kicker">77waxing MEMBER</div><h2 id="member-center-title">我的紀錄</h2></div>
+        <div><div class="member-auth-kicker">${isShopPage() ? "77select" : "77waxing"} MEMBER</div><h2 id="member-center-title">${isShopPage() ? "會員中心" : "我的紀錄"}</h2></div>
         <button class="member-auth-close" type="button" data-member-center-close aria-label="關閉">×</button>
       </div>
       <div class="member-profile-summary" data-member-profile-summary></div>
-      <div class="member-history" data-member-history><div class="member-history-empty">正在讀取預約紀錄…</div></div>
+      <div class="member-history" data-member-history>${isShopPage() ? "" : '<div class="member-history-empty">正在讀取預約紀錄…</div>'}</div>
       <div class="member-center-foot"><button type="button" class="member-logout" data-member-logout>登出</button></div>
     </section>`;
   document.body.appendChild(wrap);
@@ -416,6 +421,7 @@ function ensureMemberCenter() {
 }
 
 function closeMemberCenter() {
+  memberCenterRequest++;
   const wrap = document.querySelector("#member-center-wrap");
   if (wrap) wrap.hidden = true;
   document.documentElement.classList.remove("member-auth-open");
@@ -423,21 +429,38 @@ function closeMemberCenter() {
 
 async function openMemberCenter() {
   if (!isMember()) return openLogin({ reason: "member" });
+  const uid = currentUser.uid, request = ++memberCenterRequest;
   const profile = await ensureProfile();
+  if (request !== memberCenterRequest || !isMember() || currentUser.uid !== uid) return;
+  const shop = isShopPage();
   const wrap = ensureMemberCenter();
   const summary = wrap.querySelector("[data-member-profile-summary]");
   summary.innerHTML = `
     <div><small>會員名稱</small><b>${esc(profile?.displayName || currentUser.displayName || "—")}</b></div>
     <div><small>Email</small><b>${esc(profile?.email || currentUser.email || "尚未填寫")}</b></div>
     <div><small>電話</small><b>${esc(profile?.phone || "尚未填寫")}</b></div>
-    <div><small>生理性別</small><b>${esc(genderText(profile?.gender))}</b></div>
+    ${shop ? "" : `<div><small>生理性別</small><b>${esc(genderText(profile?.gender))}</b></div>`}
     <div><small>生日</small><b>${esc(rocBirthday(profile?.birthday))}</b></div>`;
   const history = wrap.querySelector("[data-member-history]");
-  history.innerHTML = `<div class="member-history-empty">正在讀取預約紀錄…</div>`;
   wrap.hidden = false;
   document.documentElement.classList.add("member-auth-open");
+  if (shop) {
+    // Reuse the store's existing order view and owner-scoped order subscription.
+    // Do not fetch bookings and do not disguise treatment rows as order rows.
+    history.innerHTML = `<button type="button" class="member-provider" data-member-orders><span>我的訂單</span><small>檢視訂單狀態</small></button><p class="member-auth-copy">商品訂購紀錄請至「我的訂單」檢視。</p>`;
+    history.querySelector("[data-member-orders]").addEventListener("click", () => {
+      if (!isMember()) return openLogin({ reason: "member" });
+      const orders = document.querySelector('[data-tab="orders"]');
+      if (!orders) return;
+      closeMemberCenter();
+      orders.click();
+    });
+    return;
+  }
+  history.innerHTML = `<div class="member-history-empty">正在讀取預約紀錄…</div>`;
   try {
     const rows = await loadBookingHistory();
+    if (request !== memberCenterRequest || !isMember() || currentUser.uid !== uid || wrap.hidden) return;
     history.innerHTML = rows.length ? rows.map((booking) => {
       const gender = parseGender(booking.note) || profile?.gender || "";
       const note = cleanBookingNote(booking.note);
@@ -456,6 +479,7 @@ async function openMemberCenter() {
       </article>`;
     }).join("") : `<div class="member-history-empty">目前還沒有預約／施作紀錄。</div>`;
   } catch (error) {
+    if (request !== memberCenterRequest || !isMember() || currentUser.uid !== uid || wrap.hidden) return;
     console.warn("member booking history unavailable", error);
     history.innerHTML = `<div class="member-history-empty">目前無法讀取預約紀錄，請稍後再試。</div>`;
   }
@@ -621,6 +645,12 @@ await setPersistence(auth, browserLocalPersistence).catch(() => {});
 await handleRedirectResult();
 
 onAuthStateChanged(auth, async (user) => {
+  if (currentUser?.uid !== user?.uid || !isMember(user)) {
+    closeMemberCenter();
+    const center = document.querySelector("#member-center-wrap");
+    center?.querySelector("[data-member-profile-summary]")?.replaceChildren();
+    center?.querySelector("[data-member-history]")?.replaceChildren();
+  }
   authReady = true;
   currentUser = user || null;
   currentProfile = null;
@@ -650,4 +680,3 @@ window.__77_MEMBER__ = {
   openMemberCenter,
   saveProfile,
 };
-
