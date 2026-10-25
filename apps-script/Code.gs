@@ -1,7 +1,7 @@
 const PROJECT_ID = 'waxing-86909';
 const FIRESTORE_BASE = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
 const STORE_EMAIL = '77waxing.mail@gmail.com';
-const SCRIPT_VERSION = '2026-10-25-interface-copy';
+const SCRIPT_VERSION = '2026-10-25-deposit-copy';
 const WEBSITE_URL = 'https://5j1u35k6.github.io/77-waxing-site/';
 const SHOP_URL = 'https://5j1u35k6.github.io/77select/';
 const EMAIL_FOOTER_IMAGE = 'https://5j1u35k6.github.io/77-waxing-site/assets/email-footer-77waxing-v25.jpg?v=20260911-0035';
@@ -197,20 +197,20 @@ function sendForStatus_(b, s) {
   if (status === 'pending_payment') {
     const amount = b.depositAmount ? `NT$${esc_(b.depositAmount)}` : 'NT$—';
     const qr = s.depositQrUrl
-      ? `<div style="margin:20px 0"><p style="margin:0 0 12px"><b>請完成訂金：${amount}</b></p><img src="${esc_(s.depositQrUrl)}" alt="訂金 QR Code" style="display:block;max-width:240px;width:100%;height:auto;border-radius:12px"></div>`
-      : `<p><b>請完成訂金：${amount}</b></p>`;
-    const title = `您好 ${customerName}，你的預約可安排｜待付訂金`;
-    const body = `<p>77waxing已確認可以安排這次預約，請依下方資訊完成訂金付款。</p>
+      ? `<div style="margin:20px 0"><p style="margin:0 0 12px"><b>請完成定金：${amount}</b></p><img src="${esc_(s.depositQrUrl)}" alt="定金 QR Code" style="display:block;max-width:240px;width:100%;height:auto;border-radius:12px"></div>`
+      : `<p><b>請完成定金：${amount}</b></p>`;
+    const title = `您好 ${customerName}，你的預約可安排｜待付定金`;
+    const body = `<p>77waxing已確認可以安排這次預約，請依下方資訊完成定金付款。</p>
       ${bookingInfo_(b)}
       ${qr}
       ${bookingCareBefore_(b)}`;
-    send_(customerEmail, '77waxing｜預約已確認，請完成訂金付款', shell_(title, body));
+    send_(customerEmail, '77waxing｜預約已確認，請完成定金付款', shell_(title, body));
     return true;
   }
 
   if (status === 'confirmed') {
     const title = `您好 ${customerName}，預約已確認`;
-    const body = `<p>77waxing已確認可以安排這次預約，不需付訂金。</p>
+    const body = `<p>77waxing已確認可以安排這次預約，不需付定金。</p>
       ${bookingInfo_(b)}
       ${bookingCareBefore_(b)}
       <p>好期待到時見到你呀 ♡</p>`;
