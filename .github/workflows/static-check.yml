@@ -55,7 +55,9 @@ jobs:
           node tests/customer-record-transport.mjs
           node tests/customer-records.mjs
       - name: Check Taiwan interface wording
-        run: node tests/taiwan-copy.cjs
+        run: |
+          node tests/taiwan-copy.cjs
+          node tests/interface-copy.cjs
       - name: Check service care content and booking email regression
         run: node tests/service-care.cjs
       - name: Check admin Firebase bootstrap
@@ -169,5 +171,3 @@ jobs:
         run: |
           set -euo pipefail
           ! grep -R -n -E 'catalog-v1\.js|catalog-copy-v1\.js|admin-ui-fixes\.js|admin-ux\.js|nav-v4\.(js|css)|booking-v3\.(js|css)|admin-v2\.(js|css)|admin-dashboard-v3\.(js|css)|catalog-v1\.css|footer-v1\.css|firebase-pages\.js' index.html booking admin assets shop --include='*.html' --include='*.js' --include='*.css' || exit 1
-
-
