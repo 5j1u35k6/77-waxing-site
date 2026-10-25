@@ -1,7 +1,7 @@
 const fs = require('node:fs'), path = require('node:path'), assert = require('node:assert/strict');
 const root = path.resolve(__dirname, '..');
 // Developer-authored UI only. Never rewrite customer/OCR/signed content at runtime.
-const rejected = ['掃碼', '已保存', '重試', '信息', '視頻', '二維碼', '點擊', '查看', '加載', '用戶', '默認', '屏幕', '鏈接', '數據庫', '短信', '發貨', '已確認保存', '已修正', '可以直接部署'];
+const rejected = ['掃碼', '已保存', '重試', '信息', '視頻', '二維碼', '點擊', '查看', '加載', '用戶', '默認', '屏幕', '鏈接', '數據庫', '短信', '發貨', '已確認保存', '已修正', '可以直接部署', '訂金'];
 const directories = ['assets', 'admin', 'booking', 'services', 'shop', 'apps-script'];
 const files = ['index.html'];
 function walk(dir) {
