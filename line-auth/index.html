@@ -85,7 +85,7 @@
       }
 
       if(!state||!expectedState||state!==expectedState){
-        status.textContent='LINE 登入驗證狀態不一致，正在返回網站…';
+        status.textContent='LINE 登入驗證未完成，正在返回網站…';
         finish(`77line_error=state_mismatch&77line_state=${encodeURIComponent(state)}`);
         return;
       }
@@ -95,12 +95,12 @@
         return;
       }
       if(!code){
-        status.textContent='LINE 未回傳登入憑證，正在返回網站…';
+        status.textContent='LINE 登入未完成，正在返回網站…';
         finish(`77line_error=missing_code&77line_state=${encodeURIComponent(state)}`);
         return;
       }
 
-      status.textContent='LINE 已完成授權，正在建立會員登入…';
+      status.textContent='LINE 登入處理中，請稍候…';
       exchange().catch((exchangeError)=>{
         console.error('LINE proxy exchange failed',exchangeError);
         finish(`77line_error=proxy_network_failed&77line_state=${encodeURIComponent(state)}`);
