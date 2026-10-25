@@ -1,0 +1,28 @@
+import assert from 'node:assert/strict';
+import vm from 'node:vm';import fs from 'node:fs';import {webcrypto} from 'node:crypto';
+import {recordPayload,RECORD_KIND} from '../assets/customer-record-data.js';
+import {mergeStoredCustomerRecords,customerRecordKey} from '../assets/customer-record-list.js';
+const rows=new Map([['0900000000',{key:'0900000000',name:'會員姓名',phone:'0900000000',birthday:'2000-01-01',lineId:'已驗證 LINE',count:2,last:'2026-10-30 20:00',services:new Set(['預約服務'])}]]);
+mergeStoredCustomerRecords(rows,[{id:'a',name:'紙本姓名',phone:'+886900000000',line:'不應覆寫綁定',birthday:'2001-07-28'},{id:'b',name:'手動新增',phone:'0900000001',line:'紙本聯絡'}]);
+assert.equal(rows.size,2);assert.equal(rows.get('0900000000').count,2);assert.equal(rows.get('0900000000').lineId,'已驗證 LINE');assert.equal(rows.get('0900000000').name,'會員姓名');
+assert.equal(rows.get('0900000001').count,0);assert.equal(rows.get('0900000001').last,'');assert.equal(rows.get('0900000001').lineId,'紙本：紙本聯絡');assert.equal(customerRecordKey({customerPhone:'+886900000000'}),'0900000000');
+const records=new Map();let writes=0,verifyFailure=false;
+const snapshot=id=>({exists:()=>records.has(id),data:()=>records.get(id)});
+const firebase={doc:(_db,c,id)=>({c,id}),getDocFromServer:async ref=>verifyFailure?{exists:()=>false}:snapshot(ref.id),serverTimestamp:()=>({seconds:123}),runTransaction:async(_db,callback)=>callback({get:async ref=>snapshot(ref.id),set:(ref,value)=>{records.set(ref.id,value);writes++;}})};
+const context=vm.createContext({console,crypto:webcrypto,TextEncoder,Error});
+const source=new vm.SourceTextModule(fs.readFileSync(new URL('../assets/customer-record-store.js',import.meta.url),'utf8'),{context});
+await source.link(async name=>{
+  const exports=name.includes('firebase-firestore')?firebase:{recordPayload,RECORD_KIND};
+  return new vm.SyntheticModule(Object.keys(exports),function(){for(const [key,value] of Object.entries(exports))this.setExport(key,value);},{context});
+});await source.evaluate();
+const {saveCustomerRecord,loadCustomerRecord}=source.namespace;
+const id='paper_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',user={uid:'admin',isAnonymous:false},data={name:'儲存測試',phone:'0900000000'};
+await assert.rejects(saveCustomerRecord({},null,id,data),/登入/);
+await assert.rejects(saveCustomerRecord({},user,'invalid',data),/編號/);
+const first=await saveCustomerRecord({},user,id,data);assert.equal(first.confirmationStatus,'not_confirmed');assert.equal(first.createdBy,'admin');assert.equal(writes,1);
+await saveCustomerRecord({},user,id,data);assert.equal(writes,1);
+await assert.rejects(saveCustomerRecord({},user,id,{...data,name:'不得覆寫'}),/不會覆寫/);assert.equal(writes,1);
+await assert.rejects(saveCustomerRecord({},{uid:'another-admin'},id,data),/不會覆寫/);
+assert.equal((await loadCustomerRecord({},id)).name,'儲存測試');
+verifyFailure=true;await assert.rejects(saveCustomerRecord({},user,id,data),/無法確認是否已儲存/);verifyFailure=false;await saveCustomerRecord({},user,id,data);assert.equal(writes,1);
+console.log('PASS: persistent record schema, immutable/idempotent writes, server verification/retry, customer-list merge, no inflated booking counts or LINE binding overwrite.');

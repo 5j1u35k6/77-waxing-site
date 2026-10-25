@@ -62,7 +62,7 @@ const server=http.createServer((req,res)=>{
     const phone=await context.newPage(),endpoint='https://script.google.com/macros/s/test/exec';
     await phone.goto(origin+'/admin/record-upload.html#'+new URLSearchParams({session:createdSession,key:'b'.repeat(64),endpoint}));
     const phoneBefore=requests.length;await phone.locator('input').setInputFiles(file('phone.txt'));
-    await phone.getByRole('status').filter({hasText:'原檔已確認保存'}).waitFor();
+    await phone.getByRole('status').filter({hasText:'檔案已上傳'}).waitFor();
     assert.equal(requests.slice(phoneBefore).filter(p=>p.action==='record_upload').length,1,'no extra upload click');
     await owner.waitForURL('**/admin/customer-record.html?**');await owner.locator('[data-source-summary-text]').filter({hasText:'辨識完成'}).waitFor();
     assert.equal(await owner.locator('[name="name"]').inputValue(),'自動帶入測試');assert.equal(await owner.locator('[name="consent"]').isChecked(),false);
