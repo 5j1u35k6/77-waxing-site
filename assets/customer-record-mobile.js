@@ -1,5 +1,6 @@
-import { recordRequest, encodeRecordFile, validRecordEndpoint } from "./customer-record-upload-api.js?v=20261023-auto5";
-import { showUploadQueue } from "./customer-record-progress.js?v=20261023-auto5";
+import { operationErrorText } from "./interface-copy.js?v=20261025-copy2";
+import { recordRequest, encodeRecordFile, validRecordEndpoint } from "./customer-record-upload-api.js?v=20261025-copy2";
+import { showUploadQueue } from "./customer-record-progress.js?v=20261025-copy2";
 const args=new URLSearchParams(location.hash.slice(1));history.replaceState(null,"",location.pathname);
 const endpoint=args.get("endpoint"),sessionId=args.get("session"),uploadKey=args.get("key");
 const input=document.querySelector('input'),button=document.querySelector('button'),status=document.querySelector('[role="status"]');
@@ -27,8 +28,8 @@ async function upload(){
       if(!result.uploaded||!result.verified)throw new Error('尚未取得原檔儲存確認，請按「繼續上傳」。');
       current.queue.update(index,'accepted');job.accepted=true;job.file=null;job.encoded=null;current.completed++;
     }
-    status.textContent='原檔已確認保存。原管理裝置將自動辨識並帶入表格，請回原裝置核對。';input.value='';button.textContent='上傳完成';button.disabled=true;
-  }catch(error){current.queue.update(current.completed,'failed',error.message);status.textContent='已確認保存 '+current.completed+' 個。'+error.message+' 未完成檔案保留在此頁，請按「繼續上傳」；關閉或重新整理會清除尚未確認的檔案。';button.textContent='繼續上傳';button.disabled=false;}
+    status.textContent='檔案已上傳，請回到原裝置核對辨識結果。';input.value='';button.textContent='上傳完成';button.disabled=true;
+  }catch(error){current.queue.update(current.completed,'failed',operationErrorText(error));status.textContent='已上傳 '+current.completed+' 個。'+operationErrorText(error)+' 未完成檔案保留在此頁，請按「繼續上傳」；關閉或重新整理會清除尚未確認的檔案。';button.textContent='繼續上傳';button.disabled=false;}
   finally{busy=false;input.disabled=false;}
 }
 button.onclick=upload;

@@ -95,7 +95,7 @@ function space(){
 }
 function courses(){
   return hero('COURSES','專業教學','教學內容與開課資訊會在確認後於此更新。')+
-  `<section class="section"><div class="wrap narrow"><span class="tag">COURSES</span><h2>目前教學資訊整理中</h2><p>為避免放上尚未確認的課程內容、費用或時數，這個頁面只保留正式公告位置。</p></div></section>`;
+  `<section class="section"><div class="wrap narrow"><span class="tag">COURSES</span><h2>課程資訊準備中</h2><p>課程內容與開課時間將於此公布，歡迎先聯絡我們詢問。</p></div></section>`;
 }
 function bookingShell(){
   return `<section class="section"><div class="wrap booking-wide"><div class="booking" id="booking"></div></div></section>`;

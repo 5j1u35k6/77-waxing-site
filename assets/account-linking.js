@@ -142,13 +142,13 @@ function paintStatus(providers) {
 
 function statusReadErrorText(error) {
   const code = String(error?.code || error?.message || "unknown");
-  if (code.includes("invalid_action")) return "綁定後端尚未更新到新版 Cloudflare Worker（invalid_action）。";
-  if (code.includes("missing_data") || code.includes("missing_shop_data")) return "Apps Script 尚未把會員綁定請求交給 IdentityLink（missing_data）。";
+  if (code.includes("invalid_action")) return "目前無法讀取帳號綁定狀態，請稍後再試或聯絡我們。";
+  if (code.includes("missing_data") || code.includes("missing_shop_data")) return "目前無法讀取帳號綁定狀態，請稍後再試或聯絡我們。";
   if (code.includes("firebase_auth_invalid")) return "會員登入狀態已過期，請重新登入後再試。";
-  if (code.includes("identity_server_error")) return "會員綁定後端執行失敗（identity_server_error），請檢查 Apps Script 執行紀錄。";
-  if (code.includes("identity_backend_invalid")) return "Cloudflare 已收到請求，但 Apps Script 回傳格式不正確（identity_backend_invalid）。";
-  if (code.includes("proxy_http_")) return `會員綁定服務目前無法連線（${code}）。`;
-  return `目前無法讀取綁定狀態（${code}）。`;
+  if (code.includes("identity_server_error")) return "帳號綁定服務暫時無法使用，請稍後再試或聯絡我們。";
+  if (code.includes("identity_backend_invalid")) return "帳號綁定服務暫時無法使用，請稍後再試或聯絡我們。";
+  if (code.includes("proxy_http_")) return `目前無法連線，請稍後再試或聯絡我們。`;
+  return `目前無法讀取帳號綁定狀態，請稍後再試。`;
 }
 
 async function render(force = false) {
@@ -280,14 +280,14 @@ function bindingErrorText(error) {
   const code = String(error?.code || error?.message || "unknown");
   if (code.includes("popup-closed-by-user")) return "已取消 Google 帳號選擇。";
   if (code.includes("popup-blocked")) return "瀏覽器阻擋了 Google 視窗，請允許彈出式視窗後再試。";
-  if (code.includes("google_already_linked")) return "這個 Google 已經綁定其他 77waxing 會員。";
-  if (code.includes("line_already_linked")) return "這個 LINE 已經綁定其他 77waxing 會員。";
+  if (code.includes("google_already_linked")) return "這個 Google 帳號已綁定其他會員。";
+  if (code.includes("line_already_linked")) return "這個 LINE 帳號已綁定其他會員。";
   if (code.includes("primary_google_exists")) return "目前會員已經綁定另一個 Google 帳號。";
   if (code.includes("firebase_auth_invalid")) return "會員登入狀態已過期，請重新登入後再綁定。";
-  if (code.includes("invalid_action")) return "Cloudflare Worker 尚未更新到支援會員綁定的版本。";
-  if (code.includes("missing_data") || code.includes("missing_shop_data")) return "Apps Script 的 doPost 尚未接上會員綁定路由。";
-  if (code.includes("identity_server_error")) return "Apps Script 會員綁定後端執行失敗，請檢查執行紀錄。";
-  return `綁定目前無法完成（${code}）。`;
+  if (code.includes("invalid_action")) return "目前無法完成帳號綁定，請稍後再試或聯絡我們。";
+  if (code.includes("missing_data") || code.includes("missing_shop_data")) return "目前無法完成帳號綁定，請稍後再試或聯絡我們。";
+  if (code.includes("identity_server_error")) return "帳號綁定服務暫時無法使用，請稍後再試或聯絡我們。";
+  return `目前無法完成帳號綁定，請稍後再試。`;
 }
 
 function scheduleRender(force = false) {

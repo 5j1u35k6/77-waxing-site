@@ -18,7 +18,7 @@ export async function saveCustomerRecord(db,user,id,data,signaturePng=''){
     tx.set(ref,{...payload,payloadHash,createdBy:user.uid,createdAt:serverTimestamp()});
   });
   const verified=await getDocFromServer(ref);
-  if(!verified.exists()||verified.data().payloadHash!==payloadHash)throw new Error('尚未確認伺服器儲存結果，請在同一頁再試一次，避免重複新增。');
+  if(!verified.exists()||verified.data().payloadHash!==payloadHash)throw new Error('暫時無法確認是否已儲存，請留在此頁再試一次，避免重複新增。');
   return {id,...verified.data()};
 }
 export async function loadCustomerRecord(db,id){

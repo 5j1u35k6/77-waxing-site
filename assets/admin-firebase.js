@@ -183,7 +183,7 @@ async function showAdminDashboard(root) {
     renderAdminRows(root, rows);
   }, (error) => {
     console.error(error);
-    root.querySelector("[data-admin-rows]").innerHTML = '<tr><td colspan="8" class="muted">無法讀取預約資料，請確認此帳號具有 admins/{uid} 權限。</td></tr>';
+    root.querySelector("[data-admin-rows]").innerHTML = '<tr><td colspan="8" class="muted">無法讀取預約資料，請確認已使用管理員帳號登入。</td></tr>';
   });
 }
 
@@ -222,8 +222,8 @@ async function mountAdmin(root) {
   const oldPreview = root.querySelector(".preview");
   if (oldPreview) oldPreview.remove();
   if (!firebaseConfigured) {
-    root.innerHTML = `<main class="dash admin-setup"><span class="tag">FIREBASE SETUP REQUIRED</span><h2>正式後台尚未啟用</h2><p>Firebase Web App 設定尚未完成，請確認 Authentication 與 Firestore 設定。</p></main>`;
-    replacePreviewBanner(root, "請先完成 Firebase Web App 設定。", "warning");
+    root.innerHTML = `<main class="dash admin-setup"><span class="tag">暫時無法使用</span><h2>後台暫時無法使用</h2><p>目前無法連線至管理後台，請稍後再試；若仍無法使用，請聯絡網站管理人員。</p></main>`;
+    replacePreviewBanner(root, "後台連線暫時無法使用。", "warning");
     return;
   }
 

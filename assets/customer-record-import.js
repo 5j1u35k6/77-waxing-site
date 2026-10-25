@@ -1,8 +1,9 @@
+import { operationErrorText } from "./interface-copy.js?v=20261025-copy2";
 import { getApp } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";
 import { getAuth } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
 import { getFirestore, getDoc, doc } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
-import { DEFAULT_RECORD_ENDPOINT, recordRequest, encodeRecordFile, recordCapability } from "./customer-record-upload-api.js?v=20261023-auto5";
-import { showUploadQueue } from "./customer-record-progress.js?v=20261023-upload4";
+import { DEFAULT_RECORD_ENDPOINT, recordRequest, encodeRecordFile, recordCapability } from "./customer-record-upload-api.js?v=20261025-copy2";
+import { showUploadQueue } from "./customer-record-progress.js?v=20261025-copy2";
 
 let dialog=null,endpoint=DEFAULT_RECORD_ENDPOINT,session=null,generation=0,pollTimer=null,polling=false,busy=false,opener=null,prepared=null,creating=null,qrLoading=null,watching=false,watchStarted=0;
 let transfer=null,navigating=false;
@@ -40,7 +41,7 @@ function renderFiles(files){
         let url=urls.get(file.id);
         if(!url){const result=await request('record_download',{fileId:file.id});if(turn!==generation)return;const bytes=Uint8Array.from(atob(result.file.data),x=>x.charCodeAt(0));url=URL.createObjectURL(new Blob([bytes],{type:'application/octet-stream'}));urls.set(file.id,url);}
         const link=document.createElement('a');link.href=url;link.download=file.name;link.click();
-      }catch(error){if(turn===generation)status(error.message);}finally{download.disabled=false;}
+      }catch(error){if(turn===generation)status(operationErrorText(error));}finally{download.disabled=false;}
     };
     row.append(name,download,scan);list.append(row);
   }
@@ -82,10 +83,10 @@ async function poll(){
     const result=await request('record_list');if(turn!==generation)return;
     const before=dialog.querySelector('[data-record-files]').children.length;renderFiles(result.files);
     if(result.files.length>before&&!busy){
-      status('檔案已確認保存，正在自動開啟表格並辨識…');
+      status('檔案已上傳，正在開啟資料表並辨識…');
       if(watching)openRecordPage(result.files[0].id);
     }
-  }catch(error){if(turn===generation&&!busy)status(error.message);}
+  }catch(error){if(turn===generation&&!busy)status(operationErrorText(error));}
   finally{polling=false;schedulePoll(turn);}
 }
 function loadQR(){
@@ -103,7 +104,7 @@ async function showQR(){
     const graphic=document.createElement('div');graphic.innerHTML=code.createSvgTag({cellSize:4,margin:4,scalable:true});
     const caption=document.createElement('p');caption.textContent='使用其他裝置掃描 QR Code 上傳；20 分鐘內有效，關閉此視窗即失效。';
     box.append(graphic,caption);box.hidden=false;status('等待其他裝置上傳…');watching=true;watchStarted=Date.now();schedulePoll(turn);
-  }catch(error){if(turn===generation)status(error.message);}finally{if(turn===generation)setBusy(false);}
+  }catch(error){if(turn===generation)status(operationErrorText(error));}finally{if(turn===generation)setBusy(false);}
 }
 async function upload(files){
   if(busy||!files.length)return;
@@ -132,8 +133,8 @@ async function continueUpload(){
       session=result;job.accepted=true;job.serverFile=result.file;job.encoded=null;job.file=null;batch.completed++;
       queue.update(index,'accepted');renderFiles([result.file]);
     }
-    if(turn===generation){status('檔案已確認保存，正在自動辨識並帶入表格…');openRecordPage(jobs[0].serverFile.id);}
-  }catch(error){if(turn===generation){queue.update(batch.completed,'failed',error.message);status('已確認保存 '+batch.completed+' 個。'+error.message+' 未完成的檔案仍保留在此頁，請按「繼續上傳」；關閉或重新整理會清除尚未確認的檔案。');dialog.querySelector('[data-upload-retry]').hidden=false;}}
+    if(turn===generation){status('檔案已上傳，正在辨識並帶入表格…');openRecordPage(jobs[0].serverFile.id);}
+  }catch(error){if(turn===generation){queue.update(batch.completed,'failed',operationErrorText(error));status('已上傳 '+batch.completed+' 個。'+operationErrorText(error)+' 未完成的檔案仍保留在此頁，請按「繼續上傳」；關閉或重新整理會清除尚未確認的檔案。');dialog.querySelector('[data-upload-retry]').hidden=false;}}
   finally{if(turn===generation&&!navigating)setBusy(false);}
 }
 function openImport(button){
@@ -141,7 +142,7 @@ function openImport(button){
   opener=button;generation++;session=null;prepared=null;creating=null;watching=false;polling=false;busy=false;transfer=null;navigating=false;clearTimeout(pollTimer);
   dialog?.remove();releaseFiles();
   dialog=document.createElement('dialog');dialog.className='record-modal';dialog.setAttribute('aria-labelledby','record-title');
-  dialog.innerHTML='<header class="record-head"><h2 id="record-title">新增紀錄</h2><button type="button" data-record-close aria-label="關閉">×</button></header><div class="record-methods"><button type="button" data-record-manual>手動輸入</button><button type="button" data-record-direct>直接上傳</button><button type="button" data-record-device>透過其他裝置上傳</button></div><input type="file" multiple hidden data-record-picker><p>選檔後自動上傳，確認原檔保存後會自動開啟表格、辨識並帶入資料。每個檔案最多 5 MB，最多 8 個；多個檔案會先帶入第一份，其他檔案可在表格中選擇核對。</p><p class="record-status" role="status" aria-live="polite" data-record-status></p><button class="record-button" type="button" data-upload-retry hidden>繼續上傳</button><ul class="record-files" data-upload-queue hidden></ul><div class="record-qr" data-record-qr hidden></div><ul class="record-files" data-record-files></ul>';
+  dialog.innerHTML='<header class="record-head"><h2 id="record-title">新增紀錄</h2><button type="button" data-record-close aria-label="關閉">×</button></header><div class="record-methods"><button type="button" data-record-manual>手動輸入</button><button type="button" data-record-direct>直接上傳</button><button type="button" data-record-device>透過其他裝置上傳</button></div><input type="file" multiple hidden data-record-picker><p>選取檔案後會自動上傳，接著開啟資料表、辨識並帶入資料。每個檔案最多 5 MB，最多 8 個；多個檔案會先帶入第一份，其他檔案可在表格中選擇核對。</p><p class="record-status" role="status" aria-live="polite" data-record-status></p><button class="record-button" type="button" data-upload-retry hidden>繼續上傳</button><ul class="record-files" data-upload-queue hidden></ul><div class="record-qr" data-record-qr hidden></div><ul class="record-files" data-record-files></ul>';
   document.body.appendChild(dialog);
   const picker=dialog.querySelector('[data-record-picker]');
   dialog.querySelector('[data-record-manual]').onclick=()=>openRecordPage();
@@ -158,7 +159,7 @@ function openImport(button){
     session=null;prepared=null;transfer=null;opener?.focus();
   },{once:true});
   dialog.showModal();prepare().catch(()=>{});
-  for(const [rel,href] of [['modulepreload','../assets/customer-record-page-form.js?v=20261023-tw1'],['prefetch','./customer-record.html']]){
+  for(const [rel,href] of [['modulepreload','../assets/customer-record-page-form.js?v=20261025-copy2'],['prefetch','./customer-record.html']]){
     if(!Array.from(document.querySelectorAll('link[href]')).some(link=>link.getAttribute('href')===href)){const link=document.createElement('link');link.rel=rel;link.href=href;document.head.append(link);}
   }
 }

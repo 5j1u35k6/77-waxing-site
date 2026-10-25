@@ -10,7 +10,7 @@
       heading=document.createElement('div');
       heading.className='admin-concept-heading';
       heading.dataset.adminConceptHeading='1';
-      heading.innerHTML='<span class="tag">OVERVIEW</span><h3>概論</h3><p class="muted">快速掌握目前預約狀態。</p>';
+      heading.innerHTML='<span class="tag">OVERVIEW</span><h3>預約概況</h3><p class="muted">快速掌握目前預約狀態。</p>';
     }
     return heading;
   }

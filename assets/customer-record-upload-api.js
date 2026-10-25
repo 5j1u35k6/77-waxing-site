@@ -25,22 +25,22 @@ export async function recordRequest(endpoint, action, payload = {}, {onState=()=
       response = await fetch(target.href, {method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body,signal,cache:"no-store",credentials:"omit",referrerPolicy:"no-referrer",keepalive:action==='record_close'});
     } catch (error) {
       if (retryable && attempt<attempts-1 && !signal.aborted && error instanceof TypeError) { await new Promise(resolve=>setTimeout(resolve,350*(attempt+1))); continue; }
-      const failure=new Error(signal.aborted ? "連線等候逾時，請稍後再試。" : "暫時無法取得伺服器確認，請稍後再試。");failure.code='transport';throw failure;
+      const failure=new Error(signal.aborted ? "連線等候逾時，請稍後再試。" : "連線暫時中斷，請稍後再試。");failure.code='transport';throw failure;
     }
     if (!response.ok) {
       if (retryable && attempt<attempts-1 && !signal.aborted && [404,408,429,500,502,503,504].includes(response.status)) { await new Promise(resolve=>setTimeout(resolve,350*(attempt+1))); continue; }
-      const failure=new Error('尚未取得伺服器確認，請稍後再試。');failure.code='transport';throw failure;
+      const failure=new Error('連線未完成，請稍後再試。');failure.code='transport';throw failure;
     }
     let result;
     try { result = await response.json();if(!result||typeof result!=='object')throw new Error('invalid_response'); }
     catch (error) {
       if (retryable && attempt<attempts-1 && !signal.aborted) { await new Promise(resolve=>setTimeout(resolve,350*(attempt+1))); continue; }
-      throw new Error("上傳服務回應格式有誤，請稍後再試。");
+      throw new Error("目前無法連線，請稍後再試。");
     }
     // Authorization, validation, expiry and other business errors are never retried.
     if (!result.ok || result.service !== "customer-records-v1") {
       if(['record_submit','record_upload','record_create'].includes(action)&&['busy','verify_failed'].includes(result.code)&&attempt<attempts-1&&!signal.aborted){await new Promise(resolve=>setTimeout(resolve,700*(attempt+1)));continue;}
-      const error=new Error(result.message || "上傳服務回應異常，請稍後再試；原檔不會因此被刪除。");
+      const error=new Error(result.code==='processing_failed' ? "目前無法處理檔案，請稍後再試；若仍無法使用，請聯絡網站管理人員。" : result.message || "目前無法完成檔案處理，請稍後再試。");
       error.code=result.code || 'service_error';throw error;
     }
     onState('accepted');

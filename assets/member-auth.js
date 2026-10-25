@@ -180,7 +180,7 @@ async function beginProviderLogin(kind) {
     console.error("member login failed", error);
     const code = String(error?.code || "");
     if (code.includes("operation-not-allowed") || code.includes("invalid-provider-id") || code.includes("invalid-oauth-provider")) {
-      setLoginStatus(`${config.label} 登入尚未完成後台供應商設定。`, "error");
+      setLoginStatus(`${config.label} 登入暫時無法使用，請稍後再試或聯絡我們。`, "error");
     } else {
       setLoginStatus(`${config.label} 登入目前無法使用，請稍後再試。`, "error");
     }

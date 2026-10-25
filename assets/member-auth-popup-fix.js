@@ -178,7 +178,7 @@ async function consumeLineCallback() {
 
   if (errorCode) {
     cleanAuthFragment();
-    showLoginError(`LINE 已完成授權，但會員交換失敗（${errorCode}）。`, errorCode);
+    showLoginError(`LINE 登入未完成，請重新登入；若仍無法使用，請聯絡我們。`, errorCode);
     return true;
   }
 
@@ -240,7 +240,7 @@ async function consumeLineCallback() {
     console.error("LINE custom token login failed", error);
     cleanAuthFragment();
     const code = String(error?.code || error?.message || "unknown");
-    showLoginError(`LINE 已授權，但 Firebase 會員登入失敗（${code}）。`, code);
+    showLoginError(`LINE 登入未完成，請重新登入；若仍無法使用，請聯絡我們。`, code);
     return true;
   }
 }
@@ -262,7 +262,7 @@ async function beginLineLogin() {
     console.error("LINE prepare failed", error);
     clearExpectedState();
     const code = String(error?.code || error?.message || "prepare_failed");
-    showLoginError(`LINE 登入初始化失敗（${code}），請稍後再試。`, code);
+    showLoginError(`目前無法開啟 LINE 登入，請稍後再試。`, code);
     return;
   }
 
@@ -288,7 +288,7 @@ document.addEventListener("click", (event) => {
     return;
   }
   if (kind === "whatsapp") {
-    setStatus("WhatsApp 會員驗證尚未接通；目前先使用 LINE 登入。", "error");
+    setStatus("目前未開放 WhatsApp 登入，請使用 LINE 登入。", "error");
   }
 }, true);
 

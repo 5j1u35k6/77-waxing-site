@@ -1,11 +1,12 @@
+import { operationErrorText } from "./interface-copy.js?v=20261025-copy2";
 import { getApps, initializeApp } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js';
 import { getAuth, setPersistence, browserLocalPersistence, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js';
 import { doc, getDoc, getFirestore } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 import { firebaseConfig } from './firebase-config.js';
-import { mountRecordForm } from './customer-record-page-form.js?v=20261023-tw1';
+import { mountRecordForm } from './customer-record-page-form.js?v=20261025-copy2';
 import { recordFields } from './customer-record-fields.js?v=20261023-paper';
-import { saveCustomerRecord, loadCustomerRecord } from './customer-record-store.js?v=20261023-tw1';
-import { DEFAULT_RECORD_ENDPOINT, recordRequest } from './customer-record-upload-api.js?v=20261023-auto5';
+import { saveCustomerRecord, loadCustomerRecord } from './customer-record-store.js?v=20261025-copy2';
+import { DEFAULT_RECORD_ENDPOINT, recordRequest } from './customer-record-upload-api.js?v=20261025-copy2';
 
 const status=document.querySelector('[data-page-status]'),host=document.querySelector('[data-record-page]'),params=new URLSearchParams(location.search);
 // Older cached HTML remains usable while the new page and module deploy separately.
@@ -38,13 +39,13 @@ async function scanSource(fileId){
     if(!String(text||'').trim())throw new Error('原檔已保留，但未辨識到文字。請換一張清晰照片或手動填寫。');
     recognized.set(fileId,text);lastFailedFile='';
     if(!saved){editor.apply(recordFields(text),text);sourceStatus('辨識完成。請核對資料；人工修改、同意及簽名不會被自動覆蓋。');}
-  }catch(error){lastFailedFile=fileId;sourceStatus(error.code==='transport'?'原檔上傳與文字辨識是分開的：辨識連線中斷，請按「重新辨識」，不必重傳原檔。':error.message);}
+  }catch(error){lastFailedFile=fileId;sourceStatus(error.code==='transport'?'辨識連線中斷。檔案已上傳，請按「重新辨識」，不必再次上傳。':operationErrorText(error));}
   finally{setScanning(false);}
 }
 function scheduleSources(){clearTimeout(pollTimer);if(sourceSession&&!saved&&!sourceStopped)pollTimer=setTimeout(listSources,sourceFailures?Math.min(30000,sourceFailures*10000):document.hidden?15000:5000);}
 async function listSources(){
   if(!sourceSession||sourcePolling||saved||sourceStopped)return;
-  if(Date.now()>sourceExpiresAt){sourceStopped=true;document.querySelector('[data-source-list-status]').textContent='暫存連結已到期，已停止背景連線；表格內已帶入的資料仍保留，請核對並正式儲存。';return;}
+  if(Date.now()>sourceExpiresAt){sourceStopped=true;document.querySelector('[data-source-list-status]').textContent='上傳連結已到期。已填寫的內容仍在此頁，請核對後儲存。';return;}
   if(scanning){scheduleSources();return;}sourcePolling=true;
   try{
     const result=await sourceRequest('record_list'),list=document.querySelector('[data-source-files]');
@@ -55,17 +56,17 @@ async function listSources(){
       const button=document.createElement('button');button.type='button';button.className='record-button';button.dataset.scanFile=file.id;button.textContent='辨識並套用';button.disabled=scanning||saved;button.onclick=()=>scanSource(file.id);item.append(name,button);list.appendChild(item);
     }
     document.querySelector('[data-source-list-status]').textContent='';
-  }catch(error){sourceFailures++;if(['session_expired','admin_required'].includes(error.code))sourceStopped=true;document.querySelector('[data-source-list-status]').textContent='檔案清單暫時無法更新；這不代表辨識失敗。'+error.message;}
+  }catch(error){sourceFailures++;if(['session_expired','admin_required'].includes(error.code))sourceStopped=true;document.querySelector('[data-source-list-status]').textContent='檔案清單暫時無法更新；這不代表辨識失敗。'+operationErrorText(error);}
   finally{sourcePolling=false;scheduleSources();}
 }
 async function save(){
-  if(saving||saved)return;saving=true;editor.setBusy(true);message('正在寫入並向伺服器確認…');
+  if(saving||saved)return;saving=true;editor.setBusy(true);message('正在儲存顧客紀錄，請稍候…');
   try{
     const record=await saveCustomerRecord(db,user,recordId,editor.data(),editor.signature);
-    saved=true;dirty=false;editor.load(record);message('已正式儲存，重新整理後仍可檢視。顧客資料清單與歷史紀錄已同步。');
+    saved=true;dirty=false;editor.load(record);message('顧客紀錄已儲存，可在顧客資料中檢視。');
     const url=new URL(location.href);url.search='';url.searchParams.set('record',record.id);history.replaceState(null,'',url);
     closeSource();document.querySelector('[data-source-panel]').hidden=true;
-  }catch(error){message(error.message||'儲存失敗，資料仍保留在本頁，請再試一次。');}
+  }catch(error){message(operationErrorText(error)||'儲存失敗，資料仍保留在本頁，請再試一次。');}
   finally{saving=false;editor.setBusy(false);}
 }
 async function boot(){
@@ -101,6 +102,6 @@ async function boot(){
       if(!scanning){document.querySelector('[data-source-progress]').hidden=true;document.querySelector('[data-source-summary]').setAttribute('aria-busy','false');}
       if(!file)sourceStatus('請在下方選擇檔案進行辨識。');
     }
-  }catch(error){host.hidden=true;document.querySelector('[data-source-summary]').hidden=true;document.querySelector('[data-source-progress]').hidden=true;status.hidden=false;status.replaceChildren();const text=document.createElement('p');text.textContent=error.message||'無法載入顧客資料表。';const back=document.createElement('a');back.href='./#customers';back.textContent='返回管理後台';status.append(text,back);}
+  }catch(error){host.hidden=true;document.querySelector('[data-source-summary]').hidden=true;document.querySelector('[data-source-progress]').hidden=true;status.hidden=false;status.replaceChildren();const text=document.createElement('p');text.textContent=operationErrorText(error)||'無法載入顧客資料表。';const back=document.createElement('a');back.href='./#customers';back.textContent='返回管理後台';status.append(text,back);}
 }
 boot();

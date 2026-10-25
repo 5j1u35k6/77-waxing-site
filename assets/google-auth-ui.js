@@ -132,14 +132,14 @@ async function saveGoogleProfile(user, identity, { mapped = false } = {}) {
 
 function errorText(error) {
   const code = String(error?.code || error?.message || "unknown");
-  if (code.includes("operation-not-allowed")) return "Google 登入尚未在 Firebase 啟用。";
-  if (code.includes("unauthorized-domain")) return "目前網站網域尚未加入 Firebase 授權網域。";
+  if (code.includes("operation-not-allowed")) return "Google 登入暫時無法使用，請改用 LINE 或稍後再試。";
+  if (code.includes("unauthorized-domain")) return "此頁暫時無法使用 Google 登入，請改用 LINE 或聯絡我們。";
   if (code.includes("popup-closed-by-user")) return "Google 登入已取消。";
   if (code.includes("popup-blocked")) return "瀏覽器阻擋了 Google 登入視窗，請允許彈出式視窗後再試。";
   if (code.includes("account-exists-with-different-credential")) return "這個 Email 已使用其他登入方式建立會員，請先用原本方式登入。";
   if (code.includes("firebase_auth_invalid")) return "會員驗證已過期，請重新登入。";
   if (code.includes("identity_backend") || code.includes("proxy_")) return "會員綁定服務目前無法連線，請稍後再試。";
-  return `Google 登入目前無法使用（${code}）。`;
+  return `Google 登入暫時無法使用，請稍後再試或聯絡我們。`;
 }
 
 async function beginGoogleLogin() {
