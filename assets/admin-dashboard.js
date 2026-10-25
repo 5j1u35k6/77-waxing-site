@@ -98,7 +98,7 @@ function render(force=false){
 
       <section class="dashboard-attention-summary">
         <div class="dashboard-v3-title"><div><small>ACTION</small><h4>待處理</h4></div><button type="button" data-overview-bookings>前往處理</button></div>
-        <div class="dashboard-attention-counts"><article><b>${pending.length}</b><span>待確認</span></article><article><b>${unpaid.length}</b><span>待收訂金</span></article></div>
+        <div class="dashboard-attention-counts"><article><b>${pending.length}</b><span>待確認</span></article><article><b>${unpaid.length}</b><span>待收定金</span></article></div>
       </section>
 
       <section class="dashboard-week-panel ${weekTotal===0?'is-empty':''}">

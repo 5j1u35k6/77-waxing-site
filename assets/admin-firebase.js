@@ -143,7 +143,7 @@ function renderAdminRows(root, rows) {
   root.querySelector("[data-admin-rows]").innerHTML = rows.map((row) => {
     let actions = "—";
     if (row.status === "pending_confirmation") {
-      actions = `<button type="button" data-admin-action="deposit" data-id="${row.id}">確認＋收訂金</button>${row.isFirstVisit ? "" : `<button type="button" data-admin-action="nodeposit" data-id="${row.id}">確認免訂金</button>`}<button type="button" data-admin-action="cancel" data-id="${row.id}">取消</button>`;
+      actions = `<button type="button" data-admin-action="deposit" data-id="${row.id}">確認＋收定金</button>${row.isFirstVisit ? "" : `<button type="button" data-admin-action="nodeposit" data-id="${row.id}">確認免定金</button>`}<button type="button" data-admin-action="cancel" data-id="${row.id}">取消</button>`;
     } else if (row.status === "pending_payment") {
       actions = `<button type="button" data-admin-action="paid" data-id="${row.id}">標記已付款</button><button type="button" data-admin-action="cancel" data-id="${row.id}">取消</button>`;
     } else if (row.status === "confirmed") {
