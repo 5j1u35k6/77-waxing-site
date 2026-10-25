@@ -430,20 +430,33 @@ function closeMemberCenter() {
 async function openMemberCenter() {
   if (!isMember()) return openLogin({ reason: "member" });
   const uid = currentUser.uid, request = ++memberCenterRequest;
-  const profile = await ensureProfile();
-  if (request !== memberCenterRequest || !isMember() || currentUser.uid !== uid) return;
   const shop = isShopPage();
   const wrap = ensureMemberCenter();
   const summary = wrap.querySelector("[data-member-profile-summary]");
+  const history = wrap.querySelector("[data-member-history]");
+  summary.setAttribute("aria-busy", "true");
+  summary.innerHTML = '<div class="member-history-empty" role="status" style="grid-column:1/-1">正在讀取會員資料…</div>';
+  history.replaceChildren();
+  wrap.hidden = false;
+  document.documentElement.classList.add("member-auth-open");
+  let profile;
+  try {
+    profile = await ensureProfile();
+  } catch (error) {
+    if (request === memberCenterRequest && !wrap.hidden) {
+      summary.innerHTML = '<div class="member-history-empty" role="status" style="grid-column:1/-1">目前無法讀取會員資料，請關閉後再試。</div>';
+    }
+    return;
+  } finally {
+    if (request === memberCenterRequest) summary.setAttribute("aria-busy", "false");
+  }
+  if (request !== memberCenterRequest || !isMember() || currentUser.uid !== uid || wrap.hidden) return;
   summary.innerHTML = `
     <div><small>會員名稱</small><b>${esc(profile?.displayName || currentUser.displayName || "—")}</b></div>
     <div><small>Email</small><b>${esc(profile?.email || currentUser.email || "尚未填寫")}</b></div>
     <div><small>電話</small><b>${esc(profile?.phone || "尚未填寫")}</b></div>
     ${shop ? "" : `<div><small>生理性別</small><b>${esc(genderText(profile?.gender))}</b></div>`}
     <div><small>生日</small><b>${esc(rocBirthday(profile?.birthday))}</b></div>`;
-  const history = wrap.querySelector("[data-member-history]");
-  wrap.hidden = false;
-  document.documentElement.classList.add("member-auth-open");
   if (shop) {
     // Reuse the store's existing order view and owner-scoped order subscription.
     // Do not fetch bookings and do not disguise treatment rows as order rows.

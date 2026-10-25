@@ -74,14 +74,21 @@ async function boot(){
     if(!user||user.isAnonymous)throw new Error('請先在管理後台登入，再重新載入本頁。');
     const settingsReady=sourceSession?getDoc(doc(db,'settings','general')):null;if(settingsReady)settingsReady.catch(()=>{});
     const admin=await getDoc(doc(db,'admins',user.uid));if(!admin.exists())throw new Error('此頁僅供管理員使用。');
-    editor=mountRecordForm(host,{onDirty:()=>{if(!saved)dirty=true;},onSave:save});host.hidden=false;status.hidden=true;
+    editor=mountRecordForm(host,{onDirty:()=>{if(!saved)dirty=true;},onSave:save});
+    const openingSaved=params.has('record');
+    host.hidden=openingSaved;status.hidden=!openingSaved;
+    if(openingSaved)status.textContent='正在讀取顧客紀錄…';
     onAuthStateChanged(auth,current=>{if(!current||current.uid!==user.uid){dirty=false;clearInterval(pollTimer);document.querySelector('.paper-signature-dialog')?.close();host.hidden=true;document.querySelector('[data-source-panel]').hidden=true;location.replace('./');}});
     host.querySelector('[data-record-back]').onclick=async e=>{
       e.preventDefault();if(saving)return;if(dirty&&!saved&&!confirm('尚未儲存，確定返回顧客資料？未儲存內容將清除。'))return;
       dirty=false;closeSource();location.assign('./#customers');
     };
-    if(params.has('record')){const record=await loadCustomerRecord(db,recordId);editor.load(record);saved=true;dirty=false;return;}
+    if(openingSaved){const record=await loadCustomerRecord(db,recordId);if(auth.currentUser?.uid!==user.uid)return;editor.load(record);saved=true;dirty=false;host.hidden=false;status.hidden=true;return;}
     if(sourceSession){
+      document.querySelector('[data-source-summary]').hidden=false;
+      document.querySelector('[data-source-summary]').setAttribute('aria-busy','true');
+      document.querySelector('[data-source-progress]').hidden=false;
+      sourceStatus('正在讀取上傳檔案，準備辨識…');
       const settings=await settingsReady,data=settings.exists()?settings.data():{};
       const configured=String(data.customerRecordUploadUrl||data.appsScriptEmailUrl||'').trim();
       endpoint=!configured||configured==='https://script.google.com/macros/s/AKfycby1y-oojBtmNsT8T1UPMydCTPkaZIjRss7QvxXkWi2duOs4mKI8p3tbIzvhi2xwd_Zb/exec'?DEFAULT_RECORD_ENDPOINT:configured;
@@ -91,7 +98,9 @@ async function boot(){
       const file=params.get('file');
       // Scanning validates its own file/session; listing need not block it.
       await Promise.all([listing,file&&/^[\w-]{1,160}$/.test(file)?scanSource(file):Promise.resolve()]);
+      if(!scanning){document.querySelector('[data-source-progress]').hidden=true;document.querySelector('[data-source-summary]').setAttribute('aria-busy','false');}
+      if(!file)sourceStatus('請在下方選擇檔案進行辨識。');
     }
-  }catch(error){host.hidden=true;status.hidden=false;status.replaceChildren();const text=document.createElement('p');text.textContent=error.message||'無法載入顧客資料表。';const back=document.createElement('a');back.href='./#customers';back.textContent='返回管理後台';status.append(text,back);}
+  }catch(error){host.hidden=true;document.querySelector('[data-source-summary]').hidden=true;document.querySelector('[data-source-progress]').hidden=true;status.hidden=false;status.replaceChildren();const text=document.createElement('p');text.textContent=error.message||'無法載入顧客資料表。';const back=document.createElement('a');back.href='./#customers';back.textContent='返回管理後台';status.append(text,back);}
 }
 boot();
