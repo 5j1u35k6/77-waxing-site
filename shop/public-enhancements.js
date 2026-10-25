@@ -1,8 +1,8 @@
 import "./seo.js?v=20261023-tw1";
-import "../assets/member-auth.js?v=20261025-loading1";
-import "../assets/google-auth-ui.js?v=20260915-google5-linked";
-import "../assets/member-auth-popup-fix.js?v=20260915-line-custom6-linked";
-import "../assets/account-linking.js?v=20260915-account-link1";
+import "../assets/member-auth.js?v=20261025-copy2";
+import "../assets/google-auth-ui.js?v=20261025-copy2";
+import "../assets/member-auth-popup-fix.js?v=20261025-copy2";
+import "../assets/account-linking.js?v=20261025-copy2";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
 import { collection, onSnapshot, query, where } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
 import { getPublicFirebase } from "../assets/public-firebase.js?v=20260913-shop2";

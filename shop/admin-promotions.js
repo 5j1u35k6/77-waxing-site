@@ -1,3 +1,4 @@
+import { operationErrorText } from "../assets/interface-copy.js?v=20261025-copy2";
 import { getApps } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
 import { collection, doc, getDoc, getFirestore, onSnapshot, serverTimestamp, setDoc } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
@@ -35,6 +36,7 @@ async function isAdmin(user) {
 }
 
 function message(text, error = false) {
+  if (error) text = operationErrorText(text, "活動設定暫時無法儲存，請確認管理員登入狀態與網路後再試。");
   if (error) {
     alert(text);
     return;
@@ -203,7 +205,7 @@ function formHtml(promo) {
       <div class="admin-section-head">
         <div>
           <h2>${editId ? "編輯促銷" : "新增促銷"}</h2>
-          <p class="order-date">促銷設定獨立儲存，不改商品、圖片、規格與購物車既有程式。</p>
+          <p class="order-date">請設定活動內容、適用商品與優惠條件，再儲存活動。</p>
         </div>
         ${editId ? `<button id="promo-cancel" class="mini-btn" type="button">取消編輯</button>` : ""}
       </div>

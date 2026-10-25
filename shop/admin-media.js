@@ -269,12 +269,12 @@ async function enhanceImageField(db) {
     <input id="p-image" type="hidden" value="${esc(mediaState[0]?.url || "")}" data-gallery-enhanced="1">
     <input id="p-media-json" type="hidden" value="">
     <div class="product-media-upload-head">
-      <div><b>商品圖庫</b><p>圖片會維持上傳時的原始尺寸與比例；前台只會依版面等比例縮放，不再提供「顯示範圍」或局部放大設定。第一張仍會作為商品主圖。</p></div>
+      <div><b>商品圖庫</b><p>圖片會保留原始比例，並依畫面大小縮放。第一張圖片為商品主圖。</p></div>
       <label class="product-image-upload-button">＋ 選擇圖片<input id="p-image-file" type="file" multiple accept="image/jpeg,image/png,image/webp,image/avif"></label>
     </div>
     <div class="product-media-list" data-media-list></div>
     <div class="product-image-upload-progress" aria-hidden="true"><i data-image-progress></i></div>
-    <div class="product-image-upload-status" data-image-status>圖片會存入 Firestore。若原始尺寸檔案超過資料上限，系統會請你先縮小檔案後再上傳；最多 ${MAX_IMAGES} 張。</div>`;
+    <div class="product-image-upload-status" data-image-status>最多可上傳 ${MAX_IMAGES} 張圖片；若總大小超過上限，請縮小圖片或減少張數後再上傳。</div>`;
 
   const input = field.querySelector("#p-image-file");
   const progress = field.querySelector("[data-image-progress]");
@@ -303,7 +303,7 @@ async function enhanceImageField(db) {
         setStatus(`正在處理 ${file.name}…`);
         const image = await resizeAndConvertToBase64(file);
         if (totalMediaLength() + image.url.length > MAX_MEDIA_TOTAL_LENGTH) {
-          setStatus("商品圖片總量已接近 Firestore 單筆資料大小上限，請移除一張或改用較小圖片。", true);
+          setStatus("商品圖片總大小接近上限，請移除一張圖片或縮小圖片後再上傳。", true);
           break;
         }
         mediaState.push({ id: mediaId(), url: image.url, variantId: "", sortOrder: mediaState.length, width: image.width, height: image.height });
@@ -321,7 +321,7 @@ async function enhanceImageField(db) {
     input.value = "";
     if (completed) {
       syncHidden();
-      setStatus(`已加入 ${completed} 張。現在共 ${mediaState.length} 張，約 ${Math.round(totalMediaLength() / 1024)} KB；儲存商品後前台會以原比例顯示。`);
+      setStatus(`已加入 ${completed} 張。現在共 ${mediaState.length} 張，約 ${Math.round(totalMediaLength() / 1024)} KB；儲存商品後，圖片會在商店中依原始比例顯示。`);
       setTimeout(() => { if (progress) progress.style.width = "0%"; }, 700);
     }
   });

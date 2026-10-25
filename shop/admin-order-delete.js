@@ -1,3 +1,4 @@
+import { operationErrorText } from "../assets/interface-copy.js?v=20261025-copy2";
 import { getApps } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";
 import { getAuth } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
 import { addDoc, collection, deleteDoc, doc, getFirestore, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
@@ -20,6 +21,7 @@ async function waitForAdminApp() {
 }
 
 function flash(message, type = "ok") {
+  if (type === "error") message = operationErrorText(message, "目前無法儲存變更，請確認管理員登入狀態與網路後再試。");
   const el = $("#admin-message");
   if (!el) return;
   el.textContent = message;

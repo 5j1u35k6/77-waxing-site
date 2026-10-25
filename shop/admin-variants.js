@@ -240,8 +240,8 @@ async function saveVariantProduct(event, db, auth) {
     console.error("77select variant product save failed", error);
     const text = String(error?.message || "");
     flash(text.includes("maximum size") || text.includes("1048576")
-      ? "商品圖片資料太多，已超過 Firestore 單筆資料上限；請移除一張圖片或改用較小圖片。"
-      : "商品儲存失敗，請檢查欄位與 Firestore 權限。", "error");
+      ? "商品圖片總大小超過上限，請移除一張圖片或縮小圖片後再儲存。"
+      : "商品儲存失敗，請確認欄位內容及管理員登入狀態。", "error");
   } finally {
     if (button?.isConnected) {
       button.disabled = false;
@@ -255,7 +255,7 @@ async function enhanceForm(form, db, auth) {
   form.dataset.variantEnhanced = "1";
 
   const intro = form.querySelector(".admin-section-head .order-date");
-  if (intro) intro.textContent = "商品可建立多個規格、TW/HK 獨立售價、規格庫存、數量優惠，以及多張規格對應圖片。";
+  if (intro) intro.textContent = "可設定商品規格、台灣與香港售價、庫存及數量優惠，並為各規格選擇圖片。";
 
   const legacyPrice = $("#p-price", form)?.closest(".field");
   const legacyStock = $("#p-stock", form)?.closest(".field");

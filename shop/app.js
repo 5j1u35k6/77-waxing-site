@@ -1,3 +1,4 @@
+import { operationErrorText } from "../assets/interface-copy.js?v=20261025-copy2";
 import { browserLocalPersistence, onAuthStateChanged, setPersistence, signInAnonymously } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
 import { addDoc, collection, doc, getDoc, getDocs, onSnapshot, query, serverTimestamp, setDoc, where } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
 import { getPublicFirebase } from "../assets/public-firebase.js?v=20260913-shop2";
@@ -69,6 +70,7 @@ function saveCart() {
   renderCart();
 }
 function toast(message, type = "ok") {
+  if (type === "error") message = operationErrorText(message, "目前無法完成操作，請稍後再試或聯絡我們。");
   const el = $("#toast");
   el.textContent = message;
   el.className = `toast${type === "error" ? " error" : ""}`;
