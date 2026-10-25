@@ -1,5 +1,5 @@
 import "./seo.js?v=20261023-tw1";
-import "../assets/member-auth.js?v=20261024-shop-member1";
+import "../assets/member-auth.js?v=20261025-loading1";
 import "../assets/google-auth-ui.js?v=20260915-google5-linked";
 import "../assets/member-auth-popup-fix.js?v=20260915-line-custom6-linked";
 import "../assets/account-linking.js?v=20260915-account-link1";
