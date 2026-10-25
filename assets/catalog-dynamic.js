@@ -113,12 +113,15 @@ function syncHomeCards() {
   const grid = section?.querySelector("[data-home-service-grid]");
   if (!grid || grid.dataset.dynamicCatalog === "1") return;
   const known = {
-    women: "VIO 私密處、腋下、四肢與細部熱蠟整理",
-    men: "男士私密處、胸腹背、四肢與細部熱蠟整理",
+    women: "今次嘅妳想改變啲咩呢？77waxing幫妳實現願望。",
+    men: "唔使怕醜！專業嘅77waxing一樣可以令你變得更型、更有自信！",
     skin: "臉部、粉刺、撥筋與身體肌膚保養",
     bust: "依時間與需求選擇不同美胸保養流程",
   };
-  grid.innerHTML = catalog.map((service, index) => `<article class="card"><div class="num">${String(index + 1).padStart(2, "0")}</div><h3>${esc(service.name)}</h3><p>${esc(known[service.key] || service.intro || "檢視服務項目與內容")}</p><a href="${servicePath(service)}" data-catalog-link>了解服務 →</a></article>`).join("");
+  const homeIntro = (service) => service.key === "women" || service.key === "men"
+    ? service.intro || known[service.key]
+    : known[service.key] || service.intro || "檢視服務項目與內容";
+  grid.innerHTML = catalog.map((service, index) => `<article class="card"><div class="num">${String(index + 1).padStart(2, "0")}</div><h3>${esc(service.name)}</h3><p>${esc(homeIntro(service))}</p><a href="${servicePath(service)}" data-catalog-link>了解服務 →</a></article>`).join("");
   grid.dataset.dynamicCatalog = "1";
 }
 

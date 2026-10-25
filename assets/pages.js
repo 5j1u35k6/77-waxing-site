@@ -66,7 +66,7 @@ function home(){
   <section class="section soft" data-home-service-catalog><div class="wrap"><div class="head"><div><h2 class="home-section-title">第一次，不需要一次懂全部。</h2></div></div><div class="grid4" data-home-service-grid aria-live="polite"></div></div></section>
   <section class="section home-safe-section"><div class="wrap home-safe-layout"><div class="art home-safe-art" aria-hidden="true"></div><div class="home-safe-copy"><h2 class="home-safe-title home-section-title">把「會不會尷尬」先放下。</h2>${experienceFlow()}</div></div></section>
   <section class="section home-video-section"><div class="wrap"><div class="home-feature-head"><h2 class="home-section-title">7777waxing video</h2></div><div class="home-video-shell" data-home-video-slot aria-label="7777waxing video"><span class="home-video-play" aria-hidden="true"></span></div></div></section>
-  <section class="section home-recommend-section"><div class="wrap narrow"><div class="home-feature-head"><h2 class="home-section-title">為什麼大家都推薦77waxing？</h2></div><div class="home-recommend-slot" data-home-recommend-slot></div></div></section>`;
+  <section class="section home-recommend-section"><div class="wrap"><div class="home-feature-head"><h2 class="home-section-title">為什麼大家都推薦77waxing？</h2></div><div class="home-recommend-slot" data-home-recommend-slot aria-label="Google 顧客評論"></div></div></section>`;
 }
 function beginner(){
   return `<section class="pagehero beginner-hero"><div class="wrap narrow"><span class="tag">FIRST WAX · 小白小白專區</span><h1>第一次熱蠟，可能也會想問...</h1><p class="lead">第一次嘗試熱蠟，會緊張、怕痛，甚至不知道要先準備什麼，其實都很正常。</p><p class="lead">希望在來之前，先把最在意的事情說清楚，讓第一次也可以安心一點。</p></div></section>
