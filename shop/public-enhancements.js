@@ -1,15 +1,16 @@
-import "./seo.js?v=20261023-tw1";
-import "../assets/member-auth.js?v=20261025-copy2";
-import "../assets/google-auth-ui.js?v=20261025-copy2";
-import "../assets/member-auth-popup-fix.js?v=20261025-copy2";
-import "../assets/account-linking.js?v=20261025-copy2";
+import "./seo.js?v=20261026-audit1";
+import "../assets/member-auth.js?v=20261026-audit1";
+import "../assets/google-auth-ui.js?v=20261026-audit1";
+import "../assets/member-auth-popup-fix.js?v=20261026-audit1";
+import "../assets/account-linking.js?v=20261026-audit1";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
 import { collection, onSnapshot, query, where } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
-import { getPublicFirebase } from "../assets/public-firebase.js?v=20260913-shop2";
+import { getPublicFirebase } from "../assets/public-firebase.js?v=20261026-audit1";
 
 const { auth, db } = getPublicFirebase();
 let orderUnsubscribe = null;
 let ownOrderLookup = new Map();
+let orderWatchVersion = 0;
 
 function ensureMemberShopStyle() {
   if (document.querySelector("#shop-member-auth-style")) return;
@@ -34,10 +35,10 @@ function normalizeProductCardActions() {
     // visible detail button appear unresponsive.
     const buyButtons = actions.querySelectorAll("[data-regional-buy]");
     buyButtons.forEach((button) => {
-      button.hidden = true;
+      if (!button.hidden) button.hidden = true;
       button.tabIndex = -1;
       button.setAttribute("aria-hidden", "true");
-      button.classList.add("card-format-buy-sentinel");
+      if (!button.classList.contains("card-format-buy-sentinel")) button.classList.add("card-format-buy-sentinel");
     });
 
     if (detail.textContent.trim() !== "詳情") detail.textContent = "詳情";
@@ -89,7 +90,7 @@ function polishOrderCards() {
     if (!order) return;
 
     const status = card.querySelector(".status");
-    if (status && labels[order.status]) status.textContent = labels[order.status];
+    if (status && labels[order.status] && status.textContent !== labels[order.status]) status.textContent = labels[order.status];
 
     let reason = card.querySelector(".order-cancel-reason");
     const reasonText = String(order.cancellationReason || "").trim();
@@ -103,7 +104,8 @@ function polishOrderCards() {
         reason.append(title, body);
         card.appendChild(reason);
       }
-      reason.querySelector("span").textContent = reasonText;
+      const body = reason.querySelector("span");
+      if (body.textContent !== reasonText) body.textContent = reasonText;
     } else {
       reason?.remove();
     }
@@ -152,6 +154,7 @@ function scheduleEnhancements() {
 }
 
 onAuthStateChanged(auth, (user) => {
+  const version = ++orderWatchVersion;
   orderUnsubscribe?.();
   orderUnsubscribe = null;
   ownOrderLookup = new Map();
@@ -167,6 +170,7 @@ onAuthStateChanged(auth, (user) => {
   orderUnsubscribe = onSnapshot(
     query(collection(db, "shopOrders"), where("ownerUid", "==", user.uid)),
     (snap) => {
+      if (version !== orderWatchVersion || auth.currentUser?.uid !== user.uid) return;
       ownOrderLookup = new Map();
       snap.docs.forEach((row) => {
         const data = { id: row.id, ...row.data() };

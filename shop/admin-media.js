@@ -251,14 +251,17 @@ async function enhanceImageField(db) {
   const form = document.querySelector("#product-form");
   if (!original || !form) return;
   const token = `${activeEditId || "new"}:${form.dataset.variantEnhanced || "0"}`;
+  if (original.dataset.galleryEnhanced === "loading" && activeFormToken === token) return;
   if (original.dataset.galleryEnhanced === "1" && activeFormToken === token) return;
 
   const field = original.closest(".field");
   if (!field) return;
   activeField = field;
   activeFormToken = token;
+  original.dataset.galleryEnhanced = "loading";
 
   const product = await loadProduct(db, activeEditId);
+  if (!form.isConnected || !original.isConnected || activeField !== field || activeFormToken !== token) return;
   mediaState = normalizeMedia(product);
   const legacyValue = original.value.trim();
   if (!mediaState.length && legacyValue) mediaState = [{ id: mediaId(), url: legacyValue, variantId: "", sortOrder: 0, width: 0, height: 0 }];
@@ -288,6 +291,13 @@ async function enhanceImageField(db) {
       return;
     }
 
+    form.dataset.dirty = "1";
+    form.dataset.mediaProcessing = "1";
+    input.disabled = true;
+    const saveButton = form.querySelector('button[type="submit"]');
+    const wasSaveDisabled = Boolean(saveButton?.disabled);
+    if (saveButton) saveButton.disabled = true;
+
     let completed = 0;
     for (const file of files) {
       if (!file.type.startsWith("image/")) {
@@ -302,6 +312,7 @@ async function enhanceImageField(db) {
       try {
         setStatus(`正在處理 ${file.name}…`);
         const image = await resizeAndConvertToBase64(file);
+        if (!form.isConnected || activeField !== field || activeFormToken !== token) break;
         if (totalMediaLength() + image.url.length > MAX_MEDIA_TOTAL_LENGTH) {
           setStatus("商品圖片總大小接近上限，請移除一張圖片或縮小圖片後再上傳。", true);
           break;
@@ -318,7 +329,12 @@ async function enhanceImageField(db) {
       }
     }
 
+    if (!form.isConnected || activeField !== field || activeFormToken !== token) return;
     input.value = "";
+    input.disabled = false;
+    form.dataset.mediaProcessing = "";
+    if (saveButton?.isConnected) saveButton.disabled = wasSaveDisabled;
+    if (!form.isConnected || activeField !== field || activeFormToken !== token) return;
     if (completed) {
       syncHidden();
       setStatus(`已加入 ${completed} 張。現在共 ${mediaState.length} 張，約 ${Math.round(totalMediaLength() / 1024)} KB；儲存商品後，圖片會在商店中依原始比例顯示。`);

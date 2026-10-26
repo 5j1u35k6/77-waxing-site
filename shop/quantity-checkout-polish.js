@@ -99,9 +99,10 @@ function ensureDetailQtyControl() {
 
   const max = clampDetailQty();
   const shouldHide = !isOpen || max <= 0 || addButton.disabled;
-  picker.hidden = shouldHide;
+  if (picker.hidden !== shouldHide) picker.hidden = shouldHide;
   if (shouldHide) {
-    addButton.textContent = baseAddText(addButton, signature);
+    const text = baseAddText(addButton, signature);
+    if (addButton.textContent !== text) addButton.textContent = text;
     return;
   }
 
@@ -109,46 +110,14 @@ function ensureDetailQtyControl() {
   const stock = $("#product-detail-qty-stock", picker);
   const minus = picker.querySelector("[data-detail-qty='-1']");
   const plus = picker.querySelector("[data-detail-qty='1']");
-  if (value) value.textContent = String(detailQty);
-  if (stock) stock.textContent = `最多 ${max} 件`;
+  if (value && value.textContent !== String(detailQty)) value.textContent = String(detailQty);
+  if (stock && stock.textContent !== `最多 ${max} 件`) stock.textContent = `最多 ${max} 件`;
   if (minus) minus.disabled = detailQty <= 1;
   if (plus) plus.disabled = detailQty >= max;
 
   const base = baseAddText(addButton, signature);
-  addButton.textContent = detailQty > 1 ? `${base} × ${detailQty}` : base;
-}
-
-function currentCartCount() {
-  return int($("#cart-count")?.textContent || 0);
-}
-
-function cartRowMatches(row, meta) {
-  const title = row.querySelector("h4")?.textContent?.trim() || "";
-  if (meta.title && title !== meta.title) return false;
-  const variantText = row.querySelector(".cart-variant")?.textContent?.trim() || "";
-  return !meta.labels.length || meta.labels.every((label) => variantText.includes(label));
-}
-
-function findCartRow(meta) {
-  const rows = $$("#cart-items .regional-cart-row,#cart-items .cart-row");
-  return rows.find((row) => cartRowMatches(row, meta)) || [...rows].reverse().find((row) => row.querySelector("h4")?.textContent?.trim() === meta.title) || rows.at(-1) || null;
-}
-
-function clickAdditionalCartQty(meta, remaining) {
-  if (remaining <= 0) return;
-  const row = findCartRow(meta);
-  const plus = row?.querySelector("[data-regional-qty][data-delta='1'],[data-delta='1']");
-  if (!plus || plus.disabled) return;
-  plus.click();
-  setTimeout(() => clickAdditionalCartQty(meta, remaining - 1), 45);
-}
-
-function scheduleDetailQtyCartSync(meta, requestedCount, beforeCount) {
-  setTimeout(() => {
-    const addedByOriginalButton = Math.max(0, currentCartCount() - beforeCount);
-    const remaining = Math.max(0, requestedCount - Math.max(1, addedByOriginalButton));
-    clickAdditionalCartQty(meta, remaining);
-  }, 90);
+  const text = detailQty > 1 ? `${base} × ${detailQty}` : base;
+  if (addButton.textContent !== text) addButton.textContent = text;
 }
 
 function resetCheckoutScroll() {
@@ -160,8 +129,10 @@ function resetCheckoutScroll() {
 function tagCheckoutSummary() {
   const lines = $$("#checkout-summary .totals-line");
   lines.forEach((line, index) => {
-    line.classList.toggle("checkout-item-line", index < Math.max(0, lines.length - 2));
-    line.classList.toggle("checkout-fee-line", index === lines.length - 2);
+    const item = index < Math.max(0, lines.length - 2);
+    const fee = index === lines.length - 2;
+    if (line.classList.contains("checkout-item-line") !== item) line.classList.toggle("checkout-item-line", item);
+    if (line.classList.contains("checkout-fee-line") !== fee) line.classList.toggle("checkout-fee-line", fee);
   });
 }
 
@@ -194,13 +165,9 @@ window.addEventListener("click", (event) => {
   if (!addButton || addButton.disabled) return;
   ensureDetailQtyControl();
   const count = Math.max(1, int(detailQty));
-  const meta = selectedDetailMeta();
-  const beforeCount = currentCartCount();
-
-  // Let regional-store.js handle the real add-to-cart click first. For quantity
-  // greater than 1, add the remaining units through the existing cart + buttons.
-  // This avoids rewriting the cart data model and keeps promotion/cart logic intact.
-  if (count > 1) scheduleDetailQtyCartSync(meta, count, beforeCount);
+  // The regional handler reads this count during the same click. No delayed
+  // replay of cart buttons can affect a different product or checkout.
+  addButton.dataset.requestedQuantity = String(count);
   detailQty = 1;
   scheduleSync();
 }, true);

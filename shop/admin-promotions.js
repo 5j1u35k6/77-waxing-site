@@ -1,7 +1,7 @@
-import { operationErrorText } from "../assets/interface-copy.js?v=20261025-copy2";
+import { operationErrorText } from "../assets/interface-copy.js?v=20261026-audit1";
 import { getApps } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
-import { collection, doc, getDoc, getFirestore, onSnapshot, serverTimestamp, setDoc } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
+import { collection, doc, getDoc, getFirestore, onSnapshot, runTransaction, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
 
 const APP = "77waxing-shop-admin";
 const PROMOTION_TYPES = ["bundle_price", "any_qty_bundle", "percent_off", "amount_off", "gift"];
@@ -12,6 +12,7 @@ let promos = [];
 let editId = "";
 let active = false;
 let unsubs = [];
+let authVersion = 0;
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -360,12 +361,18 @@ function validationProblem(promo) {
   return "";
 }
 
-async function savePromotions(list) {
-  await setDoc(doc(db, "shopSettings", "public"), {
-    promotions: list,
-    promotionsUpdatedAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  }, { merge: true });
+async function savePromotions(change) {
+  const ref = doc(db, "shopSettings", "public");
+  await runTransaction(db, async (tx) => {
+    const snap = await tx.get(ref);
+    const stored = snap.exists() ? snap.data()?.promotions : [];
+    const current = Array.isArray(stored) ? stored : [];
+    tx.set(ref, {
+      promotions: change(current),
+      promotionsUpdatedAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    }, { merge: true });
+  });
 }
 
 function render() {
@@ -397,12 +404,17 @@ function bind() {
     const bad = validationProblem(promotion);
     if (bad) return message(bad, true);
     const button = event.currentTarget.querySelector('button[type="submit"]');
+    if (button?.disabled) return;
     if (button) {
       button.disabled = true;
       button.textContent = "儲存中…";
     }
     try {
-      await savePromotions(editId ? promos.map((item) => item.id === editId ? promotion : item) : [promotion, ...promos]);
+      const editingId = editId;
+      await savePromotions(current => {
+        if (editingId && !current.some(item => item.id === editingId)) throw new Error("這項活動已被刪除，請重新確認活動清單。");
+        return editingId ? current.map(item => item.id === editingId ? promotion : item) : [promotion, ...current];
+      });
       editId = "";
       flash("促銷活動已儲存。");
       render();
@@ -417,13 +429,15 @@ function bind() {
     }
   }, true);
   $("#pr-type")?.addEventListener("change", updatePanels);
+  form?.addEventListener("input", () => { form.dataset.dirty = "1"; });
   $("#promo-cancel")?.addEventListener("click", () => { editId = ""; render(); });
   $$('[data-pe]').forEach((button) => button.addEventListener("click", () => { editId = button.dataset.pe; render(); scrollTo(0, 0); }));
   $$('[data-pt]').forEach((button) => button.addEventListener("click", async () => {
     const promotion = promos.find((item) => item.id === button.dataset.pt);
     if (!promotion) return;
     try {
-      await savePromotions(promos.map((item) => item.id === promotion.id ? { ...item, active: !item.active } : item));
+      await savePromotions(current => current.map(item => item.id === promotion.id ? { ...item, active: item.active === false } : item));
+      render();
     } catch (error) {
       message(error?.message || "狀態更新失敗。", true);
     }
@@ -432,7 +446,8 @@ function bind() {
     const promotion = promos.find((item) => item.id === button.dataset.pd);
     if (!promotion || !confirm(`確定刪除促銷「${promotion.title}」？`)) return;
     try {
-      await savePromotions(promos.filter((item) => item.id !== promotion.id));
+      await savePromotions(current => current.filter(item => item.id !== promotion.id));
+      render();
     } catch (error) {
       message(error?.message || "刪除失敗。", true);
     }
@@ -440,15 +455,18 @@ function bind() {
 }
 
 function subscribe() {
+  const version = authVersion;
   unsubs.forEach((unsub) => unsub?.());
   unsubs = [
     onSnapshot(collection(db, "shopProducts"), (snap) => {
+      if (version !== authVersion) return;
       products = snap.docs.map((row) => ({ id: row.id, ...row.data() }));
-      if (active) render();
+      if (active && $("#promotion-form")?.dataset.dirty !== "1") render();
     }, console.error),
     onSnapshot(doc(db, "shopSettings", "public"), (snap) => {
+      if (version !== authVersion) return;
       promos = normalizePromotions(snap.exists() ? snap.data()?.promotions : []);
-      if (active) render();
+      if (active && $("#promotion-form")?.dataset.dirty !== "1") render();
     }, console.error),
   ];
 }
@@ -466,9 +484,16 @@ try {
     }
   }, true);
   onAuthStateChanged(auth, async (user) => {
+    const version = ++authVersion;
     unsubs.forEach((unsub) => unsub?.());
     unsubs = [];
-    if (await isAdmin(user)) {
+    active = false;
+    editId = "";
+    products = [];
+    promos = [];
+    const allowed = await isAdmin(user);
+    if (version !== authVersion || auth.currentUser?.uid !== user?.uid) return;
+    if (allowed) {
       subscribe();
       ensureNav();
     }

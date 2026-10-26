@@ -24,8 +24,8 @@
     }
 
     if(logout.parentElement!==tools)tools.appendChild(logout);
-    logout.classList.add('admin-side-logout');
-    logout.textContent='登出';
+    if(!logout.classList.contains('admin-side-logout'))logout.classList.add('admin-side-logout');
+    if(logout.textContent!=='登出')logout.textContent='登出';
   }
 
   function schedule(){

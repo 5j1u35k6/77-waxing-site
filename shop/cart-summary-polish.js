@@ -57,7 +57,9 @@ function cartRowLabel(row) {
 }
 
 function noteDiscountTotal() {
-  return $$("#cart-items .promo-bridge-note, #checkout-summary .promo-bridge-line").reduce((sum, node) => {
+  const cartNotes = $$("#cart-items .promo-bridge-note");
+  const notes = cartNotes.length ? cartNotes : $$("#checkout-summary .promo-bridge-line");
+  return notes.reduce((sum, node) => {
     const text = node.dataset.originalPromoText || node.textContent || "";
     if (!/[-−]\s*(NT\$|HK\$)/.test(text)) return sum;
     const match = text.match(/[-−]\s*((?:NT\$|HK\$)\s*[0-9,]+)/);
@@ -107,7 +109,7 @@ function syncCartMath() {
     if (!subtotalBeforeDiscount || discount <= 0) {
       existing?.remove();
       cartDiscountOpen = false;
-      if (label) label.textContent = "商品小計";
+      if (label && label.textContent !== "商品小計") label.textContent = "商品小計";
       return;
     }
 
@@ -120,14 +122,18 @@ function syncCartMath() {
     ].join("");
 
     if (existing) {
-      if (existing.innerHTML !== html) existing.innerHTML = html;
+      if (existing.dataset.mathHtml !== html) {
+        existing.innerHTML = html;
+        existing.dataset.mathHtml = html;
+      }
     } else {
       const box = document.createElement("div");
       box.className = "cart-math-breakdown";
       box.innerHTML = html;
+      box.dataset.mathHtml = html;
       foot.insertBefore(box, totalLine);
     }
-    if (label) label.textContent = "總計";
+    if (label && label.textContent !== "總計") label.textContent = "總計";
   } finally {
     applying = false;
   }
@@ -144,20 +150,28 @@ function enhanceCheckoutDiscounts() {
     line.setAttribute("tabindex", "0");
     line.setAttribute("aria-expanded", String(open));
     line.setAttribute("aria-controls", detailId);
-    line.innerHTML = `<span>活動折扣明細</span><em>−</em><b>${money(amount, currencyOf(rawText))}</b>`;
+    const lineHtml = `<span>${/^贈品[｜\s]/u.test(rawText) ? "活動贈品明細" : "活動折扣明細"}</span><em>${/^贈品[｜\s]/u.test(rawText) ? "" : "−"}</em><b>${money(amount, currencyOf(rawText))}</b>`;
+    if (line.dataset.detailHtml !== lineHtml) {
+      line.innerHTML = lineHtml;
+      line.dataset.detailHtml = lineHtml;
+    }
     const next = line.nextElementSibling;
     const detailHtml = `<div id="${detailId}" class="checkout-discount-detail" ${open ? "" : "hidden"}><h4>活動折扣明細</h4><ul><li>${esc(rawText.replace(/^促銷優惠[｜\s]*/u, ""))}</li></ul></div>`;
     if (next?.classList?.contains("checkout-discount-detail")) {
-      if (next.outerHTML !== detailHtml) next.outerHTML = detailHtml;
+      if (next.dataset.detailHtml !== detailHtml) {
+        next.outerHTML = detailHtml;
+        line.nextElementSibling.dataset.detailHtml = detailHtml;
+      }
     } else {
       line.insertAdjacentHTML("afterend", detailHtml);
+      line.nextElementSibling.dataset.detailHtml = detailHtml;
     }
   });
 
   $$("#checkout-summary .totals-line").forEach((line) => {
     const label = line.querySelector("span")?.textContent || "";
     if (!/運費|處理費/.test(label)) return;
-    line.classList.add("checkout-math-line");
+    if (!line.classList.contains("checkout-math-line")) line.classList.add("checkout-math-line");
     if (!line.querySelector("em")) line.querySelector("b")?.insertAdjacentHTML("beforebegin", "<em>＋</em>");
   });
 }

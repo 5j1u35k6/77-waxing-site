@@ -1,7 +1,8 @@
-import { operationErrorText } from "../assets/interface-copy.js?v=20261025-copy2";
+import { operationErrorText } from "../assets/interface-copy.js?v=20261026-audit1";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
 import { collection, doc, getDoc, getDocFromServer, getDocs, onSnapshot, query, serverTimestamp, setDoc, where } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
-import { getPublicFirebase } from "../assets/public-firebase.js?v=20260913-shop2";
+import { getPublicFirebase } from "../assets/public-firebase.js?v=20261026-audit1";
+import { beginCheckout, finishCheckout, cartFingerprint, validateOrderData, savePreference } from "./checkout-guard.js?v=20261026-audit1";
 
 const { auth, db } = getPublicFirebase();
 const CART_KEY = "77select_cart_v4";
@@ -20,6 +21,8 @@ let selectedProduct = null;
 let selectedVariantId = null;
 let currentUser = null;
 let ownOrders = [];
+let orderUnsubscribe = null;
+let orderWatchVersion = 0;
 let settings = {};
 let renderingOrders = false;
 let renderingCart = false;
@@ -33,14 +36,14 @@ const int = (value) => Math.max(0, Math.round(Number(value) || 0));
 function loadCart() {
   try {
     const value = JSON.parse(localStorage.getItem(CART_KEY) || "[]");
-    return Array.isArray(value) ? value : [];
+    return Array.isArray(value) ? value.filter(row => row && typeof row.productId === "string" && typeof row.variantId === "string" && Number.isFinite(Number(row.qty)) && Number(row.qty) > 0) : [];
   } catch {
     return [];
   }
 }
 
 function saveCart() {
-  localStorage.setItem(CART_KEY, JSON.stringify(cart));
+  savePreference(CART_KEY, JSON.stringify(cart));
   const count = $("#cart-count");
   if (count) count.textContent = String(cart.reduce((sum, row) => sum + int(row.qty), 0));
   renderCart();
@@ -322,14 +325,15 @@ function updateDetailAddButton() {
   button.textContent = variant && variant.stock > 0 ? `加入購物車｜${money(basePriceFor(variant))}` : "目前售完";
 }
 
-function addVariantToCart(productId, variantId) {
+function addVariantToCart(productId, variantId, requestedQuantity = 1) {
   const product = products.find((row) => row.id === productId);
   if (!product) return;
   const variant = normalizeVariants(product).find((row) => row.id === variantId);
   if (!variant || variant.stock <= 0) return toast("此規格目前沒有庫存。", "error");
   const key = cartKey(product.id, variant.id);
   const existing = cart.find((row) => row.key === key);
-  const nextQty = int(existing?.qty) + 1;
+  const quantity = Math.max(1, int(requestedQuantity));
+  const nextQty = int(existing?.qty) + quantity;
   if (nextQty > variant.stock) return toast("購物車數量已達此規格目前庫存。", "error");
   const price = unitPriceFor(variant, nextQty);
 
@@ -353,7 +357,7 @@ function addVariantToCart(productId, variantId) {
       bulkMinQty: variant.bulkMinQty,
       discountApplied: price < basePriceFor(variant),
       imageUrl: primaryImage(product, variant.id),
-      qty: 1,
+      qty: quantity,
     });
   }
   saveCart();
@@ -493,6 +497,7 @@ function taipeiOrderDay() {
 }
 
 async function createSequentialOrder(orderData) {
+  validateOrderData(orderData);
   const day = taipeiOrderDay();
   const hintKey = `77waxing_shop_sequence_${day}`;
   const hint = Math.min(9998, int(localStorage.getItem(hintKey)));
@@ -505,7 +510,7 @@ async function createSequentialOrder(orderData) {
     const orderRef = doc(db, "shopOrders", orderNo);
     try {
       await setDoc(orderRef, { ...orderData, orderNo });
-      localStorage.setItem(hintKey, String(sequence));
+      savePreference(hintKey, String(sequence));
       return { orderRef, orderNo };
     } catch (error) {
       if (error?.code === "permission-denied") continue;
@@ -541,11 +546,20 @@ async function submitOrder(event) {
   }
 
   const button = $("#checkout-submit");
+  const form = event.currentTarget;
+  if (!beginCheckout(form)) return;
+  const ownerUid = currentUser.uid;
+  const originalCart = cartFingerprint(cart);
   if (button) button.disabled = true;
   try {
     await refreshCartProducts();
     reconcileCart();
+    if (ownerUid !== currentUser?.uid) throw new Error("會員登入狀態已變更，請重新確認訂購資料。");
     if (!cart.length) throw new Error("購物車內容已失效，請重新選擇商品。");
+    if (cartFingerprint(cart) !== originalCart) {
+      updateCheckoutOptions();
+      throw new Error("商品價格或可購買數量已更新，請確認購物車與總計後再送出。");
+    }
     for (const row of cart) {
       const product = products.find((item) => item.id === row.productId);
       const variant = product ? normalizeVariants(product).find((item) => item.id === row.variantId) : null;
@@ -569,7 +583,7 @@ async function submitOrder(event) {
     }));
     const subtotal = items.reduce((sum, row) => sum + row.unitPrice * row.quantity, 0);
     const orderData = {
-      ownerUid: currentUser.uid,
+      ownerUid,
       customerName: name,
       phone,
       email,
@@ -589,9 +603,9 @@ async function submitOrder(event) {
     };
     const { orderRef, orderNo } = await createSequentialOrder(orderData);
 
-    localStorage.setItem("77waxing_shop_name", name);
-    localStorage.setItem("77waxing_shop_phone", phone);
-    localStorage.setItem("77waxing_shop_email", email);
+    savePreference("77waxing_shop_name", name);
+    savePreference("77waxing_shop_phone", phone);
+    savePreference("77waxing_shop_email", email);
     cart = [];
     saveCart();
     $("#checkout-wrap")?.classList.add("hidden");
@@ -602,6 +616,7 @@ async function submitOrder(event) {
     console.error(error);
     toast(error?.message || "訂單送出失敗，請稍後再試。", "error");
   } finally {
+    finishCheckout(form);
     if (button) button.disabled = false;
   }
 }
@@ -741,7 +756,10 @@ function bindCaptureHandlers() {
       if (!selectedProduct || !selectedVariantId) return;
       event.preventDefault();
       event.stopImmediatePropagation();
-      addVariantToCart(selectedProduct.id, selectedVariantId);
+      const button = $("#product-detail-add");
+      const quantity = Math.max(1, int(button?.dataset.requestedQuantity || 1));
+      if (button) delete button.dataset.requestedQuantity;
+      addVariantToCart(selectedProduct.id, selectedVariantId, quantity);
       $("#product-modal-wrap")?.classList.add("hidden");
       document.body.style.overflow = "";
       return;
@@ -807,10 +825,32 @@ renderLoadedCatalog();
 saveCart();
 
 onAuthStateChanged(auth, (user) => {
+  const version = ++orderWatchVersion;
+  orderUnsubscribe?.();
+  orderUnsubscribe = null;
   currentUser = user || null;
+  ownOrders = [];
+  renderOrders();
   if (!user) return;
-  onSnapshot(query(collection(db, "shopOrders"), where("ownerUid", "==", user.uid)), (snap) => {
+  orderUnsubscribe = onSnapshot(query(collection(db, "shopOrders"), where("ownerUid", "==", user.uid)), (snap) => {
+    if (version !== orderWatchVersion || currentUser?.uid !== user.uid) return;
     ownOrders = snap.docs.map((row) => ({ id: row.id, ...row.data() })).sort((a, b) => Number(b.createdAt?.toMillis?.() || 0) - Number(a.createdAt?.toMillis?.() || 0));
     renderOrders();
-  }, console.error);
+  }, (error) => {
+    if (version !== orderWatchVersion || currentUser?.uid !== user.uid) return;
+    ownOrders = [];
+    renderOrders();
+    console.error(error);
+  });
+});
+
+// A same-page promotion checkout changes storage without a browser storage event.
+window.addEventListener("77select:cart-updated", (event) => {
+  cart = Array.isArray(event.detail?.cart) ? event.detail.cart.map(row => ({ ...row })) : loadCart();
+  reconcileCart();
+});
+window.addEventListener("storage", (event) => {
+  if (event.key !== CART_KEY) return;
+  cart = loadCart();
+  reconcileCart();
 });

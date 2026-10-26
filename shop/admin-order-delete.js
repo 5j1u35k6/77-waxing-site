@@ -1,7 +1,7 @@
-import { operationErrorText } from "../assets/interface-copy.js?v=20261025-copy2";
+import { operationErrorText } from "../assets/interface-copy.js?v=20261026-audit1";
 import { getApps } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";
-import { getAuth } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
-import { addDoc, collection, deleteDoc, doc, getFirestore, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
+import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
+import { addDoc, collection, deleteDoc, doc, getDoc, getFirestore, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
 
 const ADMIN_APP_NAME = "77waxing-shop-admin";
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -90,7 +90,18 @@ const app = await waitForAdminApp();
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-onSnapshot(collection(db, "shopOrders"), (snap) => {
+let orderUnsubscribe = null;
+let authVersion = 0;
+onAuthStateChanged(auth, async (user) => {
+  const version = ++authVersion;
+  orderUnsubscribe?.();
+  orderUnsubscribe = null;
+  ordersByDisplayKey = new Map();
+  if (!user || user.isAnonymous) return;
+  const admin = await getDoc(doc(db, "admins", user.uid)).catch(() => null);
+  if (version !== authVersion || auth.currentUser?.uid !== user.uid || !admin?.exists()) return;
+  orderUnsubscribe = onSnapshot(collection(db, "shopOrders"), (snap) => {
+  if (version !== authVersion || auth.currentUser?.uid !== user.uid) return;
   const next = new Map();
   snap.docs.forEach((row) => {
     const order = { id: row.id, ...row.data() };
@@ -100,6 +111,7 @@ onSnapshot(collection(db, "shopOrders"), (snap) => {
   ordersByDisplayKey = next;
   scheduleInject();
 }, (error) => console.error("77select order-delete listener failed", error));
+});
 
 document.addEventListener("click", async (event) => {
   const button = event.target.closest?.("[data-delete-order]");

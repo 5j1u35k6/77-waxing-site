@@ -1,7 +1,8 @@
-import { operationErrorText } from "../assets/interface-copy.js?v=20261025-copy2";
+import { operationErrorText } from "../assets/interface-copy.js?v=20261026-audit1";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
-import { collection, doc, getDoc, getDocs, onSnapshot, query, serverTimestamp, setDoc, where } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
-import { getPublicFirebase } from "../assets/public-firebase.js?v=20260913-shop2";
+import { collection, doc, getDocFromServer, getDocsFromServer, onSnapshot, query, serverTimestamp, setDoc, where } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
+import { getPublicFirebase } from "../assets/public-firebase.js?v=20261026-audit1";
+import { beginCheckout, finishCheckout, cartFingerprint, validateOrderData, savePreference } from "./checkout-guard.js?v=20261026-audit1";
 
 // Promotion storefront bridge. This stays isolated from regional-store.js so the
 // existing product, detail, and cart behavior remains intact.
@@ -18,6 +19,7 @@ let settings = {};
 let currentUser = auth.currentUser || null;
 let applying = false;
 let scheduled = false;
+const checkoutPatches = new WeakMap();
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const int = (value) => Math.max(0, Math.round(Number(value) || 0));
@@ -42,7 +44,7 @@ function parseMoney(text) {
 function loadCart() {
   try {
     const value = JSON.parse(localStorage.getItem(CART_KEY) || "[]");
-    return Array.isArray(value) ? value : [];
+    return Array.isArray(value) ? value.filter(row => row && typeof row.productId === "string" && typeof row.variantId === "string" && Number.isFinite(Number(row.qty)) && Number(row.qty) > 0) : [];
   } catch {
     return [];
   }
@@ -328,11 +330,20 @@ function patchCartUi() {
   const subtotal = $("#cart-subtotal");
   if (!container || !subtotal) return;
   const pricing = cartPricing();
-  container.querySelectorAll(".promo-bridge-summary").forEach((node) => node.remove());
-  if (hasPromotionEffect(pricing)) container.insertAdjacentHTML("beforeend", promotionSummaryHtml(pricing));
-  subtotal.textContent = money(pricing.total);
+  const html = promotionSummaryHtml(pricing);
+  const existing = [...container.querySelectorAll(".promo-bridge-summary")];
+  if (existing.length !== (html ? 1 : 0) || (html && existing[0]?.dataset.promotionHtml !== html)) {
+    existing.forEach((node) => node.remove());
+    if (html) {
+      container.insertAdjacentHTML("beforeend", html);
+      container.querySelector(".promo-bridge-summary").dataset.promotionHtml = html;
+    }
+  }
+  const total = money(pricing.total);
+  if (subtotal.textContent !== total) subtotal.textContent = total;
   const label = subtotal.closest?.(".totals-line")?.querySelector("span");
-  if (label) label.textContent = pricing.discountTotal ? "折扣後小計" : "商品小計";
+  const labelText = pricing.discountTotal ? "總計" : "商品小計";
+  if (label && label.textContent !== labelText) label.textContent = labelText;
 }
 
 function checkoutPromotionLines(pricing) {
@@ -345,14 +356,22 @@ function patchCheckoutUi() {
   const summary = $("#checkout-summary");
   if (!summary || !summary.children.length) return;
   const pricing = cartPricing();
-  summary.querySelectorAll(".promo-bridge-line").forEach((node) => node.remove());
   const totalLine = summary.querySelector(".totals-line.total");
   if (!totalLine) return;
   const feeLine = totalLine.previousElementSibling;
   const fee = feeLine ? parseMoney(feeLine.querySelector("b")?.textContent || "0") : 0;
-  if (hasPromotionEffect(pricing)) (feeLine || totalLine).insertAdjacentHTML("beforebegin", checkoutPromotionLines(pricing));
+  const html = checkoutPromotionLines(pricing);
+  const existing = [...summary.querySelectorAll(".promo-bridge-line")];
+  const previous = checkoutPatches.get(summary);
+  if (!previous || previous.html !== html || previous.lines.length !== existing.length || previous.lines.some((line, index) => line !== existing[index])) {
+    existing.forEach((node) => node.remove());
+    summary.querySelectorAll(".checkout-discount-detail").forEach((node) => node.remove());
+    if (html) (feeLine || totalLine).insertAdjacentHTML("beforebegin", html);
+    checkoutPatches.set(summary, { html, lines: [...summary.querySelectorAll(".promo-bridge-line")] });
+  }
   const totalValue = totalLine.querySelector("b");
-  if (totalValue) totalValue.textContent = money(pricing.total + fee);
+  const totalText = money(pricing.total + fee);
+  if (totalValue && totalValue.textContent !== totalText) totalValue.textContent = totalText;
 }
 
 function syncUi() {
@@ -390,6 +409,7 @@ function taipeiOrderDay() {
 }
 
 async function createSequentialOrder(orderData) {
+  validateOrderData(orderData);
   const day = taipeiOrderDay();
   const hintKey = `77waxing_shop_sequence_${day}`;
   const hint = Math.min(9998, int(localStorage.getItem(hintKey)));
@@ -402,7 +422,7 @@ async function createSequentialOrder(orderData) {
     const orderRef = doc(db, "shopOrders", orderNo);
     try {
       await setDoc(orderRef, { ...orderData, orderNo });
-      localStorage.setItem(hintKey, String(sequence));
+      savePreference(hintKey, String(sequence));
       return { orderRef, orderNo };
     } catch (error) {
       if (error?.code === "permission-denied") continue;
@@ -425,8 +445,8 @@ function toast(message, type = "ok") {
 
 async function refreshData() {
   const [settingsSnap, productSnap] = await Promise.all([
-    getDoc(doc(db, "shopSettings", "public")).catch(() => null),
-    getDocs(query(collection(db, "shopProducts"), where("active", "==", true))),
+    getDocFromServer(doc(db, "shopSettings", "public")),
+    getDocsFromServer(query(collection(db, "shopProducts"), where("active", "==", true))),
   ]);
   settings = settingsSnap?.exists() ? settingsSnap.data() : {};
   products = productSnap.docs.map((row) => ({ id: row.id, ...row.data() }));
@@ -475,12 +495,24 @@ async function submitPromotedOrder(event) {
   if (!currentUser) return toast("系統仍在連線，請稍後再送出。", "error");
 
   const button = $("#checkout-submit");
+  const form = event.target;
+  if (!beginCheckout(form)) return;
+  const ownerUid = currentUser.uid;
+  const originalCart = cartFingerprint(loadCart());
+  const originalPricing = JSON.stringify(cartPricing());
   if (button) button.disabled = true;
   try {
     await refreshData();
     const rows = reconcileCartRows(loadCart());
     const pricing = cartPricing(rows);
+    if (ownerUid !== currentUser?.uid) throw new Error("會員登入狀態已變更，請重新確認訂購資料。");
     if (!rows.length) throw new Error("購物車是空的。");
+    if (cartFingerprint(rows) !== originalCart || JSON.stringify(pricing) !== originalPricing) {
+      savePreference(CART_KEY, JSON.stringify(rows));
+      window.dispatchEvent(new CustomEvent("77select:cart-updated", { detail: { cart: rows } }));
+      syncUi();
+      throw new Error("商品價格、可購買數量或活動優惠已更新，請確認購物車與總計後再送出。");
+    }
     if (!hasPromotionEffect(pricing)) throw new Error("目前沒有可套用的促銷，請重新整理後再送出。");
 
     const name = $("#checkout-name")?.value.trim() || "";
@@ -566,7 +598,7 @@ async function submitPromotedOrder(event) {
     }
 
     const orderData = {
-      ownerUid: currentUser.uid,
+      ownerUid,
       customerName: name,
       phone,
       email,
@@ -586,22 +618,24 @@ async function submitPromotedOrder(event) {
     };
     const { orderRef, orderNo } = await createSequentialOrder(orderData);
 
-    localStorage.setItem("77waxing_shop_name", name);
-    localStorage.setItem("77waxing_shop_phone", phone);
-    localStorage.setItem("77waxing_shop_email", email);
-    localStorage.setItem(CART_KEY, "[]");
+    savePreference("77waxing_shop_name", name);
+    savePreference("77waxing_shop_phone", phone);
+    savePreference("77waxing_shop_email", email);
+    savePreference(CART_KEY, "[]");
+    window.dispatchEvent(new CustomEvent("77select:cart-updated", { detail: { cart: [] } }));
     const count = $("#cart-count");
     if (count) count.textContent = "0";
     const cartItems = $("#cart-items");
     if (cartItems) cartItems.innerHTML = `<div class="empty-state" data-regional-cart>購物車目前是空的。</div>`;
     $("#checkout-wrap")?.classList.add("hidden");
     document.body.style.overflow = "";
-    toast(`訂單 ${orderNo} 已送出，已套用促銷優惠。`);
+    toast(`訂單 ${orderNo} 已送出，已套用促銷優惠。77 Select 信件可能被判定為垃圾郵件；若超過 5 分鐘仍未收到信件，請與我們聯絡。`);
     dispatchShopEmail(orderRef.id);
   } catch (error) {
     console.error(error);
     toast(error?.message || "促銷訂單送出失敗，請稍後再試。", "error");
   } finally {
+    finishCheckout(form);
     if (button) button.disabled = false;
   }
 }
