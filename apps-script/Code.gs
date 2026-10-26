@@ -1,7 +1,7 @@
 const PROJECT_ID = 'waxing-86909';
 const FIRESTORE_BASE = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
 const STORE_EMAIL = '77waxing.mail@gmail.com';
-const SCRIPT_VERSION = '2026-10-25-deposit-copy';
+const SCRIPT_VERSION = '2026-10-26-platform-bugs';
 const WEBSITE_URL = 'https://5j1u35k6.github.io/77-waxing-site/';
 const SHOP_URL = 'https://5j1u35k6.github.io/77select/';
 const EMAIL_FOOTER_IMAGE = 'https://5j1u35k6.github.io/77-waxing-site/assets/email-footer-77waxing-v25.jpg?v=20260911-0035';
@@ -94,7 +94,11 @@ function doPost(e) {
   try {
     const payload = JSON.parse((e && e.postData && e.postData.contents) || '{}');
     const recordAction = String(payload.action || '');
-    requestKind = ['record_create','record_submit','record_upload','record_list','record_download','record_scan','record_close'].includes(recordAction) ? recordAction : payload.kind === 'shop_order' ? 'shop_email' : 'booking_email';
+    requestKind = ['record_create','record_submit','record_upload','record_list','record_download','record_scan','record_close'].includes(recordAction) ? recordAction : recordAction.startsWith('identity_') || recordAction === 'line_link_prepare' ? 'identity' : payload.kind === 'shop_order' ? 'shop_email' : 'booking_email';
+    if (typeof routeIdentityLinkPost_ === 'function') {
+      const identityResponse = routeIdentityLinkPost_(payload);
+      if (identityResponse) return identityResponse;
+    }
     if (typeof routeCustomerRecordsPost_ === 'function') {
       const recordResponse = routeCustomerRecordsPost_(payload);
       if (recordResponse) return recordResponse;
@@ -126,7 +130,7 @@ function handleBookingPost_(payload) {
   const props = PropertiesService.getScriptProperties();
   if (props.getProperty(key) === '1') return json_({ ok:true, duplicate:true, version:SCRIPT_VERSION });
 
-  const sent = sendForStatus_(booking, settings);
+  const sent = sendForStatus_(booking, settings, key);
   if (sent) props.setProperty(key, '1');
   console.log(JSON.stringify({ event: 'email_result', bookingId, status: booking.status, sent }));
   return json_({ ok:true, sent, status:booking.status, version:SCRIPT_VERSION });
@@ -149,7 +153,7 @@ function handleShopOrderPost_(payload) {
   const props = PropertiesService.getScriptProperties();
   if (props.getProperty(key) === '1') return json_({ ok:true, duplicate:true, kind:'shop_order', version:SCRIPT_VERSION });
 
-  const sent = sendShopOrderForStatus_(order, settings);
+  const sent = sendShopOrderForStatus_(order, settings, key);
   if (sent) props.setProperty(key, '1');
   console.log(JSON.stringify({ event:'shop_email_result', orderId, status:order.status, sent }));
   return json_({ ok:true, sent, kind:'shop_order', status:order.status, version:SCRIPT_VERSION });
@@ -167,7 +171,7 @@ function shopDispatchKey_(orderId, status) {
   return `shop-sent:${orderId}:${status || 'unknown'}`;
 }
 
-function sendForStatus_(b, s) {
+function sendForStatus_(b, s, dispatchKey) {
   const customerEmail = String(b.customerEmail || '').trim();
   const storeEmail = String(s.storeEmail || STORE_EMAIL).trim() || STORE_EMAIL;
   const status = String(b.status || '');
@@ -182,11 +186,11 @@ function sendForStatus_(b, s) {
         ${bookingCareBefore_(b)}
         <p>77waxing確認完成後，我們會再寄一封 Email 通知你。</p>
         <p>若預約資訊需要調整，也可以直接與 77waxing 聯繫。</p>`;
-      send_(customerEmail, '77waxing｜已收到你的預約需求', shell_(title, body));
+      sendNotice_(dispatchKey, 'customer', customerEmail, '77waxing｜已收到你的預約需求', shell_(title, body));
       sent = true;
     }
     if (storeEmail) {
-      send_(storeEmail, `新預約待確認｜${b.customerName || '未命名'}｜${b.preferredDate || ''} ${b.preferredTime || ''}`, shell_('有新的預約需求', `${bookingTable_(b)}<table style="border-collapse:collapse;margin:16px 0">${line_('手機', b.customerPhone || '—')}${line_('Email', customerEmail || '—')}</table><p>請至管理後台確認預約。</p>`));
+      sendNotice_(dispatchKey, 'store', storeEmail, `新預約待確認｜${b.customerName || '未命名'}｜${b.preferredDate || ''} ${b.preferredTime || ''}`, shell_('有新的預約需求', `${bookingTable_(b)}<table style="border-collapse:collapse;margin:16px 0">${line_('手機', b.customerPhone || '—')}${line_('Email', customerEmail || '—')}</table><p>請至管理後台確認預約。</p>`));
       sent = true;
     }
     return sent;
@@ -204,17 +208,20 @@ function sendForStatus_(b, s) {
       ${bookingInfo_(b)}
       ${qr}
       ${bookingCareBefore_(b)}`;
-    send_(customerEmail, '77waxing｜預約已確認，請完成定金付款', shell_(title, body));
+    sendNotice_(dispatchKey, 'customer', customerEmail, '77waxing｜預約已確認，請完成定金付款', shell_(title, body));
     return true;
   }
 
   if (status === 'confirmed') {
     const title = `您好 ${customerName}，預約已確認`;
-    const body = `<p>77waxing已確認可以安排這次預約，不需付定金。</p>
+    const depositNotice = b.paymentStatus === 'paid'
+      ? '已收到你的定金。'
+      : b.depositRequired === false ? '不需付定金。' : '如有付款相關問題，請與我們聯繫。';
+    const body = `<p>77waxing已確認可以安排這次預約，${depositNotice}</p>
       ${bookingInfo_(b)}
       ${bookingCareBefore_(b)}
       <p>好期待到時見到你呀 ♡</p>`;
-    send_(customerEmail, '77waxing｜預約已確認', shell_(title, body));
+    sendNotice_(dispatchKey, 'customer', customerEmail, '77waxing｜預約已確認', shell_(title, body));
     return true;
   }
 
@@ -223,14 +230,14 @@ function sendForStatus_(b, s) {
     const body = `<p>${esc_(rejectionText_(b))}</p>
       ${bookingInfo_(b)}
       <p>多謝你嘅理解。</p>`;
-    send_(customerEmail, '77waxing｜預約安排通知', shell_(title, body));
+    sendNotice_(dispatchKey, 'customer', customerEmail, '77waxing｜預約安排通知', shell_(title, body));
     return true;
   }
 
   return false;
 }
 
-function sendShopOrderForStatus_(o, s) {
+function sendShopOrderForStatus_(o, s, dispatchKey) {
   const customerEmail = String(o.email || '').trim();
   const storeEmail = String(s.storeEmail || STORE_EMAIL).trim() || STORE_EMAIL;
   const customerName = String(o.customerName || '顧客').trim() || '顧客';
@@ -248,13 +255,13 @@ function sendShopOrderForStatus_(o, s) {
 
   if (status === 'pending') {
     if (customerEmail) {
-      const customerText = `${customerName} 您好，\n\n謝謝你訂購77 Select商品\n已經收到你的訂單，目前狀態為「待接單」。\n77waxing 確認後，會再寄一封 Email 通知你訂單已接單。\n\n────────────────────\n\n訂單編號 ${orderNo}\n\n訂購商品\n${itemText}\n\n商品小計        NT$${shopNumber_(pricing.subtotal)}\n活動折扣       -NT$${shopNumber_(pricing.discount)}\n運費            NT$${shopNumber_(pricing.shippingFee)}\n────────────────────\n訂單總計        NT$${shopNumber_(pricing.total)}\n\n取貨方式 ${delivery}\n付款方式 ${payment}\n${o.storeInfo ? storeInfo : ''}\n\n────────────────────\n\n之後只要訂單狀態更新，我們也會透過 Email 通知你。\n若訂單資料有需要修改，請直接與 77waxing 聯絡。\n\n\n77Select`;
-      send_(customerEmail, '77 Select｜我們已收到你的訂單｜目前狀態「待接單」', shopShell_(customerText));
+      const customerText = `${customerName} 您好，\n\n謝謝你訂購77 Select商品\n已經收到你的訂單，目前狀態為「待接單」。\n77 Select 確認後，會再寄一封 Email 通知你訂單已接單。\n\n────────────────────\n\n訂單編號 ${orderNo}\n\n訂購商品\n${itemText}\n\n商品小計        NT$${shopNumber_(pricing.subtotal)}\n活動折扣       -NT$${shopNumber_(pricing.discount)}\n運費            NT$${shopNumber_(pricing.shippingFee)}\n────────────────────\n訂單總計        NT$${shopNumber_(pricing.total)}\n\n取貨方式 ${delivery}\n付款方式 ${payment}\n${o.storeInfo ? storeInfo : ''}\n\n────────────────────\n\n之後只要訂單狀態更新，我們也會透過 Email 通知你。\n若訂單資料有需要修改，請直接與 77 Select 聯絡。\n\n\n77Select`;
+      sendNotice_(dispatchKey, 'customer', customerEmail, '77 Select｜我們已收到你的訂單｜目前狀態「待接單」', shopShell_(customerText));
       sent = true;
     }
     if (storeEmail) {
       const storeText = `收到一筆新的產品訂單。\n\n訂單編號 ${orderNo}\n\n客人資料\n姓名：${customerName}\n電話：${String(o.phone || '').trim() || '—'}\nEmail：${customerEmail || '—'}\n\n訂購商品\n${itemText}\n\n商品小計：NT$${shopNumber_(pricing.subtotal)}\n活動折扣：-NT$${shopNumber_(pricing.discount)}\n運費：NT$${shopNumber_(pricing.shippingFee)}\n訂單總計：NT$${shopNumber_(pricing.total)}\n\n配送方式\n${delivery}\n\n付款方式\n${payment}\n\n門市資訊\n${storeInfo}\n\n客人備註\n${note}\n\n────────────────────\n\n請至 77select 商店管理後台確認訂單。`;
-      send_(storeEmail, `【77select 新訂單】｜${customerName}｜商品${itemCount}件`, shopShell_(storeText));
+      sendNotice_(dispatchKey, 'store', storeEmail, `【77select 新訂單】｜${customerName}｜商品${itemCount}件`, shopShell_(storeText));
       sent = true;
     }
     return sent;
@@ -264,33 +271,33 @@ function sendShopOrderForStatus_(o, s) {
 
   if (status === 'confirmed') {
     const text = `${customerName} 您好，\n\n你的訂單已由 77 Select 接單。\n\n我們已確認訂單內容，\n接下來將開始處理你的商品。\n\n訂單編號：${orderNo}\n\n目前狀態：已接單\n\n商品準備完成後，\n我們會再透過 Email 通知你。\n\n77 Select`;
-    send_(customerEmail, '77 Select｜你的訂單進度已更新｜目前狀態「已接單」', shopShell_(text));
+    sendNotice_(dispatchKey, 'customer', customerEmail, '77 Select｜你的訂單進度已更新｜目前狀態「已接單」', shopShell_(text));
     return true;
   }
   if (status === 'packing') {
     const text = `${customerName} 您好，\n\n你的訂單目前正在準備中。\n\n訂單編號：${orderNo}\n\n目前狀態：處理中\n\n商品準備完成後，\n我們會再寄 Email 通知你。\n\n77 Select`;
-    send_(customerEmail, '77 Select｜你的訂單進度已更新｜目前狀態「處理中」', shopShell_(text));
+    sendNotice_(dispatchKey, 'customer', customerEmail, '77 Select｜你的訂單進度已更新｜目前狀態「處理中」', shopShell_(text));
     return true;
   }
   if (status === 'ready') {
     const pickupInfo = String(o.storeInfo || '').trim() || String(s.pickupNote || '').trim() || '—';
     const text = `${customerName} 您好，\n\n你的訂單已經準備完成 🤎\n\n訂單編號：${orderNo}\n\n目前狀態：已準備完成・待取貨\n\n取貨方式：\n${delivery}\n\n${pickupInfo}\n\n請依照約定方式完成取貨。\n\n謝謝你本次向我們訂購，希望很快能再次為你服務。\n77 Select`;
-    send_(customerEmail, '77 Select｜你的訂單進度已更新｜目前狀態「已準備完成・待取貨」', shopShell_(text));
+    sendNotice_(dispatchKey, 'customer', customerEmail, '77 Select｜你的訂單進度已更新｜目前狀態「已準備完成・待取貨」', shopShell_(text));
     return true;
   }
   if (status === 'shipped') {
     const tracking = o.trackingNumber ? `<p><b>物流編號：${esc_(o.trackingNumber)}</b></p>` : '';
-    send_(customerEmail, `77waxing｜產品訂單已出貨 ${orderNo}`, shopHtmlShell_(`您好 ${customerName}，訂單已出貨`, `<p>你的商品已交付物流處理。</p>${shopOrderInfo_(o)}${tracking}`));
+    sendNotice_(dispatchKey, 'customer', customerEmail, `77 Select｜產品訂單已出貨 ${orderNo}`, shopHtmlShell_(`您好 ${customerName}，訂單已出貨`, `<p>你的商品已交付物流處理。</p>${shopOrderInfo_(o)}${tracking}`));
     return true;
   }
   if (status === 'completed') {
-    send_(customerEmail, `77waxing｜產品訂單已完成 ${orderNo}`, shopHtmlShell_(`您好 ${customerName}，訂單已完成`, `<p>這筆產品訂單已完成，謝謝你的訂購。</p>${shopOrderInfo_(o)}<p><a href="${SHOP_URL}" style="color:#8b7355">回到 77waxing 產品訂購</a></p>`));
+    sendNotice_(dispatchKey, 'customer', customerEmail, `77 Select｜產品訂單已完成 ${orderNo}`, shopHtmlShell_(`您好 ${customerName}，訂單已完成`, `<p>這筆產品訂單已完成，謝謝你的訂購。</p>${shopOrderInfo_(o)}<p><a href="${SHOP_URL}" style="color:#8b7355">回到 77 Select 商店</a></p>`));
     return true;
   }
   if (status === 'cancelled') {
     const cancellationReason = String(o.cancellationReason || o.cancelReason || '').trim() || '未提供';
     const text = `${customerName} 您好，\n\n你的這筆訂單已取消。\n\n訂單編號：${orderNo}\n\n目前狀態：已取消\n\n取消原因：\n${cancellationReason}\n\n如果對取消原因有疑問，\n或希望重新訂購，\n歡迎直接與 77 Select 聯絡。\n\n77 Select`;
-    send_(customerEmail, '77 Select｜你的訂單進度已更新｜目前狀態「訂單取消通知」', shopShell_(text));
+    sendNotice_(dispatchKey, 'customer', customerEmail, '77 Select｜你的訂單進度已更新｜目前狀態「訂單取消通知」', shopShell_(text));
     return true;
   }
   return false;
@@ -434,6 +441,34 @@ function footerHtml_() {
   </table>`;
 }
 
+// Claim only one recipient at a time; slow Gmail work runs outside the shared lock.
+// Keep each delivered recipient when a later recipient fails and the request retries.
+function sendNotice_(dispatchKey, audience, to, subject, html) {
+  if (!dispatchKey) return send_(to, subject, html);
+  const key = `${dispatchKey}:recipient:${audience}`;
+  const props = PropertiesService.getScriptProperties();
+  const lease = JSON.stringify({ nonce:Utilities.getUuid(), expiresAt:Date.now() + 7*60*1000 });
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(1500)) throw new Error('email_busy');
+  try {
+    const current = props.getProperty(key);
+    if (current === '1') return;
+    if (current) {
+      let pending;
+      try { pending = JSON.parse(current); } catch (_) {}
+      if (pending && pending.expiresAt > Date.now()) throw new Error('email_busy');
+    }
+    props.setProperty(key, lease);
+  } finally { lock.releaseLock(); }
+  try {
+    send_(to, subject, html);
+    props.setProperty(key, '1');
+  } catch (error) {
+    if (props.getProperty(key) === lease) props.deleteProperty(key);
+    throw error;
+  }
+}
+
 function send_(to, subject, html) {
   const options = senderOptions_();
   options.htmlBody = html;
@@ -463,7 +498,7 @@ function bookingInfo_(b) {
     <div style="font-size:13px;font-weight:700;letter-spacing:.08em;margin-bottom:12px">預約資訊</div>
     ${infoLine_('日期', displayDate_(b.preferredDate))}
     ${infoLine_('時間', serviceRange_(b))}
-    ${infoLine_('項目', b.serviceName || '—')}
+    ${infoLine_('項目', String(b.serviceName || '—').replace(/\u64a5筋/g, '鬆筋'))}
     ${infoLine_('姓名', b.customerName || '—')}
   </div>`;
 }
@@ -479,7 +514,7 @@ function infoLine_(label, value) {
 }
 
 function bookingTable_(b) {
-  return `<table style="border-collapse:collapse;margin:16px 0">${line_('日期', b.preferredDate || '—')}${line_('時間', serviceRange_(b))}${line_('服務', b.serviceName || '—')}${line_('姓名', b.customerName || '—')}</table>`;
+  return `<table style="border-collapse:collapse;margin:16px 0">${line_('日期', b.preferredDate || '—')}${line_('時間', serviceRange_(b))}${line_('服務', String(b.serviceName || '—').replace(/\u64a5筋/g, '鬆筋'))}${line_('姓名', b.customerName || '—')}</table>`;
 }
 
 function rejectionText_(b) {
