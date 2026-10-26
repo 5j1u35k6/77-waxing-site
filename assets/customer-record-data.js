@@ -1,4 +1,4 @@
-import { recordOptions, recordTerms } from './customer-record-fields.js?v=20261023-paper';
+import { recordOptions, recordTerms } from './customer-record-fields.js?v=20261026-audit1';
 
 export const RECORD_KIND='waxing_customer_record';
 export const RECORD_VERSION=3;

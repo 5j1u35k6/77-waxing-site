@@ -1,11 +1,13 @@
-import { loadCatalog, publicCatalog, watchCatalog } from "./service-catalog-store.js?v=20261023-perf1";
-import { bindServiceCareCards } from './service-care-ui.js?v=20261023-tw1';
+import { loadCatalog, publicCatalog, watchCatalog } from "./service-catalog-store.js?v=20261026-audit1";
+import { bindServiceCareCards } from './service-care-ui.js?v=20261026-audit1';
 
 const B = "/77-waxing-site";
 const CACHE_KEY = "77waxing-public-catalog-v1";
 let catalog = [];
 let scheduled = false;
 let rendering = false;
+let catalogLoaded = false;
+let catalogError = false;
 
 const catalogHierarchyStyle = document.createElement("style");
 catalogHierarchyStyle.textContent = ".service-group-head{display:block!important}.service-group-head p{margin:8px 0 0!important;max-width:620px}";
@@ -43,6 +45,28 @@ function renderLoading() {
   const path = normalizedPath();
   if (path !== "/menu/" && path !== "/services/" && !path.startsWith("/services/")) return;
   root.innerHTML = `<section class="section" data-catalog-loading><div class="wrap narrow"><span class="tag">${path === "/menu/" ? "MENU" : "SERVICES"}</span><p class="muted">正在載入最新服務內容…</p></div></section>`;
+}
+
+function renderCatalogMessage(kind) {
+  const root = app(), path = normalizedPath();
+  if (!root || (path !== "/menu/" && path !== "/services/" && !path.startsWith("/services/"))) return;
+  if (root.dataset.catalogMessage === kind && root.dataset.catalogPath === path && root.querySelector('[data-catalog-message]')) return;
+  root.dataset.catalogMessage = kind;
+  root.dataset.catalogPath = path;
+  const title = kind === "error" ? "服務資料載入失敗" : kind === "empty" ? "目前沒有開放中的服務" : "找不到這個服務項目";
+  const message = kind === "error" ? "請稍後再試，或直接聯絡 77waxing。" : kind === "empty" ? "請稍後再回來檢視，或直接聯絡 77waxing。" : "請選擇其他服務，或從價目表檢視目前開放的項目。";
+  root.innerHTML = `<section class="section" data-catalog-message><div class="wrap narrow"><h1>${title}</h1><p>${message}</p>${kind === "missing" ? serviceSwitcher("") : ""}<div class="catalog-actions">${kind === "error" ? '<button type="button" class="btn" data-catalog-retry>重新載入</button>' : ""}<a class="btn" href="${B}/">回到首頁</a></div></div></section>`;
+  root.querySelector('[data-catalog-retry]')?.addEventListener('click', () => {
+    catalogError = false;
+    renderLoading();
+    start().catch(catalogFailed);
+  });
+}
+
+function catalogFailed(error) {
+  console.error("77waxing dynamic catalog failed", error);
+  catalogError = true;
+  renderCurrent(true);
 }
 
 function markHeader() {
@@ -107,15 +131,15 @@ function syncServiceMenus() {
   }
 }
 
-function syncHomeCards() {
+function syncHomeCards(force = false) {
   if (normalizedPath() !== "/") return;
   const section = document.querySelector("#app [data-home-service-catalog]");
   const grid = section?.querySelector("[data-home-service-grid]");
-  if (!grid || grid.dataset.dynamicCatalog === "1") return;
+  if (!grid || (!force && grid.dataset.dynamicCatalog === "1")) return;
   const known = {
     women: "今次嘅妳想改變啲咩呢？77waxing幫妳實現願望。",
     men: "唔使怕醜！專業嘅77waxing一樣可以令你變得更型、更有自信！",
-    skin: "臉部、粉刺、撥筋與身體肌膚保養",
+    skin: "臉部、粉刺、鬆筋與身體肌膚保養",
     bust: "依時間與需求選擇不同美胸保養流程",
   };
   const homeIntro = (service) => service.key === "women" || service.key === "men"
@@ -127,9 +151,14 @@ function syncHomeCards() {
 
 function renderCurrent(force = false) {
   if (rendering) return;
-  if (!catalog.length) { renderLoading(); return; }
+  if (!catalog.length) {
+    if (catalogError) renderCatalogMessage("error");
+    else if (catalogLoaded) renderCatalogMessage("empty");
+    else renderLoading();
+    return;
+  }
   syncServiceMenus();
-  syncHomeCards();
+  syncHomeCards(force);
   const root = app(); if (!root) return;
   const path = normalizedPath();
   if (path === "/services/") {
@@ -139,6 +168,12 @@ function renderCurrent(force = false) {
   if (service) {
     if (!force && root.dataset.dynamicCatalog === "1" && root.dataset.catalogPath === normalizedPath() && root.querySelector('[data-catalog-page="service"]')) return;
     renderService(service);
+    return;
+  }
+  if (path.startsWith("/services/")) {
+    if (catalogError) renderCatalogMessage("error");
+    else if (catalogLoaded) renderCatalogMessage("missing");
+    else renderLoading();
     return;
   }
   if (path === "/menu/") {
@@ -163,6 +198,8 @@ async function start() {
   }
 
   const fresh = publicCatalog(await loadCatalog());
+  catalogLoaded = true;
+  catalogError = false;
   catalog = fresh;
   writeCachedCatalog(fresh);
   renderCurrent(true);
@@ -193,5 +230,5 @@ document.addEventListener("click", (event) => {
 new MutationObserver(() => schedule()).observe(document.querySelector("#app") || document.body, { childList: true, subtree: true });
 addEventListener("popstate", () => setTimeout(() => renderCurrent(true), 0));
 addEventListener("hashchange", () => schedule());
-start().catch((error) => console.error("77waxing dynamic catalog failed", error));
+start().catch(catalogFailed);
 

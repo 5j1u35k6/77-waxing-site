@@ -7,8 +7,8 @@ import {
   signInWithPopup,
   signOut,
 } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
-import { firebaseConfig } from "./firebase-config.js";
-import { getPublicFirebase } from "./public-firebase.js?v=20260912-1330";
+import { firebaseConfig } from "./firebase-config.js?v=20261026-audit1";
+import { getPublicFirebase } from "./public-firebase.js?v=20261026-audit1";
 
 const { auth } = getPublicFirebase();
 const VERSION = "20260915-account-link2-diagnostics";
@@ -25,6 +25,7 @@ const LINE_STATE_COOKIE = "77waxing_line_oauth_state_cookie";
 
 let statusCache = null;
 let statusForUid = "";
+let statusRequest = null;
 let busy = "";
 let renderScheduled = false;
 
@@ -108,11 +109,19 @@ async function loadStatus(force = false) {
   const user = auth.currentUser;
   if (!user || user.isAnonymous) return null;
   if (!force && statusCache && statusForUid === user.uid) return statusCache;
-  const firebaseIdToken = await user.getIdToken(true);
-  const result = await proxyRequest({ action: "identity_status", firebaseIdToken });
-  statusCache = result.providers || { line: false, google: false };
-  statusForUid = user.uid;
-  return statusCache;
+  if (statusRequest?.uid === user.uid) return statusRequest.promise;
+  const request = { uid: user.uid };
+  request.promise = (async () => {
+    const firebaseIdToken = await user.getIdToken(true);
+    const result = await proxyRequest({ action: "identity_status", firebaseIdToken });
+    if (auth.currentUser?.uid !== user.uid) return null;
+    statusCache = result.providers || { line: false, google: false };
+    statusForUid = user.uid;
+    return statusCache;
+  })();
+  statusRequest = request;
+  try { return await request.promise; }
+  finally { if (statusRequest === request) statusRequest = null; }
 }
 
 function inferLocalProviders() {
@@ -131,10 +140,12 @@ function paintStatus(providers) {
     const linked = Boolean(providers[provider]);
     const button = section.querySelector(`[data-link-provider="${provider}"]`);
     const label = section.querySelector(`[data-link-label="${provider}"]`);
-    if (label) label.textContent = linked ? "已連結此會員" : "尚未綁定";
+    const labelText = linked ? "已連結此會員" : "尚未綁定";
+    if (label && label.textContent !== labelText) label.textContent = labelText;
     if (button) {
       button.dataset.linked = linked ? "1" : "0";
-      button.textContent = linked ? "已綁定" : `綁定 ${provider === "line" ? "LINE" : "Google"}`;
+      const buttonText = linked ? "已綁定" : `綁定 ${provider === "line" ? "LINE" : "Google"}`;
+      if (button.textContent !== buttonText) button.textContent = buttonText;
       button.disabled = linked || Boolean(busy);
     }
   });
@@ -154,10 +165,16 @@ function statusReadErrorText(error) {
 async function render(force = false) {
   const section = ensureSection();
   if (!section || !auth.currentUser || auth.currentUser.isAnonymous) return;
+  const uid = auth.currentUser.uid;
+  const stillCurrent = () => auth.currentUser?.uid === uid
+    && section === center()?.querySelector('[data-member-linking]');
   try {
-    paintStatus(await loadStatus(force));
+    const providers = await loadStatus(force);
+    if (!stillCurrent()) return;
+    paintStatus(providers);
     setLocalStatus("");
   } catch (error) {
+    if (!stillCurrent()) return;
     console.warn("member identity status unavailable", error);
     statusCache = inferLocalProviders();
     statusForUid = auth.currentUser.uid;

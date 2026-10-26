@@ -9,7 +9,7 @@ import {
   serverTimestamp,
   setDoc,
 } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
-import { getPublicFirebase } from "./public-firebase.js?v=20260912-1330";
+import { getPublicFirebase } from "./public-firebase.js?v=20261026-audit1";
 
 const { auth, db } = getPublicFirebase();
 const PENDING_TARGET_KEY = "77waxing_member_pending_target";
@@ -167,6 +167,7 @@ async function consumeLineCallback() {
   if (!errorCode && !customToken) return false;
 
   const expectedState = getExpectedState();
+  const returnTarget = getPendingTarget();
   if (!expectedState || !returnedState || expectedState !== returnedState) {
     cleanAuthFragment();
     clearExpectedState();
@@ -234,7 +235,14 @@ async function consumeLineCallback() {
     window.dispatchEvent(new CustomEvent("77waxing:line-login-complete", { detail: { user: result.user, linked: Boolean(claims.linked) } }));
     rememberDebug("complete");
 
-    setTimeout(() => location.reload(), 180);
+    setTimeout(() => {
+      let target;
+      try { target = new URL(returnTarget); } catch {}
+      const allowed = target?.origin === location.origin
+        && (/^\/77-waxing-site(?:\/|$)/.test(target.pathname) || /^\/77select(?:\/|$)/.test(target.pathname));
+      if (allowed && target.href !== location.href) location.replace(target.href);
+      else location.reload();
+    }, 180);
     return true;
   } catch (error) {
     console.error("LINE custom token login failed", error);

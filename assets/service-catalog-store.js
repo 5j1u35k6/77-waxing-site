@@ -1,8 +1,8 @@
 import { getApp, getApps } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";
 import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
 import { doc, getDoc, getFirestore, onSnapshot, serverTimestamp, setDoc } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
-import { firebaseConfigured } from "./firebase-config.js";
-import { getPublicFirebase } from "./public-firebase.js?v=20260912-1330";
+import { firebaseConfigured } from "./firebase-config.js?v=20261026-audit1";
+import { getPublicFirebase } from "./public-firebase.js?v=20261026-audit1";
 
 export const CATALOG_DOC_ID = "catalog-main";
 
@@ -121,13 +121,13 @@ export const DEFAULT_CATALOG = [
       },
       {
         id: "skin-massage",
-        title: "臉部撥筋系列",
-        priceTitle: "臉部撥筋",
+        title: "臉部鬆筋系列",
+        priceTitle: "臉部鬆筋",
         kind: "main",
         desc: "",
         items: [
-          serviceItem("skin-massage-basic", "全方位臉部撥筋", "臉部清潔、舒活嫩膚、臉部與肩頸放鬆、臉部肩頸撥筋、保濕、頭皮放鬆與肌膚喚醒", 70, "60–70 分鐘", "$1399"),
-          serviceItem("skin-massage-clean", "臉部撥筋 + 基礎手工清粉刺", "臉部清潔、舒活嫩膚、放鬆與撥筋、肌膚處理、保濕、光譜儀、頭皮放鬆、頭刮與肌膚喚醒", 150, "120–150 分鐘", "$2499"),
+          serviceItem("skin-massage-basic", "全方位臉部鬆筋", "臉部清潔、舒活嫩膚、臉部與肩頸放鬆、臉部肩頸鬆筋、保濕、頭皮放鬆與肌膚喚醒", 70, "60–70 分鐘", "$1399"),
+          serviceItem("skin-massage-clean", "臉部鬆筋 + 基礎手工清粉刺", "臉部清潔、舒活嫩膚、放鬆與鬆筋、肌膚處理、保濕、光譜儀、頭皮放鬆、頭刮與肌膚喚醒", 150, "120–150 分鐘", "$2499"),
         ],
       },
       {
@@ -182,12 +182,13 @@ export const DEFAULT_CATALOG = [
   },
 ];
 
+const serviceText = value => String(value || '').replace(/\u64a5筋/g, '鬆筋');
 function normalizeItem(item, index) {
   const durationMinutes = Math.max(1, Math.min(180, Number(item?.durationMinutes || 90)));
   return {
     id: String(item?.id || makeCatalogId(`item${index}`)),
-    name: String(item?.name || `未命名項目 ${index + 1}`).trim(),
-    description: String(item?.description || "").trim(),
+    name: serviceText(item?.name || `未命名項目 ${index + 1}`).trim(),
+    description: serviceText(item?.description || "").trim(),
     durationMinutes,
     durationLabel: String(item?.durationLabel || `約 ${durationMinutes} 分鐘`).trim(),
     priceLabel: String(item?.priceLabel || "").trim(),
@@ -196,13 +197,13 @@ function normalizeItem(item, index) {
 }
 
 function normalizeGroup(group, index) {
-  const title = String(group?.title || `服務項目 ${index + 1}`).trim();
+  const title = serviceText(group?.title || `服務項目 ${index + 1}`).trim();
   return {
     id: String(group?.id || makeCatalogId(`group${index}`)),
     title,
-    priceTitle: String(group?.priceTitle || title).trim(),
+    priceTitle: serviceText(group?.priceTitle || title).trim(),
     kind: group?.kind === "addon" || /加購/.test(title) ? "addon" : "main",
-    desc: String(group?.desc || "").trim(),
+    desc: serviceText(group?.desc || "").trim(),
     items: Array.isArray(group?.items) ? group.items.map(normalizeItem) : [],
   };
 }
@@ -214,12 +215,12 @@ export function normalizeCatalog(input) {
     return {
       key: String(category?.key || slug || `service-${index + 1}`).trim(),
       slug,
-      name: String(category?.name || `服務分類 ${index + 1}`).trim(),
+      name: serviceText(category?.name || `服務分類 ${index + 1}`).trim(),
       en: String(category?.en || "SERVICE").trim(),
-      intro: String(category?.intro || "").trim(),
+      intro: serviceText(category?.intro || "").trim(),
       enabled: category?.enabled !== false,
       groups: Array.isArray(category?.groups) ? category.groups.map(normalizeGroup) : [],
-      notes: Array.isArray(category?.notes) ? category.notes.map((note) => String(note || "").trim()).filter(Boolean) : [],
+      notes: Array.isArray(category?.notes) ? category.notes.map((note) => serviceText(note || "").trim()).filter(Boolean) : [],
     };
   });
 }

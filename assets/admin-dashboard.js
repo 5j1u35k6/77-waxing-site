@@ -93,7 +93,7 @@ function render(force=false){
     <div class="dashboard-overview-grid">
       <section class="dashboard-next-card">
         <div class="dashboard-v3-title"><div><small>NEXT</small><h4>下一位顧客</h4></div></div>
-        ${next?`<div class="dashboard-next-main"><time>${esc(next.preferredDate||'')}<strong>${esc(range(next))}</strong></time><div><b>${esc(next.customerName||'未命名')}</b><span>${esc(next.serviceName||'—')}</span><small>${statusLabel(next.status)}</small></div></div>`:`<div class="dashboard-panel-empty"><b>目前沒有下一筆預約</b><span>之後有預約時，這裡會直接顯示下一位顧客。</span></div>`}
+        ${next?`<div class="dashboard-next-main"><time>${esc(next.preferredDate||'')}<strong>${esc(range(next))}</strong></time><div><b>${esc(next.customerName||'未命名')}</b><span>${esc(String(next.serviceName || '—').replace(/\u64a5筋/g, '鬆筋'))}</span><small>${esc(statusLabel(next.status))}</small></div></div>`:`<div class="dashboard-panel-empty"><b>目前沒有下一筆預約</b><span>之後有預約時，這裡會直接顯示下一位顧客。</span></div>`}
       </section>
 
       <section class="dashboard-attention-summary">

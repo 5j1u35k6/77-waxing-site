@@ -1,9 +1,9 @@
-import { operationErrorText } from "./interface-copy.js?v=20261025-copy2";
+import { operationErrorText } from "./interface-copy.js?v=20261026-audit1";
 import { getApp } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";
 import { getAuth } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
 import { getFirestore, getDoc, doc } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
-import { DEFAULT_RECORD_ENDPOINT, recordRequest, encodeRecordFile, recordCapability } from "./customer-record-upload-api.js?v=20261025-copy2";
-import { showUploadQueue } from "./customer-record-progress.js?v=20261025-copy2";
+import { DEFAULT_RECORD_ENDPOINT, recordRequest, encodeRecordFile, recordCapability } from "./customer-record-upload-api.js?v=20261026-audit1";
+import { showUploadQueue } from "./customer-record-progress.js?v=20261026-audit1";
 
 let dialog=null,endpoint=DEFAULT_RECORD_ENDPOINT,session=null,generation=0,pollTimer=null,polling=false,busy=false,opener=null,prepared=null,creating=null,qrLoading=null,watching=false,watchStarted=0;
 let transfer=null,navigating=false;
@@ -92,7 +92,7 @@ async function poll(){
 function loadQR(){
   if(window.qrcode)return Promise.resolve();
   if(qrLoading)return qrLoading;
-  qrLoading=new Promise((resolve,reject)=>{const script=document.createElement('script');script.src='../assets/vendor/qrcode-generator.js';script.onload=resolve;script.onerror=()=>{script.remove();qrLoading=null;reject(new Error('QR Code 載入失敗，請稍後再試。'));};document.head.appendChild(script);});return qrLoading;
+  qrLoading=new Promise((resolve,reject)=>{const script=document.createElement('script');script.src='../assets/vendor/qrcode-generator.js?v=20261026-audit1';script.onload=resolve;script.onerror=()=>{script.remove();qrLoading=null;reject(new Error('QR Code 載入失敗，請稍後再試。'));};document.head.appendChild(script);});return qrLoading;
 }
 async function showQR(){
   if(busy)return;setBusy(true);const turn=generation;status('正在建立上傳 QR Code…');
@@ -159,7 +159,7 @@ function openImport(button){
     session=null;prepared=null;transfer=null;opener?.focus();
   },{once:true});
   dialog.showModal();prepare().catch(()=>{});
-  for(const [rel,href] of [['modulepreload','../assets/customer-record-page-form.js?v=20261025-copy2'],['prefetch','./customer-record.html']]){
+  for(const [rel,href] of [['modulepreload','../assets/customer-record-page-form.js?v=20261026-audit1'],['prefetch','./customer-record.html']]){
     if(!Array.from(document.querySelectorAll('link[href]')).some(link=>link.getAttribute('href')===href)){const link=document.createElement('link');link.rel=rel;link.href=href;document.head.append(link);}
   }
 }

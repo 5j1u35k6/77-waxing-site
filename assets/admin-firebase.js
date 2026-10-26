@@ -12,14 +12,14 @@ import {
   doc,
   getDoc,
   getFirestore,
-  limit,
   onSnapshot,
   orderBy,
   query,
   runTransaction,
   serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
-import { firebaseConfig, firebaseConfigured } from "./firebase-config.js";
+import { firebaseConfig, firebaseConfigured } from "./firebase-config.js?v=20261026-audit1";
+import { readBookingLocks } from "./admin-booking-locks.js?v=20261026-audit1";
 
 const REPO_BASE = "/77-waxing-site";
 const B = location.hostname.endsWith("github.io") ? REPO_BASE : "";
@@ -29,6 +29,7 @@ let auth = null;
 let db = null;
 let adminUnsubscribe = null;
 let authPersistenceReady = Promise.resolve();
+let adminGeneration = 0;
 
 if (firebaseConfigured) {
   app = initializeApp(firebaseConfig);
@@ -44,6 +45,7 @@ const statusText = (status) => ({
   completed: "已完成",
   no_show: "未到店",
 }[status] || status);
+const escapeHtml = value => String(value ?? "").replace(/[&<>"']/g, character => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[character]));
 
 function normalizeStaticLinks(root = document) {
   if (B) return;
@@ -71,7 +73,7 @@ function adminLoginMarkup() {
 }
 
 function adminShellMarkup() {
-  return `<aside class="sidebar"><h2><b>77</b>waxing</h2><a class="on" href="#dashboard">總覽</a><a href="#bookings">預約管理</a><a href="#calendar">預約行事曆</a><a href="#customers">顧客資料</a><a href="#services">服務功能</a><a href="#slots">時段功能</a><a href="#pricing">價格功能</a><a href="#settings">網站設定</a><a class="admin-site-link" href="/77-waxing-site/" data-admin-site-link>← 回到網站</a><button class="btn admin-logout" type="button" data-admin-logout>登出</button></aside><main class="dash"><div class="admin-topline"><div><span class="tag">ADMIN</span><h2>77 管理後台</h2></div><span class="firebase-live">● 即時同步</span></div><div class="metrics" data-metrics></div><div class="panel"><h3>預約與時段狀態</h3><div class="admin-table-scroll"><table><thead><tr><th>日期</th><th>時間</th><th>顧客</th><th>手機</th><th>服務</th><th>客別</th><th>狀態</th><th>操作</th></tr></thead><tbody data-admin-rows></tbody></table></div></div></main>`;
+  return `<aside class="sidebar"><h2><b>77</b>waxing</h2><a class="on" href="#dashboard">總覽</a><a href="#bookings">預約管理</a><a href="#calendar">預約行事曆</a><a href="#customers">顧客資料</a><a href="#audience">客群分析</a><a href="#services">服務功能</a><a href="#slots">時段功能</a><a href="#pricing">價格功能</a><a href="#settings">網站設定</a><a class="admin-site-link" href="/77-waxing-site/" data-admin-site-link>← 回到網站</a><button class="btn admin-logout" type="button" data-admin-logout>登出</button></aside><main class="dash"><div class="admin-topline"><div><span class="tag">ADMIN</span><h2>77 管理後台</h2></div><span class="firebase-live">● 即時同步</span></div><div class="metrics" data-metrics></div><div class="panel"><h3>預約與時段狀態</h3><div class="admin-table-scroll"><table><thead><tr><th>日期</th><th>時間</th><th>顧客</th><th>手機</th><th>服務</th><th>客別</th><th>狀態</th><th>操作</th></tr></thead><tbody data-admin-rows></tbody></table></div></div></main>`;
 }
 
 async function verifyAdmin(user) {
@@ -90,8 +92,12 @@ async function applyBookingAction(bookingId, action) {
     const bookingSnapshot = await transaction.get(bookingRef);
     if (!bookingSnapshot.exists()) throw new Error("BOOKING_NOT_FOUND");
     const booking = bookingSnapshot.data();
-    const lockIds = Array.isArray(booking.lockIds) ? booking.lockIds : [];
-    const lockRefs = lockIds.map((id) => doc(db, "availabilityLocks", id));
+    const allowedStatuses = {
+      deposit: ["pending_confirmation"], nodeposit: ["pending_confirmation"],
+      paid: ["pending_payment"], complete: ["confirmed"], no_show: ["confirmed"],
+      cancel: ["pending_confirmation", "pending_payment", "confirmed"],
+    };
+    if (!allowedStatuses[action]?.includes(booking.status)) throw new Error("BOOKING_STATUS_CHANGED");
     const updates = { updatedAt: serverTimestamp() };
     let releaseLocks = false;
     let confirmLocks = false;
@@ -121,12 +127,13 @@ async function applyBookingAction(bookingId, action) {
       throw new Error("UNKNOWN_ACTION");
     }
 
+    const locks = await readBookingLocks(transaction, db, bookingId, booking, { requireOwned: confirmLocks });
     transaction.update(bookingRef, updates);
     if (confirmLocks) {
-      lockRefs.forEach((lockRef) => transaction.update(lockRef, { state: "confirmed", updatedAt: serverTimestamp() }));
+      locks.forEach(lock => transaction.update(lock.ref, { state: "confirmed", updatedAt: serverTimestamp() }));
     }
     if (releaseLocks) {
-      lockRefs.forEach((lockRef) => transaction.delete(lockRef));
+      locks.filter(lock => lock.owned).forEach(lock => transaction.delete(lock.ref));
     }
   });
 }
@@ -141,15 +148,16 @@ function renderAdminRows(root, rows) {
   };
   root.querySelector("[data-metrics]").innerHTML = `<div class="metric">待確認<b>${counts.pending}</b></div><div class="metric">待付款<b>${counts.payment}</b></div><div class="metric">已確認<b>${counts.confirmed}</b></div><div class="metric">新客<b>${counts.newCustomers}</b></div>`;
   root.querySelector("[data-admin-rows]").innerHTML = rows.map((row) => {
+    const id = escapeHtml(row.id);
     let actions = "—";
     if (row.status === "pending_confirmation") {
-      actions = `<button type="button" data-admin-action="deposit" data-id="${row.id}">確認＋收定金</button>${row.isFirstVisit ? "" : `<button type="button" data-admin-action="nodeposit" data-id="${row.id}">確認免定金</button>`}<button type="button" data-admin-action="cancel" data-id="${row.id}">取消</button>`;
+      actions = `<button type="button" data-admin-action="deposit" data-id="${id}">確認＋收定金</button>${row.isFirstVisit ? "" : `<button type="button" data-admin-action="nodeposit" data-id="${id}">確認免定金</button>`}<button type="button" data-admin-action="cancel" data-id="${id}">取消</button>`;
     } else if (row.status === "pending_payment") {
-      actions = `<button type="button" data-admin-action="paid" data-id="${row.id}">標記已付款</button><button type="button" data-admin-action="cancel" data-id="${row.id}">取消</button>`;
+      actions = `<button type="button" data-admin-action="paid" data-id="${id}">標記已付款</button><button type="button" data-admin-action="cancel" data-id="${id}">取消</button>`;
     } else if (row.status === "confirmed") {
-      actions = `<button type="button" data-admin-action="complete" data-id="${row.id}">完成</button><button type="button" data-admin-action="no_show" data-id="${row.id}">未到店</button><button type="button" data-admin-action="cancel" data-id="${row.id}">取消</button>`;
+      actions = `<button type="button" data-admin-action="complete" data-id="${id}">完成</button><button type="button" data-admin-action="no_show" data-id="${id}">未到店</button><button type="button" data-admin-action="cancel" data-id="${id}">取消</button>`;
     }
-    return `<tr><td>${row.preferredDate || "—"}</td><td>${row.preferredTime || "—"}</td><td>${row.customerName || "未命名"}</td><td>${row.customerPhone || "—"}</td><td>${row.serviceName || "—"}</td><td>${row.isFirstVisit ? "新客" : "回訪"}</td><td><span class="status-${row.status}">${statusText(row.status)}</span></td><td class="adminacts">${actions}</td></tr>`;
+    return `<tr data-booking-id="${id}"><td>${escapeHtml(row.preferredDate || "—")}</td><td>${escapeHtml(row.preferredTime || "—")}</td><td>${escapeHtml(row.customerName || "未命名")}</td><td>${escapeHtml(row.customerPhone || "—")}</td><td>${escapeHtml(String(row.serviceName || "—").replace(/\u64a5筋/g, '鬆筋'))}</td><td>${row.isFirstVisit ? "新客" : "回訪"}</td><td><span class="status-${escapeHtml(row.status)}">${escapeHtml(statusText(row.status))}</span></td><td class="adminacts">${actions}</td></tr>`;
   }).join("") || '<tr><td colspan="8" class="muted">目前沒有預約資料。</td></tr>';
 
   root.querySelectorAll("[data-admin-action]").forEach((button) => {
@@ -168,6 +176,7 @@ function renderAdminRows(root, rows) {
 }
 
 async function showAdminDashboard(root) {
+  const generation=adminGeneration,uid=auth.currentUser?.uid;
   root.innerHTML = adminShellMarkup();
   root.querySelector("[data-admin-logout]").onclick = async () => {
     if (adminUnsubscribe) adminUnsubscribe();
@@ -175,14 +184,16 @@ async function showAdminDashboard(root) {
     await signOut(auth);
     renderAdminLogin(root);
   };
-  const bookingsQuery = query(collection(db, "bookings"), orderBy("preferredDate", "asc"), limit(300));
+  const bookingsQuery = query(collection(db, "bookings"), orderBy("preferredDate", "asc"));
   if (adminUnsubscribe) adminUnsubscribe();
   adminUnsubscribe = onSnapshot(bookingsQuery, (snapshot) => {
+    if(generation!==adminGeneration||auth.currentUser?.uid!==uid)return;
     const rows = snapshot.docs.map((snapshotDoc) => ({ id: snapshotDoc.id, ...snapshotDoc.data() }));
     rows.sort((a, b) => `${a.preferredDate || ""} ${a.preferredTime || ""}`.localeCompare(`${b.preferredDate || ""} ${b.preferredTime || ""}`));
     renderAdminRows(root, rows);
   }, (error) => {
     console.error(error);
+    if(generation!==adminGeneration||!root.querySelector("[data-admin-rows]"))return;
     root.querySelector("[data-admin-rows]").innerHTML = '<tr><td colspan="8" class="muted">無法讀取預約資料，請確認已使用管理員帳號登入。</td></tr>';
   });
 }
@@ -206,7 +217,8 @@ function renderAdminLogin(root) {
         throw new Error("NOT_ADMIN");
       }
       history.replaceState(null, "", `${location.pathname}#dashboard`);
-      await showAdminDashboard(root);
+      delete root.dataset.firebaseMounted;
+      await mountAdmin(root);
     } catch (error) {
       console.error(error);
       message.textContent = "登入失敗或此帳號沒有後台權限。";
@@ -217,8 +229,14 @@ function renderAdminLogin(root) {
 }
 
 async function mountAdmin(root) {
-  if (root.dataset.firebaseMounted) return;
-  root.dataset.firebaseMounted = "1";
+  const identity=auth?.currentUser?.uid||'signed-out';
+  if (root.dataset.firebaseMounted === identity) return;
+  root.dataset.firebaseMounted = identity;
+  const generation=++adminGeneration;
+  if(adminUnsubscribe){adminUnsubscribe();adminUnsubscribe=null;}
+  document.querySelectorAll('[data-customer-history-modal],[data-admin-customer-modal],[data-booking-editor-modal],[data-cancel-reason-modal]').forEach(element=>element.remove());
+  document.querySelectorAll('dialog[open]').forEach(dialog=>dialog.close());
+  root.innerHTML='<p class="muted" role="status">正在確認後台登入狀態…</p>';
   const oldPreview = root.querySelector(".preview");
   if (oldPreview) oldPreview.remove();
   if (!firebaseConfigured) {
@@ -229,8 +247,11 @@ async function mountAdmin(root) {
 
   await authPersistenceReady;
   await auth.authStateReady();
+  if(generation!==adminGeneration)return;
   const currentUser = auth.currentUser;
-  if (currentUser && await verifyAdmin(currentUser)) {
+  const allowed=currentUser && await verifyAdmin(currentUser);
+  if(generation!==adminGeneration||auth.currentUser?.uid!==currentUser?.uid)return;
+  if (allowed) {
     await showAdminDashboard(root);
   } else {
     renderAdminLogin(root);

@@ -1,5 +1,6 @@
 import { getApp, getApps } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";
-import { collection, doc, getDoc, getFirestore, onSnapshot, writeBatch } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
+import { collection, doc, getDoc, getFirestore, onSnapshot } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
+import { deleteBookingWithOwnedLocks } from "./admin-booking-locks.js?v=20261026-audit1";
 
 let db=null;
 let bookings=[];
@@ -7,6 +8,7 @@ let scheduled=false;
 
 const pad=n=>String(n).padStart(2,'0');
 const normalizePhone=value=>String(value||'').replace(/[^0-9+]/g,'').trim();
+const escapeHtml=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const addMinutes=(time,amount)=>{
   const [h,m]=String(time||'').split(':').map(Number);
   if(!Number.isFinite(h)||!Number.isFinite(m))return '';
@@ -50,7 +52,7 @@ function range(row){
   return {start,end:end||reservedUntil,reservedUntil:reservedUntil||end};
 }
 function matchBooking(tr){
-  const directId=tr.querySelector('[data-id]')?.dataset.id||tr.querySelector('[data-admin-delete-booking]')?.dataset.adminDeleteBooking||'';
+  const directId=tr.dataset.bookingId||tr.querySelector('[data-id]')?.dataset.id||tr.querySelector('[data-admin-delete-booking]')?.dataset.adminDeleteBooking||'';
   if(directId){const found=bookings.find(row=>row.id===directId);if(found)return found;}
   const cells=tr.querySelectorAll('td');
   if(cells.length<5)return null;
@@ -70,24 +72,24 @@ function preserveTimeRanges(){
     if(td.dataset.criticalTimeRange===signature)return;
     td.dataset.originalStart=start;
     td.dataset.criticalTimeRange=signature;
-    td.innerHTML=`<div class="admin-time-range"><b>${start}–${end}</b>${reservedUntil&&reservedUntil!==end?`<small>保留至 ${reservedUntil}</small>`:''}</div>`;
+    td.innerHTML=`<div class="admin-time-range"><b>${escapeHtml(start)}–${escapeHtml(end)}</b>${reservedUntil&&reservedUntil!==end?`<small>保留至 ${escapeHtml(reservedUntil)}</small>`:''}</div>`;
   });
   document.querySelectorAll('.cal-booking').forEach(card=>{
     const b=card.querySelector('b');if(!b)return;
     const start=(b.dataset.originalStart||b.textContent.match(/\d{2}:\d{2}/)?.[0]||'').slice(0,5);
     const name=card.querySelector('span')?.textContent.trim()||'';
     const service=card.querySelector('small')?.textContent.split(' · ')[0].trim()||'';
-    const row=bookings.find(r=>String(r.preferredTime||'').slice(0,5)===start&&String(r.customerName||'').trim()===name&&String(r.serviceName||'').trim()===service);
+    const row=card.dataset.bookingId?bookings.find(r=>r.id===card.dataset.bookingId):bookings.find(r=>String(r.preferredTime||'').slice(0,5)===start&&String(r.customerName||'').trim()===name&&String(r.serviceName||'').trim()===service);
     if(!row)return;const {end}=range(row);if(!end)return;
-    b.dataset.originalStart=start;b.textContent=`${start}–${end}`;
+    b.dataset.originalStart=start;const text=`${start}–${end}`;if(b.textContent!==text)b.textContent=text;
   });
   document.querySelectorAll('.month-event').forEach(button=>{
     const raw=button.dataset.originalLabel||button.textContent||'';
     const m=raw.trim().match(/^(\d{2}:\d{2})(?:–\d{2}:\d{2})?\s+(.+)$/);if(!m)return;
-    const row=bookings.find(r=>String(r.preferredTime||'').slice(0,5)===m[1]&&String(r.customerName||'').trim()===m[2].trim());if(!row)return;
+    const row=button.dataset.bookingId?bookings.find(r=>r.id===button.dataset.bookingId):bookings.find(r=>String(r.preferredTime||'').slice(0,5)===m[1]&&String(r.customerName||'').trim()===m[2].trim());if(!row)return;
     const {end}=range(row);if(!end)return;
     button.dataset.originalLabel=`${m[1]} ${m[2].trim()}`;
-    button.innerHTML=`<b>${m[1]}–${end}</b> ${m[2].trim()}`;
+    const signature=`${m[1]}|${end}|${m[2].trim()}`;if(button.dataset.criticalMonthRange!==signature){button.dataset.criticalMonthRange=signature;button.innerHTML=`<b>${escapeHtml(m[1])}–${escapeHtml(end)}</b> ${escapeHtml(m[2].trim())}`;}
   });
 }
 async function deleteBooking(id){
@@ -99,12 +101,7 @@ async function deleteBooking(id){
   const {start,end}=range(row);
   const label=`${row.customerName||'未命名'}｜${row.preferredDate||''} ${start}${end?`–${end}`:''}`;
   if(!confirm(`確定永久刪除這筆預約？\n${label}\n\n對應保留時段也會一起釋放。此操作無法復原。`))return;
-  const refs=[ref];
-  (Array.isArray(row.lockIds)?row.lockIds:[]).forEach(lockId=>refs.push(doc(firestore,'availabilityLocks',lockId)));
-  const unique=[...new Map(refs.map(item=>[item.path,item])).values()];
-  for(let i=0;i<unique.length;i+=400){
-    const batch=writeBatch(firestore);unique.slice(i,i+400).forEach(item=>batch.delete(item));await batch.commit();
-  }
+  await deleteBookingWithOwnedLocks(firestore,id);
 }
 function preserveDeleteButtons(){
   document.querySelectorAll('.admin-table-scroll tbody tr').forEach(tr=>{

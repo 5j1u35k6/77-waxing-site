@@ -1,11 +1,13 @@
 import { getApp, getApps } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";
 import { collection, doc, getDoc, getDocs, getFirestore, onSnapshot, writeBatch } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
+import { deleteBookingWithOwnedLocks } from "./admin-booking-locks.js?v=20261026-audit1";
+import { normalizeRecordPhone } from './customer-record-data.js?v=20261026-audit1';
 
 let db=null;
 let bookings=[];
 let scheduled=false;
 
-const normalizePhone=value=>String(value||'').replace(/[^0-9+]/g,'').trim();
+const normalizePhone = value => normalizeRecordPhone(value);
 
 function ensureDb(){
   if(db)return db;
@@ -33,9 +35,7 @@ async function deleteBooking(id){
   const row=snap.data();
   const label=`${row.customerName||'未命名'}｜${row.preferredDate||''} ${row.preferredTime||''}`;
   if(!confirm(`確定永久刪除這筆預約？\n${label}\n\n對應的保留時段也會一起釋放。此操作無法復原。`))return;
-  const refs=[doc(firestore,'bookings',id)];
-  (Array.isArray(row.lockIds)?row.lockIds:[]).forEach(lockId=>refs.push(doc(firestore,'availabilityLocks',lockId)));
-  await commitDeletes(refs);
+  await deleteBookingWithOwnedLocks(firestore,id);
 }
 
 async function deleteCustomer(phone,name){
@@ -46,10 +46,9 @@ async function deleteCustomer(phone,name){
   if(!confirm(`確定永久刪除顧客「${name||phone}」？\n\n此操作會同時刪除這位顧客的 ${linked.length} 筆預約紀錄與已儲存的顧客資料表，並釋放相關保留時段。此操作無法復原。`))return;
 
   const refs=[];
-  linked.forEach(row=>{
-    refs.push(doc(firestore,'bookings',row.id));
-    (Array.isArray(row.lockIds)?row.lockIds:[]).forEach(lockId=>refs.push(doc(firestore,'availabilityLocks',lockId)));
-  });
+  // Refresh each booking and lock owner within its transaction; the table may
+  // have been open while a released time was assigned to another customer.
+  for(const row of linked)await deleteBookingWithOwnedLocks(firestore,row.id);
 
   for(const collectionName of ['customers','customerPhoneIndex']){
     try{

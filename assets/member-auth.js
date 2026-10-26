@@ -18,7 +18,7 @@ import {
   setDoc,
   where,
 } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
-import { getPublicFirebase } from "./public-firebase.js?v=20260912-1330";
+import { getPublicFirebase } from "./public-firebase.js?v=20261026-audit1";
 
 const { auth, db } = getPublicFirebase();
 const VERSION = "20260915-member2";
@@ -363,8 +363,8 @@ function rocBirthday(value) {
 function parseGender(note) {
   const match = String(note || "").match(/^\[性別\]\s*([^\n]+)/);
   const text = match?.[1]?.trim() || "";
-  if (text === "女性") return "female";
-  if (text === "男性") return "male";
+  if (text === "女性" || text === "生理女") return "female";
+  if (text === "男性" || text === "生理男") return "male";
   if (text) return "private";
   return "";
 }
@@ -475,11 +475,12 @@ async function openMemberCenter() {
     const rows = await loadBookingHistory();
     if (request !== memberCenterRequest || !isMember() || currentUser.uid !== uid || wrap.hidden) return;
     history.innerHTML = rows.length ? rows.map((booking) => {
-      const gender = parseGender(booking.note) || profile?.gender || "";
+      const gender = ["female", "male"].includes(booking.customerGender)
+        ? booking.customerGender : parseGender(booking.note) || profile?.gender || "";
       const note = cleanBookingNote(booking.note);
       const phone = booking.customerPhoneInternational || booking.customerPhone || "—";
       return `<article class="member-history-card">
-        <div class="member-history-head"><div><b>${esc(booking.serviceName || "服務紀錄")}</b><span>${esc(booking.preferredDate || "—")} ${esc(booking.preferredTime || "")}</span></div><em>${esc(formatBookingStatus(booking.status))}</em></div>
+        <div class="member-history-head"><div><b>${esc(String(booking.serviceName || "服務紀錄").replace(/\u64a5筋/g, '鬆筋'))}</b><span>${esc(booking.preferredDate || "—")} ${esc(booking.preferredTime || "")}</span></div><em>${esc(formatBookingStatus(booking.status))}</em></div>
         <dl>
           <div><dt>施作時間</dt><dd>${esc(booking.durationMinutes ? `${booking.durationMinutes} 分鐘` : "—")}</dd></div>
           <div><dt>姓名</dt><dd>${esc(booking.customerName || "—")}</dd></div>
@@ -507,6 +508,16 @@ function fillFieldOnce(element, value, { force = false } = {}) {
   element.dispatchEvent(new Event("change", { bubbles: true }));
 }
 
+function clearMemberPrefills() {
+  document.querySelectorAll('[data-member-prefilled="1"]').forEach((element) => {
+    element.value = element.name === "phoneCountry" ? "Taiwan" : "";
+    delete element.dataset.memberPrefilled;
+    element.dispatchEvent(new Event("input", { bubbles: true }));
+    element.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  document.querySelectorAll('[name="line"][data-member-hidden="1"]').forEach((element) => { element.value = ""; });
+}
+
 function applyProfileToBooking() {
   if (!isMember() || !currentProfile) return;
   const root = document.querySelector("#booking");
@@ -522,7 +533,7 @@ function applyProfileToBooking() {
     lineInput.dataset.memberHidden = "1";
     root.appendChild(lineInput);
   }
-  if (lineInput) lineInput.value = currentProfile.lineId || lineInput.value || "";
+  if (lineInput) lineInput.value = currentProfile.lineId || "";
 
   fillFieldOnce(root.querySelector('[name="name"]'), currentProfile.displayName || currentUser.displayName || "");
   fillFieldOnce(root.querySelector('[name="email"]'), currentProfile.email || currentUser.email || "");
@@ -659,6 +670,7 @@ await handleRedirectResult();
 
 onAuthStateChanged(auth, async (user) => {
   if (currentUser?.uid !== user?.uid || !isMember(user)) {
+    clearMemberPrefills();
     closeMemberCenter();
     const center = document.querySelector("#member-center-wrap");
     center?.querySelector("[data-member-profile-summary]")?.replaceChildren();

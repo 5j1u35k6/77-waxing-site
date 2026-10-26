@@ -9,7 +9,7 @@ import {
   serverTimestamp,
   setDoc,
 } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
-import { getPublicFirebase } from "./public-firebase.js?v=20260912-1330";
+import { getPublicFirebase } from "./public-firebase.js?v=20261026-audit1";
 
 const { auth, db } = getPublicFirebase();
 const PENDING_TARGET_KEY = "77waxing_member_pending_target";

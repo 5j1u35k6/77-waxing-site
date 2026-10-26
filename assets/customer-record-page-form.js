@@ -1,6 +1,6 @@
-import { recordOptions, recordTerms } from './customer-record-fields.js?v=20261023-paper';
-import { mountBirthdayCalendar } from './customer-record-calendar.js?v=20261023-record-page';
-import { cleanRecord, scalarRecordFields } from './customer-record-data.js?v=20261023-record-page';
+import { recordOptions, recordTerms } from './customer-record-fields.js?v=20261026-audit1';
+import { mountBirthdayCalendar } from './customer-record-calendar.js?v=20261026-audit1';
+import { cleanRecord, scalarRecordFields } from './customer-record-data.js?v=20261026-audit1';
 
 const input=(label,name,type='text',extra='')=>`<label class="record-field">${label}<input name="${name}" type="${type}" ${type==='text'&&!extra.includes('maxlength')?'maxlength="200"':''} ${extra}>${type==='date'?`<small class="paper-hint" data-roc-for="${name}"></small>`:''}</label>`;
 const conditional=(condition,content,css='')=>`<div class="paper-conditional ${css}" data-conditional="${condition}" hidden>${content}</div>`;
