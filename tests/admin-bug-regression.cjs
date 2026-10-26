@@ -193,3 +193,11 @@ function editor(s) {
   assert.deepEqual(persisted, { name: '辨識結果' }); finishSave({ id: 'paper_test' }); await saving;
   console.log('PASS: lock ownership and stale actions; editor catalog/duration/payment/concurrency; escaped admin HTML; 301 bookings; calendar identity; OCR/save race.');
 })().catch(error => { console.error(error); process.exitCode = 1; });
+
+{
+ const c = context(source("assets/admin-functions.js"));
+ assert.equal(vm.runInContext('linkedCustomerLine({customerLineId:"Uprivate"})', c), "LINE 已綁定");
+ assert.equal(vm.runInContext('linkedCustomerLine({customerLineId:"Uprivate"}, {lineName:"綁定名稱"})', c), "綁定名稱");
+ assert.equal(vm.runInContext('genderText({customerGender:"male"})', c), "生理男");
+ assert.equal(vm.runInContext('genderText({customerGender:"female"})', c), "生理女");
+}
