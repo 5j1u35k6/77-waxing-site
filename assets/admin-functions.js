@@ -1,6 +1,6 @@
 import { getApp, getApps } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
-import { collection, doc, getFirestore, onSnapshot, query, serverTimestamp, setDoc, where } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
+import { collection, doc, getDoc, getFirestore, onSnapshot, query, serverTimestamp, setDoc, where } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
 import { mountCustomerNotes } from './customer-notes.js?v=20261026-audit1';
 import { customerRecordKey } from './customer-record-list.js?v=20261026-audit1';
 import { normalizeRecordPhone } from './customer-record-data.js?v=20261026-audit1';
@@ -66,9 +66,12 @@ function sameCustomer(a, b) {
 }
 function genderText(row) {
   const raw = String(row?.customerGender || row?.gender || "").trim();
-  if (raw) return ({ female: "女性", male: "男性", private: "其他／不透露" }[raw] || raw);
+  if (raw) return ({ female: "生理女", male: "生理男", private: "未提供", 女性: "生理女", 男性: "生理男" }[raw] || raw);
   const match = String(row?.note || "").match(/\[性別\]\s*([^\n\r]+)/);
   return match?.[1]?.trim() || "—";
+}
+function linkedCustomerLine(booking = {}, profile = {}) {
+  return String(profile.lineName || booking.customerLineName || "").trim() || (booking.customerLineId || profile.lineId || profile.lineUserId ? "LINE 已綁定" : "—");
 }
 function statusText(status) {
   return ({ pending_confirmation: "待確認", pending_payment: "待付款", confirmed: "已確認", cancelled: "已取消", completed: "已完成", no_show: "未到店" }[status] || status || "—");
@@ -122,15 +125,20 @@ function openCustomerModal(bookingId) {
   const related = bookings.filter((row) => sameCustomer(row, selected));
   const phone = selected.customerPhone || latestValue(related, (row) => row.customerPhone) || "—";
   const email = selected.customerEmail || latestValue(related, (row) => row.customerEmail) || "—";
-  const lineId = selected.customerLineId || latestValue(related, (row) => row.customerLineId) || "—";
+  const lineId = linkedCustomerLine(selected) !== "—" ? linkedCustomerLine(selected) : (latestValue(related, row => linkedCustomerLine(row) === "—" ? "" : linkedCustomerLine(row)) || "—");
   const gender = genderText(selected) !== "—" ? genderText(selected) : (latestValue(related, (row) => genderText(row) === "—" ? "" : genderText(row)) || "—");
   const cutoff = bookingKey(selected);
   const history = related.filter((row) => row.id !== selected.id && bookingKey(row) < cutoff).sort((a, b) => bookingKey(b).localeCompare(bookingKey(a)));
   const phoneHtml = phone !== "—" ? `<a href="tel:${esc(String(phone).replace(/[^0-9+]/g, ""))}">${esc(phone)}</a>` : "<b>—</b>";
   const emailHtml = email !== "—" ? `<a href="mailto:${esc(email)}">${esc(email)}</a>` : "<b>—</b>";
   const modal = ensureCustomerModal();
-  modal.innerHTML = `<section class="admin-customer-dialog" role="dialog" aria-modal="true" aria-label="顧客聯絡資訊與過去預約紀錄"><header class="admin-customer-dialog-head"><div><small>CUSTOMER PROFILE</small><h3>${esc(selected.customerName || "未命名")}</h3></div><button type="button" class="admin-customer-close" data-customer-close aria-label="關閉">×</button></header><div class="admin-customer-body"><div class="admin-customer-contact"><article><small>姓名</small><b>${esc(selected.customerName || "—")}</b></article><article><small>電話</small>${phoneHtml}</article><article><small>性別</small><b>${esc(gender)}</b></article><article><small>信箱</small>${emailHtml}</article><article><small>LINE ID</small><b>${esc(lineId)}</b></article></div><section class="admin-customer-history"><h4>過去預約紀錄</h4><div class="admin-customer-history-list">${history.length ? history.map((row) => `<article class="admin-history-row"><time>${esc(row.preferredDate || "—")}</time><strong>${esc(timeRange(row))}</strong><span title="${esc(String(row.serviceName || "—").replace(/\u64a5筋/g,"鬆筋"))}">${esc(String(row.serviceName || "—").replace(/\u64a5筋/g,"鬆筋"))}</span><small>${esc(statusText(row.status))}</small></article>`).join("") : `<div class="admin-history-empty">目前沒有更早的預約紀錄。</div>`}</div></section></div></section>`;
+  modal.innerHTML = `<section class="admin-customer-dialog" role="dialog" aria-modal="true" aria-label="顧客聯絡資訊與過去預約紀錄"><header class="admin-customer-dialog-head"><div><small>CUSTOMER PROFILE</small><h3>${esc(selected.customerName || "未命名")}</h3></div><button type="button" class="admin-customer-close" data-customer-close aria-label="關閉">×</button></header><div class="admin-customer-body"><div class="admin-customer-contact"><article><small>姓名</small><b>${esc(selected.customerName || "—")}</b></article><article><small>電話</small>${phoneHtml}</article><article><small>性別</small><b>${esc(gender)}</b></article><article><small>信箱</small>${emailHtml}</article><article><small>LINE 綁定</small><b data-customer-line-name>${esc(lineId)}</b></article></div><section class="admin-customer-history"><h4>過去預約紀錄</h4><div class="admin-customer-history-list">${history.length ? history.map((row) => `<article class="admin-history-row"><time>${esc(row.preferredDate || "—")}</time><strong>${esc(timeRange(row))}</strong><span title="${esc(String(row.serviceName || "—").replace(/\u64a5筋/g,"鬆筋"))}">${esc(String(row.serviceName || "—").replace(/\u64a5筋/g,"鬆筋"))}</span><small>${esc(statusText(row.status))}</small></article>`).join("") : `<div class="admin-history-empty">目前沒有更早的預約紀錄。</div>`}</div></section></div></section>`;
   modal.hidden = false;
+  const lineTarget = modal.querySelector("[data-customer-line-name]"), generation = authGeneration;
+  if (selected.ownerUid) getDoc(doc(db, "memberProfiles", selected.ownerUid)).then(snapshot => {
+    if (generation !== authGeneration || modal.hidden || !lineTarget.isConnected) return;
+    if (snapshot.exists()) lineTarget.textContent = linkedCustomerLine(selected, snapshot.data());
+  }).catch(() => {});
   mountCustomerNotes(modal.querySelector('.admin-customer-body'),db,auth,{key:customerRecordKey(selected),name:selected.customerName,phone:selected.customerPhone,email:selected.customerEmail});
   modal.querySelector("[data-customer-close]")?.focus();
 }
