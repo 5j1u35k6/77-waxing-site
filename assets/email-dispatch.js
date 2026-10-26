@@ -1,7 +1,7 @@
 import { getApp, getApps } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
 import { collection, doc, getDoc, getDocs, getFirestore, onSnapshot, query, where } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
-import { getPublicFirebase } from "./public-firebase.js?v=20260912-1330";
+import { getPublicFirebase } from "./public-firebase.js?v=20261026-audit1";
 
 const DEFAULT_APPS_SCRIPT_EMAIL_URL='https://script.google.com/macros/s/AKfycbx6iC26KXbHWYte5XhLGNRMmG16Yydx2vPHDxYpmp4rmWn3plk__6Qwwr7Y09hLptTW/exec';
 const LEGACY_APPS_SCRIPT_EMAIL_URL='https://script.google.com/macros/s/AKfycby1y-oojBtmNsT8T1UPMydCTPkaZIjRss7QvxXkWi2duOs4mKI8p3tbIzvhi2xwd_Zb/exec';
@@ -12,6 +12,7 @@ let statusMap=new Map();
 let publicObserver=null;
 let currentUser=null;
 let currentDb=null;
+let authGeneration=0;
 const inFlight=new Set();
 const queuedCreated=new Set();
 const pendingCreated=new Set();
@@ -28,13 +29,13 @@ async function emailUrl(db){
   return configured;
 }
 async function dispatchBooking(user,db,bookingId){
-  if(!user||!db||!bookingId)return false;
+  if(!user||!db||!bookingId||currentUser?.uid!==user.uid)return false;
   const flightKey=`${user.uid}:${bookingId}`;
   if(inFlight.has(flightKey))return false;
   inFlight.add(flightKey);
   try{
     const [url,idToken]=await Promise.all([emailUrl(db),user.getIdToken()]);
-    if(!url)return false;
+    if(!url||currentUser?.uid!==user.uid)return false;
     console.info('[77 email] dispatch',DISPATCH_VERSION,bookingId,url);
     await fetch(url,{method:'POST',mode:'no-cors',cache:'no-store',keepalive:true,headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({bookingId,idToken})});
     return true;
@@ -54,7 +55,7 @@ function queueCreatedBooking(user,db,bookingId){
   queuedCreated.add(queueKey);
   try{sessionStorage.setItem(`77-email-created-queued-${id}`,'1');}catch(_error){}
   dispatchBooking(user,db,id);
-  setTimeout(()=>dispatchBooking(user,db,id),4000);
+  setTimeout(()=>{if(currentUser?.uid===user.uid)dispatchBooking(user,db,id);},4000);
 }
 async function latestOwnedBooking(user,db){
   const snap=await getDocs(query(collection(db,'bookings'),where('ownerUid','==',user.uid)));
@@ -71,11 +72,11 @@ function watchPublicSuccess(user,db){
   let busy=false;
   const run=async()=>{
     const success=document.querySelector('#booking .success.on');
-    if(busy||!success)return;
+    if(busy||!success||currentUser?.uid!==user.uid)return;
     busy=true;
     try{
       const row=await latestOwnedBooking(user,db);
-      if(!row)return;
+      if(!row||currentUser?.uid!==user.uid)return;
       const key=`77-email-created-queued-${row.id}`;
       try{if(sessionStorage.getItem(key))return;}catch(_error){}
       queueCreatedBooking(user,db,row.id);
@@ -94,6 +95,7 @@ function watchAdmin(user,db){
   if(adminUnsub)return;
   let first=true;
   adminUnsub=onSnapshot(collection(db,'bookings'),snap=>{
+    if(currentUser?.uid!==user.uid)return;
     const next=new Map();
     snap.docs.forEach(d=>{
       const data=d.data();
@@ -108,7 +110,7 @@ function watchAdmin(user,db){
     first=false;
   });
 }
-async function startForUser(user){
+async function startForUser(user,generation){
   const app=appReady();if(!app||!user)return;
   const db=getFirestore(app);
   currentUser=user;
@@ -116,7 +118,19 @@ async function startForUser(user){
   if(pendingCreated.size){
     [...pendingCreated].forEach(id=>{pendingCreated.delete(id);queueCreatedBooking(user,db,id);});
   }
-  if(await isAdmin(user,db))watchAdmin(user,db);else watchPublicSuccess(user,db);
+  const admin=await isAdmin(user,db);
+  if(generation!==authGeneration||currentUser?.uid!==user.uid)return;
+  if(admin)watchAdmin(user,db);else watchPublicSuccess(user,db);
+}
+function changeUser(user){
+  const generation=++authGeneration;
+  if(adminUnsub){adminUnsub();adminUnsub=null;}
+  if(publicObserver){publicObserver.disconnect();publicObserver=null;}
+  statusMap=new Map();
+  if(currentUser&&currentUser.uid!==user?.uid)pendingCreated.clear();
+  currentUser=user||null;
+  currentDb=null;
+  if(user)startForUser(user,generation);
 }
 function dispatchCreatedFromEvent(event){
   const bookingId=String(event?.detail?.bookingId||'').trim();
@@ -134,8 +148,8 @@ function start(){
   if(started)return;started=true;
   const app=appReady();if(!app){started=false;return setTimeout(start,120);}
   const auth=getAuth(app);
-  onAuthStateChanged(auth,user=>{if(user)startForUser(user);});
-  if(auth.currentUser)startForUser(auth.currentUser);
+  onAuthStateChanged(auth,changeUser);
+  if(auth.currentUser)changeUser(auth.currentUser);
 }
 start();
 

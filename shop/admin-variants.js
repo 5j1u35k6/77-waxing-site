@@ -89,6 +89,7 @@ function renderVariantRows(container, variants) {
     button.onclick = () => {
       const rows = container.querySelectorAll("[data-variant-row]");
       if (rows.length <= 1) return flash("每個商品至少需要一個規格。", "error");
+      container.closest("form").dataset.dirty = "1";
       button.closest("[data-variant-row]")?.remove();
       renumberRows(container);
       document.dispatchEvent(new CustomEvent("77select:variants-changed"));
@@ -166,7 +167,9 @@ async function saveVariantProduct(event, db, auth) {
   event.preventDefault();
   event.stopImmediatePropagation();
   const form = event.currentTarget;
+  const editingId = form.dataset.productId || null;
   const button = form.querySelector('button[type="submit"]');
+  if (form.dataset.mediaProcessing === "1") return flash("商品圖片仍在處理，請完成後再儲存。", "error");
   if (button?.disabled) return;
 
   const variants = collectVariants(form);
@@ -206,7 +209,7 @@ async function saveVariantProduct(event, db, auth) {
   }
 
   try {
-    let productId = activeEditId;
+    let productId = editingId;
     if (productId) {
       await updateDoc(doc(db, "shopProducts", productId), data);
     } else {
@@ -219,7 +222,7 @@ async function saveVariantProduct(event, db, auth) {
       addDoc(collection(db, "shopAuditLogs"), {
         adminUid: user.uid,
         adminEmail: user.email || null,
-        action: activeEditId ? "product_update_variants" : "product_create_variants",
+        action: editingId ? "product_update_variants" : "product_create_variants",
         targetId: productId,
         detail: `${name}｜${variants.length} variants｜${media.length} images｜TW/HK pricing + bulk discounts｜original image ratio`,
         createdAt: serverTimestamp(),
@@ -228,7 +231,8 @@ async function saveVariantProduct(event, db, auth) {
 
     const discounted = variants.filter((variant) => variant.bulkMinQty >= 2).length;
     flash(`商品已儲存：${variants.length} 個規格、${media.length} 張圖片${discounted ? `、${discounted} 個規格有數量優惠` : ""}。`);
-    if (activeEditId) {
+    if (!form.isConnected) return;
+    if (editingId) {
       const cancel = $("#cancel-product-edit");
       activeEditId = null;
       cancel?.click();
@@ -236,6 +240,7 @@ async function saveVariantProduct(event, db, auth) {
       form.reset();
       if ($("#p-active")) $("#p-active").checked = true;
     }
+    document.dispatchEvent(new CustomEvent("77select:product-saved"));
   } catch (error) {
     console.error("77select variant product save failed", error);
     const text = String(error?.message || "");
@@ -253,6 +258,7 @@ async function saveVariantProduct(event, db, auth) {
 async function enhanceForm(form, db, auth) {
   if (form.dataset.variantEnhanced === "1") return;
   form.dataset.variantEnhanced = "1";
+  form.dataset.productId = activeEditId || "";
 
   const intro = form.querySelector(".admin-section-head .order-date");
   if (intro) intro.textContent = "可設定商品規格、台灣與香港售價、庫存及數量優惠，並為各規格選擇圖片。";
@@ -273,10 +279,12 @@ async function enhanceForm(form, db, auth) {
   grid.insertBefore(section, descriptionField);
 
   const list = section.querySelector("[data-variant-list]");
-  const product = await loadProduct(db, activeEditId);
+  const product = await loadProduct(db, form.dataset.productId || null);
+  if (!form.isConnected) return;
   renderVariantRows(list, normalizeVariants(product));
 
   section.querySelector("[data-add-variant]").onclick = () => {
+    form.dataset.dirty = "1";
     const current = collectVariants(form);
     current.push({ id: variantId(), name: "", capacity: "", priceTWD: 0, priceHKD: 0, stock: 0, bulkMinQty: 0, bulkPriceTWD: 0, bulkPriceHKD: 0 });
     renderVariantRows(list, current);

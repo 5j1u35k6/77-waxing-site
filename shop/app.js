@@ -1,7 +1,8 @@
-import { operationErrorText } from "../assets/interface-copy.js?v=20261025-copy2";
+import { operationErrorText } from "../assets/interface-copy.js?v=20261026-audit1";
 import { browserLocalPersistence, onAuthStateChanged, setPersistence, signInAnonymously } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
 import { addDoc, collection, doc, getDoc, getDocs, onSnapshot, query, serverTimestamp, setDoc, where } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
-import { getPublicFirebase } from "../assets/public-firebase.js?v=20260913-shop2";
+import { getPublicFirebase } from "../assets/public-firebase.js?v=20261026-audit1";
+import { beginCheckout, finishCheckout, cartFingerprint, validateOrderData, savePreference } from "./checkout-guard.js?v=20261026-audit1";
 
 const { auth, db } = getPublicFirebase();
 const DEFAULT_EMAIL_URL = "https://script.google.com/macros/s/AKfycbx6iC26KXbHWYte5XhLGNRMmG16Yydx2vPHDxYpmp4rmWn3plk__6Qwwr7Y09hLptTW/exec";
@@ -42,6 +43,7 @@ let messagesUnsub = null;
 let orderRows = [];
 let messageRows = [];
 let selectedProduct = null;
+let authVersion = 0;
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -61,11 +63,14 @@ function formatDate(value) {
   return value ? new Date(value).toLocaleString("zh-TW") : "—";
 }
 function loadCart() {
-  try { return JSON.parse(localStorage.getItem("77waxing_cart_v2") || "[]"); }
+  try {
+    const rows = JSON.parse(localStorage.getItem("77waxing_cart_v2") || "[]");
+    return Array.isArray(rows) ? rows.filter(row => row && typeof row.id === "string" && Number.isFinite(Number(row.qty)) && Number(row.qty) > 0) : [];
+  }
   catch { return []; }
 }
 function saveCart() {
-  localStorage.setItem("77waxing_cart_v2", JSON.stringify(cart));
+  savePreference("77waxing_cart_v2", JSON.stringify(cart));
   $("#cart-count").textContent = String(cart.reduce((sum, row) => sum + row.qty, 0));
   renderCart();
 }
@@ -249,6 +254,7 @@ function taipeiOrderDay() {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Taipei", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date()).replace(/-/g, "");
 }
 async function createSequentialOrder(orderData) {
+  validateOrderData(orderData);
   const day = taipeiOrderDay();
   const hintKey = `77waxing_shop_sequence_${day}`;
   const hint = clampInt(localStorage.getItem(hintKey), 0, 9998);
@@ -261,7 +267,7 @@ async function createSequentialOrder(orderData) {
     const orderRef = doc(db, "shopOrders", orderNo);
     try {
       await setDoc(orderRef, { ...orderData, orderNo });
-      localStorage.setItem(hintKey, String(sequence));
+      savePreference(hintKey, String(sequence));
       return { orderRef, orderNo };
     } catch (error) {
       if (error?.code === "permission-denied") continue;
@@ -294,9 +300,18 @@ async function submitOrder(event) {
   }
 
   const button = $("#checkout-submit");
+  const form = event.currentTarget;
+  if (!beginCheckout(form)) return;
+  const ownerUid = currentUser.uid;
+  const originalCart = cartFingerprint(cart);
   button.disabled = true;
   try {
     await loadProducts();
+    if (ownerUid !== currentUser?.uid) throw new Error("會員登入狀態已變更，請重新確認訂購資料。");
+    if (cartFingerprint(cart) !== originalCart) {
+      updateCheckoutOptions();
+      throw new Error("商品價格或可購買數量已更新，請確認購物車與總計後再送出。");
+    }
     for (const row of cart) {
       const product = products.find((item) => item.id === row.id);
       if (!product || Number(product.stock || 0) < Number(row.qty || 0)) throw new Error(`${row.name} 庫存不足，請重新確認購物車。`);
@@ -305,7 +320,7 @@ async function submitOrder(event) {
     const items = cart.map((row) => ({ productId: row.id, name: row.name, quantity: Number(row.qty || 0), unitPrice: Number(row.price || 0), imageUrl: row.imageUrl || "" }));
     const subtotal = items.reduce((sum, row) => sum + row.unitPrice * row.quantity, 0);
     const orderData = {
-      ownerUid: currentUser.uid,
+      ownerUid,
       customerName: name,
       phone,
       email,
@@ -325,9 +340,9 @@ async function submitOrder(event) {
     };
     const { orderRef, orderNo } = await createSequentialOrder(orderData);
 
-    localStorage.setItem("77waxing_shop_name", name);
-    localStorage.setItem("77waxing_shop_phone", phone);
-    localStorage.setItem("77waxing_shop_email", email);
+    savePreference("77waxing_shop_name", name);
+    savePreference("77waxing_shop_phone", phone);
+    savePreference("77waxing_shop_email", email);
     cart = [];
     saveCart();
     closeLayer("#checkout-wrap");
@@ -338,6 +353,7 @@ async function submitOrder(event) {
     console.error(error);
     toast(error?.message || "訂單送出失敗，請稍後再試。", "error");
   } finally {
+    finishCheckout(form);
     button.disabled = false;
   }
 }
@@ -357,11 +373,15 @@ async function dispatchShopEmail(orderId) {
 }
 
 function watchOrders(user) {
+  const version = authVersion;
   ordersUnsub?.();
   ordersUnsub = onSnapshot(query(collection(db, "shopOrders"), where("ownerUid", "==", user.uid)), (snap) => {
+    if (version !== authVersion || currentUser?.uid !== user.uid) return;
     orderRows = snap.docs.map((row) => ({ id: row.id, ...row.data() })).sort((a, b) => timestampMillis(b.createdAt) - timestampMillis(a.createdAt));
     renderOrders();
   }, (error) => {
+    if (version !== authVersion || currentUser?.uid !== user.uid) return;
+    orderRows = [];
     console.error(error);
     $("#orders-list").innerHTML = `<div class="empty-state">目前無法讀取訂單，請稍後再試。</div>`;
   });
@@ -384,11 +404,18 @@ function renderOrders() {
   }).join("");
 }
 function watchMessages(user) {
+  const version = authVersion;
   messagesUnsub?.();
   messagesUnsub = onSnapshot(query(collection(db, "shopMessages"), where("ownerUid", "==", user.uid)), (snap) => {
+    if (version !== authVersion || currentUser?.uid !== user.uid) return;
     messageRows = snap.docs.map((row) => ({ id: row.id, ...row.data() })).sort((a, b) => timestampMillis(b.createdAt) - timestampMillis(a.createdAt));
     renderMessages();
-  }, console.error);
+  }, (error) => {
+    if (version !== authVersion || currentUser?.uid !== user.uid) return;
+    messageRows = [];
+    renderMessages();
+    console.error(error);
+  });
 }
 function renderMessages() {
   if (!messageRows.length) {
@@ -453,7 +480,15 @@ await Promise.all([loadSettings(), loadProducts()]).catch((error) => {
   toast("商品資料暫時無法載入，請稍後重新整理。", "error");
 });
 onAuthStateChanged(auth, (user) => {
+  authVersion += 1;
+  ordersUnsub?.();
+  messagesUnsub?.();
+  ordersUnsub = messagesUnsub = null;
+  orderRows = [];
+  messageRows = [];
   currentUser = user || null;
+  renderOrders();
+  renderMessages();
   $("#connection-state").textContent = user ? "購物資料已安全連線" : "正在建立安全連線…";
   if (user) { watchOrders(user); watchMessages(user); }
 });

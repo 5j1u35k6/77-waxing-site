@@ -1,9 +1,9 @@
 import { signInAnonymously } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
 import { collection, doc, getDocsFromServer, query, runTransaction, serverTimestamp, where } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
-import { firebaseConfigured } from "./firebase-config.js";
-import { getPublicFirebase } from "./public-firebase.js?v=20260912-1330";
-import { loadCatalog, publicCatalog } from "./service-catalog-store.js?v=20261023-perf1";
-import { beforeCareMarkup, showServiceCare } from './service-care-ui.js?v=20261023-tw1';
+import { firebaseConfigured } from "./firebase-config.js?v=20261026-audit1";
+import { getPublicFirebase } from "./public-firebase.js?v=20261026-audit1";
+import { loadCatalog, publicCatalog } from "./service-catalog-store.js?v=20261026-audit1";
+import { beforeCareMarkup, showServiceCare } from './service-care-ui.js?v=20261026-audit1';
 
 const REPO_BASE = "/77-waxing-site";
 const B = location.hostname.endsWith("github.io") ? REPO_BASE : "";
@@ -190,15 +190,26 @@ function mainItems(category) {
 }
 
 async function mount(root) {
-  if (!root || root.dataset.bookingV3Mounted === "1" || !firebaseConfigured) return;
+  if (!root || root.dataset.bookingV3Mounted || root.dataset.bookingV3Mounting === "1" || !firebaseConfigured) return;
+  root.dataset.bookingV3Mounting = "1";
   let catalog;
   try {
     catalog = await dynamicCatalog();
   } catch (error) {
     console.error(error);
-    root.innerHTML = `<div class="notice"><b>服務資料載入失敗</b><p>請重新整理頁面後再試。</p></div>`;
+    if (root.isConnected) {
+      root.dataset.bookingV3Mounted = "error";
+      root.innerHTML = `<div class="notice"><b>服務資料載入失敗</b><p>請稍後再試。</p><button type="button" class="btn" data-booking-retry>重新載入</button></div>`;
+      root.querySelector('[data-booking-retry]').onclick = () => {
+        delete root.dataset.bookingV3Mounted;
+        mount(root);
+      };
+    }
     return;
+  } finally {
+    delete root.dataset.bookingV3Mounting;
   }
+  if (!root.isConnected) return;
   root.dataset.bookingV3Mounted = "1";
   root.innerHTML = bookingMarkup(catalog);
   if (!catalog.length) return;
@@ -217,6 +228,7 @@ async function mount(root) {
   let selectedTime = "";
   let calendarMonth = monthStart(earliestDate);
   let availability = { windowDates: [], locksByDate: new Map() };
+  let availabilityRequest = 0;
   const nextButton = root.querySelector('[data-step="1"] [data-next]');
   const prefillNote = root.querySelector('[data-booking-prefill-note]');
   const carePanel = document.createElement('div');
@@ -344,19 +356,25 @@ async function mount(root) {
 
   async function refreshAvailability() {
     if (!selectedItem) return;
+    const request = ++availabilityRequest;
+    const requestedDate = anchorDate;
     const sync = root.querySelector("[data-booking-sync]");
     sync.textContent = "正在確認可預約時段…";
     sync.classList.add("loading");
+    root.querySelector('[data-dayrail]').replaceChildren();
     try {
-      availability = await loadLocks(anchorDate);
+      const next = await loadLocks(requestedDate);
+      if (request !== availabilityRequest || !root.isConnected) return;
+      availability = next;
       drawCalendar();
       drawRail();
       sync.textContent = `可選日期範圍：${shortDate(availability.windowDates[0]).label} ～ ${shortDate(availability.windowDates[6]).label}`;
     } catch (error) {
+      if (request !== availabilityRequest || !root.isConnected) return;
       console.error(error);
       sync.textContent = "目前無法取得可預約時段，請稍後再試。";
     } finally {
-      sync.classList.remove("loading");
+      if (request === availabilityRequest) sync.classList.remove("loading");
     }
   }
 
@@ -393,6 +411,11 @@ async function mount(root) {
 
   root.querySelector("[data-submit]").onclick = async (event) => {
     const button = event.currentTarget;
+    const bookedCategory = selectedCategory;
+    const bookedItem = selectedItem;
+    const bookedDate = selectedDate;
+    const bookedTime = selectedTime;
+    const bookedAddons = chosenAddons();
     button.disabled = true;
     button.textContent = "送出中…";
     try {
@@ -406,23 +429,37 @@ async function mount(root) {
       const birthday = birthdayInput?.value || "";
       const note = root.querySelector('[name="note"]').value.trim();
       const firstVisit = root.querySelector('[name="first"]').value === "yes";
-      const lockTimes = blockTimes(selectedTime, selectedItem.blockMinutes);
-      const lockIds = lockTimes.map((time) => lockId(selectedDate, time));
+      const lockTimes = blockTimes(bookedTime, bookedItem.blockMinutes);
+      const lockIds = lockTimes.map((time) => lockId(bookedDate, time));
       const bookingRef = doc(collection(db, "bookings"));
       const lockRefs = lockIds.map((id) => doc(db, "availabilityLocks", id));
       const phoneMetadataNote = `[手機國際資訊] ${phone.country.name} ${phone.country.dial}｜${phone.international}`;
       const compatibilityNote = [note, phoneMetadataNote].filter(Boolean).join("\n").slice(0, 1000) || null;
       const writeBooking = async (includePhoneMetadata) => runTransaction(db, async (transaction) => {
-        const lockSnapshots = await Promise.all(lockRefs.map(lockRef => transaction.get(lockRef)));
+        const [generalSnapshot, manualSnapshot, lockSnapshots] = await Promise.all([
+          transaction.get(doc(db, "settings", "general")),
+          transaction.get(doc(db, "settings", `availability_${bookedDate}`)),
+          Promise.all(lockRefs.map(lockRef => transaction.get(lockRef))),
+        ]);
+        const settings = generalSnapshot.exists() ? generalSnapshot.data() : {};
+        const manual = manualSnapshot.exists() ? manualSnapshot.data() : {};
+        if (settings.bookingEnabled === false) throw new Error("BOOKING_CLOSED");
+        const today = taipeiToday();
+        const configuredDays = Number(settings.maxAdvanceDays || 60);
+        const maxDays = Number.isFinite(configuredDays) && configuredDays > 0 ? configuredDays : 60;
+        const blocked = new Set(Array.isArray(manual.blockedTimes) ? manual.blockedTimes.map(String) : []);
+        if (bookedDate < addDays(today, 1) || bookedDate > addDays(today, maxDays)
+          || bookedTime < (settings.bookingStartTime || "08:00") || bookedTime > (settings.bookingEndTime || "20:00")
+          || lockTimes.some(time => blocked.has(time))) throw new Error("SLOT_CONFLICT");
         if (lockSnapshots.some(snapshot => snapshot.exists())) throw new Error("SLOT_CONFLICT");
-        const bookingData = { ownerUid: user.uid, customerName: name, customerPhone: phone.local, customerEmail: email, customerLineId: lineId || null, customerGender: gender, customerBirthday: birthday, serviceName: `${selectedCategory.name}｜${selectedItem.name}`, preferredDate: selectedDate, preferredTime: selectedTime, status: "pending_confirmation", isFirstVisit: firstVisit, depositRequired: null, depositAmount: null, paymentStatus: "not_requested", durationMinutes: selectedItem.durationMinutes, bufferMinutes: selectedItem.blockMinutes - selectedItem.durationMinutes, lockIds, lockTimes, note: includePhoneMetadata ? (note || null) : compatibilityNote, createdAt: serverTimestamp(), updatedAt: serverTimestamp() };
+        const bookingData = { ownerUid: user.uid, customerName: name, customerPhone: phone.local, customerEmail: email, customerLineId: lineId || null, customerGender: gender, customerBirthday: birthday, serviceName: `${bookedCategory.name}｜${bookedItem.name}`, preferredDate: bookedDate, preferredTime: bookedTime, status: "pending_confirmation", isFirstVisit: firstVisit, depositRequired: null, depositAmount: null, paymentStatus: "not_requested", durationMinutes: bookedItem.durationMinutes, bufferMinutes: bookedItem.blockMinutes - bookedItem.durationMinutes, lockIds, lockTimes, note: includePhoneMetadata ? (note || null) : compatibilityNote, createdAt: serverTimestamp(), updatedAt: serverTimestamp() };
         if (includePhoneMetadata) {
           bookingData.customerPhoneCountry = phone.country.name;
           bookingData.customerPhoneDialCode = phone.country.dial;
           bookingData.customerPhoneInternational = phone.international;
         }
         transaction.set(bookingRef, bookingData);
-        lockRefs.forEach((lockRef, index) => transaction.set(lockRef, { bookingId: bookingRef.id, date: selectedDate, time: lockTimes[index], state: "held", createdAt: serverTimestamp(), updatedAt: serverTimestamp() }));
+        lockRefs.forEach((lockRef, index) => transaction.set(lockRef, { bookingId: bookingRef.id, date: bookedDate, time: lockTimes[index], state: "held", createdAt: serverTimestamp(), updatedAt: serverTimestamp() }));
       });
       try {
         await writeBooking(true);
@@ -433,7 +470,7 @@ async function mount(root) {
       }
       window.dispatchEvent(new CustomEvent("77waxing:booking-created", { detail: { bookingId: bookingRef.id } }));
       const reminder = document.createElement('div');
-      reminder.innerHTML=beforeCareMarkup(selectedCategory,selectedItem,chosenAddons());
+      reminder.innerHTML=beforeCareMarkup(bookedCategory,bookedItem,bookedAddons);
       root.querySelector('.success .email-delivery-note').after(reminder);
       root.querySelectorAll(".step").forEach((element) => element.classList.remove("on"));
       root.querySelector(".steps").style.display = "none";
@@ -442,6 +479,8 @@ async function mount(root) {
       console.error(error);
       if (error instanceof Error && error.message === "INVALID_PHONE") {
         alert(phoneRuleText(phoneState(root).country));
+      } else if (error instanceof Error && error.message === "BOOKING_CLOSED") {
+        alert("目前暫停線上預約，請稍後再試。");
       } else if (error instanceof Error && error.message === "SLOT_CONFLICT") {
         alert("這個時段剛被其他預約保留，請重新選擇。");
         selectedTime = "";

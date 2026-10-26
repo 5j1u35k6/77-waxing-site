@@ -1,4 +1,4 @@
-import { operationErrorText } from "../assets/interface-copy.js?v=20261025-copy2";
+import { operationErrorText } from "../assets/interface-copy.js?v=20261026-audit1";
 import { getApps } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";
 import { getAuth } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
 import { addDoc, collection, doc, getDoc, getFirestore, runTransaction, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
@@ -47,7 +47,7 @@ function normalizeVariants(product = {}) {
 }
 
 function basePrice(variant, item, product) {
-  if (!variant) return int(product.price || item.unitPrice || 0);
+  if (!variant) return int(item.region === "HK" ? (product.priceHKD ?? product.price ?? 0) : (product.price ?? 0));
   return item.region === "HK" ? int(variant.priceHKD) : int(variant.priceTWD);
 }
 
@@ -75,6 +75,79 @@ function productImage(product, variantId = "") {
     return [...shared, ...specific][0]?.url || media[0].url;
   }
   return product.imageUrl || "";
+}
+
+function checkedPromotionTotal(order, finalItems, shopSettings) {
+  const original = Array.isArray(order.items) ? order.items : [];
+  const summary = original[0]?.promotionSummary;
+  const invalid = () => { throw new Error("此訂單的商品價格或促銷內容已變更，請先與客人確認後再接單。"); };
+  if (!summary || !Array.isArray(summary.adjustments) || !Array.isArray(summary.gifts)) return invalid();
+  if (finalItems.some((item, index) => Number(original[index]?.unitPrice) !== item.unitPrice)) return invalid();
+  const regularItems = finalItems.filter(item => !item.isGift);
+  if (!regularItems.length) return invalid();
+  const subtotal = regularItems.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
+  const available = regularItems.map(item => ({ item, remaining: item.quantity }));
+  const expectedAdjustments = [];
+  const expectedGifts = [];
+  const code = regularItems[0].region;
+  if (finalItems.some(item => item.region !== code)) return invalid();
+  const amount = (promo, tw, hk) => int(promo.discount?.[code === "HK" ? hk : tw]);
+  const promotions = Array.isArray(shopSettings?.promotions) ? shopSettings.promotions : [];
+  for (const [index, promo] of promotions.entries()) {
+    if (!promo || promo.active === false) continue;
+    const type = promo.promotionType;
+    const groups = Array.isArray(promo.groups) ? promo.groups : [];
+    const any = type === "any_qty_bundle";
+    if (any ? !groups[0]?.items?.length || int(groups[0].minQty) < 2 : groups.length < 2 || groups.slice(0, 2).some(group => !group?.items?.length)) continue;
+    if (!["any_qty_bundle", "bundle_price", "percent_off", "amount_off", "gift"].includes(type)) continue;
+    let setCount = 0, regularTotal = 0, discountTotal = 0;
+    while (true) {
+      const picked = [];
+      let complete = true;
+      for (const group of (any ? groups.slice(0, 1) : groups.slice(0, 2))) {
+        for (let count = 0; count < Math.max(any ? 2 : 1, int(group.minQty || 1)); count += 1) {
+          const eligible = available.filter(entry => entry.remaining > 0 && group.items.some(item =>
+            String(item.productId || "") === entry.item.productId && String(item.variantId || "default") === String(entry.item.variantId || "default")));
+          const best = eligible.reduce((best, entry) => !best || entry.item.unitPrice > best.item.unitPrice ? entry : best, null);
+          if (!best) { complete = false; break; }
+          best.remaining -= 1;
+          picked.push(best);
+        }
+        if (!complete) break;
+      }
+      const regular = picked.reduce((sum, entry) => sum + entry.item.unitPrice, 0);
+      let discount = 0;
+      if (any || type === "bundle_price") {
+        const price = amount(promo, "bundlePriceTWD", "bundlePriceHKD");
+        discount = price > 0 ? Math.max(0, regular - price) : 0;
+      } else if (type === "percent_off") {
+        discount = Math.round(regular * Math.min(99, Math.max(1, int(promo.discount?.percentOff))) / 100);
+      } else if (type === "amount_off") discount = Math.min(regular, amount(promo, "amountTWD", "amountHKD"));
+      if (!complete || (type !== "gift" && discount <= 0)) {
+        picked.forEach(entry => { entry.remaining += 1; });
+        break;
+      }
+      setCount += 1;
+      regularTotal += regular;
+      discountTotal += discount;
+    }
+    const id = String(promo.id || `promo-${index + 1}`);
+    if (discountTotal > 0) expectedAdjustments.push({ id, type, setCount, amount: discountTotal, regularTotal });
+    if (type === "gift" && promo.gift && setCount > 0) expectedGifts.push({
+      promotionId: id, productId: String(promo.gift.productId || ""),
+      variantId: String(promo.gift.variantId || "default"), quantity: Math.max(1, int(promo.gift.quantity || 1)) * setCount,
+    });
+  }
+  const adjustmentKey = rows => JSON.stringify(rows.map(row => [row.id, row.type, Number(row.setCount), Number(row.amount), Number(row.regularTotal)]));
+  const giftKey = rows => JSON.stringify(rows.map(row => [row.promotionId, row.productId, String(row.variantId || "default"), Number(row.quantity)]).sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b))));
+  const discount = Math.min(subtotal, expectedAdjustments.reduce((sum, row) => sum + row.amount, 0));
+  const giftItems = finalItems.filter(item => item.isGift);
+  if (adjustmentKey(summary.adjustments) !== adjustmentKey(expectedAdjustments)
+      || giftKey(summary.gifts) !== giftKey(expectedGifts) || giftKey(giftItems) !== giftKey(expectedGifts)
+      || Number(summary.subtotalBeforePromotions) !== subtotal || Number(summary.discountTotal) !== discount
+      || Number(order.subtotal) !== subtotal - discount || Number(order.total) !== subtotal - discount + int(order.shippingFee)) return invalid();
+  finalItems[0].promotionSummary = summary;
+  return subtotal - discount;
 }
 
 async function audit(db, auth, action, targetId, detail = "") {
@@ -118,6 +191,8 @@ async function confirmVariantOrder(db, orderId) {
     if (order.status !== "pending") throw new Error("只有待確認訂單可以確認。");
     const items = Array.isArray(order.items) ? order.items : [];
     if (!items.length) throw new Error("訂單沒有商品內容。");
+    const hasPromotion = Boolean(items[0]?.promotionSummary || items.some(item => item.isGift));
+    const promotionSettings = hasPromotion ? await tx.get(doc(db, "shopSettings", "public")) : null;
 
     const ids = [...new Set(items.map((item) => String(item.productId || "")).filter(Boolean))];
     const productMap = new Map();
@@ -141,7 +216,7 @@ async function confirmVariantOrder(db, orderId) {
 
       let variant = null;
       if (item.variantId && entry.variants.length) variant = entry.variants.find((row) => row.id === item.variantId) || null;
-      if (item.variantId && !variant) throw new Error(`商品「${product.name}」的指定規格已不存在。`);
+      if (item.variantId && !variant && (entry.variants.length || item.variantId !== "default")) throw new Error(`商品「${product.name}」的指定規格已不存在。`);
 
       if (variant) {
         if (variant.stock < quantity) throw new Error(`「${product.name}｜${variant.name}${variant.capacity ? ` ${variant.capacity}` : ""}」庫存不足，目前 ${variant.stock} 件。`);
@@ -152,7 +227,7 @@ async function confirmVariantOrder(db, orderId) {
       }
 
       const listUnitPrice = basePrice(variant, item, product);
-      const unitPrice = itemPrice(variant, item, product, quantity);
+      const unitPrice = item.isGift ? 0 : itemPrice(variant, item, product, quantity);
       subtotal += unitPrice * quantity;
       finalItems.push({
         productId: String(item.productId || ""),
@@ -168,8 +243,11 @@ async function confirmVariantOrder(db, orderId) {
         discountApplied: unitPrice < listUnitPrice,
         bulkMinQty: variant?.bulkMinQty || 0,
         imageUrl: productImage(product, variant?.id || item.variantId || ""),
+        ...(item.isGift ? { isGift: true, promotionId: item.promotionId || "", promotionTitle: item.promotionTitle || "" } : {}),
       });
     }
+
+    if (hasPromotion) subtotal = checkedPromotionTotal(order, finalItems, promotionSettings?.exists() ? promotionSettings.data() : {});
 
     for (const entry of productMap.values()) {
       if (entry.variants.length) {

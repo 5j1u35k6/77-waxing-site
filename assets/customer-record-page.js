@@ -1,12 +1,12 @@
-import { operationErrorText } from "./interface-copy.js?v=20261025-copy2";
+import { operationErrorText } from "./interface-copy.js?v=20261026-audit1";
 import { getApps, initializeApp } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js';
 import { getAuth, setPersistence, browserLocalPersistence, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js';
 import { doc, getDoc, getFirestore } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
-import { firebaseConfig } from './firebase-config.js';
-import { mountRecordForm } from './customer-record-page-form.js?v=20261025-copy2';
-import { recordFields } from './customer-record-fields.js?v=20261023-paper';
-import { saveCustomerRecord, loadCustomerRecord } from './customer-record-store.js?v=20261025-copy2';
-import { DEFAULT_RECORD_ENDPOINT, recordRequest } from './customer-record-upload-api.js?v=20261025-copy2';
+import { firebaseConfig } from './firebase-config.js?v=20261026-audit1';
+import { mountRecordForm } from './customer-record-page-form.js?v=20261026-audit1';
+import { recordFields } from './customer-record-fields.js?v=20261026-audit1';
+import { saveCustomerRecord, loadCustomerRecord } from './customer-record-store.js?v=20261026-audit1';
+import { DEFAULT_RECORD_ENDPOINT, recordRequest } from './customer-record-upload-api.js?v=20261026-audit1';
 
 const status=document.querySelector('[data-page-status]'),host=document.querySelector('[data-record-page]'),params=new URLSearchParams(location.search);
 // Older cached HTML remains usable while the new page and module deploy separately.
@@ -28,12 +28,13 @@ const sourceRequest=async(action,body={})=>recordRequest(endpoint,action,{idToke
 async function closeSource(){clearTimeout(pollTimer);if(sourceSession)await sourceRequest('record_close').catch(()=>{});}
 function setScanning(value){
   scanning=value;document.querySelector('[data-source-progress]').hidden=!value;
+  const saveButton=host.querySelector('[data-record-save]');if(saveButton)saveButton.disabled=value||saving||saved;
   document.querySelector('[data-source-summary]').setAttribute('aria-busy',String(value));
   document.querySelectorAll('[data-scan-file]').forEach(button=>{button.disabled=value||saved;button.textContent=value&&button.dataset.scanFile===activeFile?'辨識中…':'辨識並套用';});
   document.querySelector('[data-source-retry]').hidden=value||!lastFailedFile||saved;
 }
 async function scanSource(fileId){
-  if(scanning||saved)return;activeFile=fileId;setScanning(true);sourceStatus('原檔已上傳，正在辨識並套用；不必重複上傳…');
+  if(scanning||saving||saved)return;activeFile=fileId;setScanning(true);sourceStatus('原檔已上傳，正在辨識並套用；不必重複上傳…');
   try{
     const text=recognized.has(fileId)?recognized.get(fileId):(await recordRequest(endpoint,'record_scan',{idToken:await user.getIdToken(),sessionId:sourceSession,fileId},{onState:state=>{if(state==='retrying')sourceStatus('辨識連線暫時中斷，正在重新連接；原檔已保留…');}})).text;
     if(!String(text||'').trim())throw new Error('原檔已保留，但未辨識到文字。請換一張清晰照片或手動填寫。');
@@ -60,7 +61,9 @@ async function listSources(){
   finally{sourcePolling=false;scheduleSources();}
 }
 async function save(){
-  if(saving||saved)return;saving=true;editor.setBusy(true);message('正在儲存顧客紀錄，請稍候…');
+  if(saving||saved)return;
+  if(scanning){message('正在辨識檔案，請完成後核對資料再儲存。');return;}
+  saving=true;editor.setBusy(true);message('正在儲存顧客紀錄，請稍候…');
   try{
     const record=await saveCustomerRecord(db,user,recordId,editor.data(),editor.signature);
     saved=true;dirty=false;editor.load(record);message('顧客紀錄已儲存，可在顧客資料中檢視。');

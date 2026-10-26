@@ -40,13 +40,13 @@
     if(dashboard&&metrics&&metrics.nextElementSibling!==dashboard)metrics.insertAdjacentElement('afterend',dashboard);
     else if(dashboard&&!metrics&&heading.nextElementSibling!==dashboard)heading.insertAdjacentElement('afterend',dashboard);
 
-    heading.hidden=!isDashboard;
-    if(metrics)metrics.hidden=!isDashboard;
-    if(dashboard)dashboard.hidden=!isDashboard;
-    if(basePanel&&isDashboard)basePanel.hidden=true;
+    if(heading.hidden!==!isDashboard)heading.hidden=!isDashboard;
+    if(metrics&&metrics.hidden!==!isDashboard)metrics.hidden=!isDashboard;
+    if(dashboard&&dashboard.hidden!==!isDashboard)dashboard.hidden=!isDashboard;
+    if(basePanel&&isDashboard&&!basePanel.hidden)basePanel.hidden=true;
 
-    if(top)top.classList.add('admin-topline-primary');
-    if(metrics)metrics.classList.add('admin-concept-metrics');
+    if(top&&!top.classList.contains('admin-topline-primary'))top.classList.add('admin-topline-primary');
+    if(metrics&&!metrics.classList.contains('admin-concept-metrics'))metrics.classList.add('admin-concept-metrics');
   }
 
   function schedule(){

@@ -1,8 +1,8 @@
-import { operationErrorText } from "../assets/interface-copy.js?v=20261025-copy2";
+import { operationErrorText } from "../assets/interface-copy.js?v=20261026-audit1";
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";
 import { browserLocalPersistence, getAuth, onAuthStateChanged, setPersistence, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
 import { addDoc, collection, deleteDoc, doc, getDoc, getFirestore, onSnapshot, runTransaction, serverTimestamp, setDoc, updateDoc } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
-import { firebaseConfig } from "../assets/firebase-config.js?v=20260913-shop2";
+import { firebaseConfig } from "../assets/firebase-config.js?v=20261026-audit1";
 
 const app = initializeApp(firebaseConfig, "77waxing-shop-admin");
 const auth = getAuth(app);
@@ -36,6 +36,7 @@ let currentView = "dashboard";
 let editingProductId = null;
 let listeners = [];
 let filteredOrderCache = [];
+let authVersion = 0;
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -160,24 +161,30 @@ function scheduleRerender() {
 }
 function rerender() {
   if (!$("#admin-view")) return;
+  if ($("#promotion-form") || $("#product-form")?.dataset.dirty === "1") return;
   showView(currentView);
 }
 function subscribeData() {
+  const version = authVersion;
   listeners.push(onSnapshot(collection(db, "shopProducts"), (snap) => {
+    if (version !== authVersion) return;
     products = snap.docs.map((row) => ({ id: row.id, ...row.data() })).sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0));
     if (currentView !== "settings") scheduleRerender();
   }));
   listeners.push(onSnapshot(collection(db, "shopOrders"), (snap) => {
+    if (version !== authVersion) return;
     orders = snap.docs.map((row) => ({ id: row.id, ...row.data() })).sort((a, b) => timestampMillis(b.createdAt) - timestampMillis(a.createdAt));
     if (currentView !== "settings") scheduleRerender();
   }));
   listeners.push(onSnapshot(collection(db, "shopMessages"), (snap) => {
+    if (version !== authVersion) return;
     messages = snap.docs.map((row) => ({ id: row.id, ...row.data() })).sort((a, b) => timestampMillis(b.createdAt) - timestampMillis(a.createdAt));
     if (currentView !== "settings") scheduleRerender();
   }));
   listeners.push(onSnapshot(doc(db, "shopSettings", "public"), (snap) => {
+    if (version !== authVersion) return;
     settings = snap.exists() ? { ...DEFAULT_SETTINGS, ...snap.data() } : { ...DEFAULT_SETTINGS };
-    if (currentView === "settings") renderSettings();
+    if (currentView === "settings" && $("#settings-form")?.dataset.dirty !== "1") renderSettings();
   }));
 }
 
@@ -271,12 +278,14 @@ async function handleOrderAction(orderId, action) {
     if (action === "confirm") await confirmOrder(orderId);
     else if (action === "cancel") await cancelOrder(orderId);
     else if (action === "ship") {
-      const tracking = prompt("請輸入物流編號（可留空稍後補）：") || "";
-      await updateDoc(doc(db, "shopOrders", orderId), { status: "shipped", trackingNumber: tracking.trim() || null, updatedAt: serverTimestamp() });
+      const tracking = prompt("請輸入物流編號（可留空稍後補）：");
+      if (tracking === null) return;
+      await transitionOrder(orderId, "shipped", ["packing"], { trackingNumber: tracking.trim() || null });
     } else {
       const status = action === "packing" ? "packing" : action === "ready" ? "ready" : action === "complete" ? "completed" : "";
       if (!status) return;
-      await updateDoc(doc(db, "shopOrders", orderId), { status, updatedAt: serverTimestamp() });
+      const allowed = action === "packing" ? ["confirmed"] : action === "ready" ? ["packing"] : ["ready", "shipped"];
+      await transitionOrder(orderId, status, allowed);
     }
     await Promise.all([audit(`order_${action}`, orderId), dispatchShopEmail(orderId)]);
     flash("訂單狀態已更新。");
@@ -284,6 +293,15 @@ async function handleOrderAction(orderId, action) {
     console.error(error);
     flash(error?.message || "更新訂單失敗。", "error");
   }
+}
+async function transitionOrder(orderId, status, allowed, extra = {}) {
+  const ref = doc(db, "shopOrders", orderId);
+  await runTransaction(db, async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists()) throw new Error("找不到訂單。");
+    if (!allowed.includes(snap.data().status)) throw new Error("訂單狀態已變更，請檢視最新狀態後再操作。");
+    tx.update(ref, { ...extra, status, updatedAt: serverTimestamp() });
+  });
 }
 async function confirmOrder(orderId) {
   const orderRef = doc(db, "shopOrders", orderId);
@@ -333,7 +351,7 @@ async function cancelOrder(orderId) {
   });
 }
 function exportOrders() {
-  const rows = filteredOrderCache.length ? filteredOrderCache : orders;
+  const rows = filteredOrderCache;
   const data = [["訂單編號", "日期", "姓名", "電話", "Email", "狀態", "交付", "門市", "金額", "品項"], ...rows.map((o) => [o.orderNo || o.id, formatDate(o.createdAt), o.customerName || "", o.phone || "", o.email || "", STATUS[o.status] || o.status || "", o.deliveryMethod || "", o.storeInfo || "", Number(o.total || 0), (o.items || []).map((i) => `${i.name}x${i.quantity}`).join(" | ")])];
   const csv = data.map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(",")).join("\n");
   const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8" });
@@ -391,8 +409,17 @@ async function saveSettings(event) {
 
 await setPersistence(auth, browserLocalPersistence).catch(() => {});
 onAuthStateChanged(auth, async (user) => {
+  const version = ++authVersion;
   cleanupListeners();
-  if (user && await isAdmin(user)) {
+  currentUser = null;
+  products = [];
+  orders = [];
+  messages = [];
+  filteredOrderCache = [];
+  $("#admin-app").innerHTML = '<p class="admin-login" role="status">正在確認商店後台登入狀態…</p>';
+  const allowed = user && await isAdmin(user);
+  if (version !== authVersion || auth.currentUser?.uid !== user?.uid) return;
+  if (allowed) {
     currentUser = user;
     mountAdmin();
   } else {
@@ -400,6 +427,15 @@ onAuthStateChanged(auth, async (user) => {
     if (user) await signOut(auth).catch(() => {});
     renderLogin();
   }
+});
+document.addEventListener("input", (event) => {
+  const form = event.target.closest?.("#product-form, #settings-form");
+  if (form) form.dataset.dirty = "1";
+});
+document.addEventListener("77select:product-saved", () => {
+  if (!$("#admin-view") || currentView !== "products") return;
+  editingProductId = null;
+  renderProducts();
 });
 window.addEventListener("error", (event) => console.error("[77waxing shop admin]", event.error || event.message));
 window.addEventListener("unhandledrejection", (event) => console.error("[77waxing shop admin promise]", event.reason));

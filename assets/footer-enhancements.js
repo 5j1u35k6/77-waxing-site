@@ -1,4 +1,4 @@
-import { loadCatalog, publicCatalog, watchCatalog } from "./service-catalog-store.js?v=20261023-perf1";
+import { loadCatalog, publicCatalog, watchCatalog } from "./service-catalog-store.js?v=20261026-audit1";
 
 (()=>{
   const footer=document.querySelector('.site-footer');
@@ -10,7 +10,7 @@ import { loadCatalog, publicCatalog, watchCatalog } from "./service-catalog-stor
   if(!document.querySelector('link[data-footer-v2-style="1"]')){
     const link=document.createElement('link');
     link.rel='stylesheet';
-    link.href=new URL('./footer.css?v=20260915-footer4-soft-coral',assetBase).href;
+    link.href=new URL('./footer.css?v=20261026-audit1',assetBase).href;
     link.dataset.footerV2Style='1';
     document.head.appendChild(link);
   }

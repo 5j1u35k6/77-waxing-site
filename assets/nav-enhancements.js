@@ -1,15 +1,15 @@
 (()=>{
   const source=document.currentScript?.src||location.href;
-  const seoUrl=new URL('./seo.js?v=20261023-tw1',source).href;
+  const seoUrl=new URL('./seo.js?v=20261026-audit1',source).href;
   import(seoUrl).catch(error=>console.warn('77waxing SEO layer unavailable',error));
 })();
 
 (()=>{
   const source=document.currentScript?.src||location.href;
-  const memberUrl=new URL('./member-auth.js?v=20261025-copy2',source).href;
-  const googleUrl=new URL('./google-auth-ui.js?v=20261025-copy2',source).href;
-  const popupFixUrl=new URL('./member-auth-popup-fix.js?v=20261025-copy2',source).href;
-  const accountLinkUrl=new URL('./account-linking.js?v=20261025-copy2',source).href;
+  const memberUrl=new URL('./member-auth.js?v=20261026-audit1',source).href;
+  const googleUrl=new URL('./google-auth-ui.js?v=20261026-audit1',source).href;
+  const popupFixUrl=new URL('./member-auth-popup-fix.js?v=20261026-audit1',source).href;
+  const accountLinkUrl=new URL('./account-linking.js?v=20261026-audit1',source).href;
   import(memberUrl)
     .then(()=>import(googleUrl))
     .then(()=>import(popupFixUrl))
@@ -131,8 +131,8 @@
 
 (()=>{
   const source=document.currentScript?.src||location.href;
-  const railUrl=new URL('./desktop-rail-nav.js?v=20260919-home-preview1',source).href;
-  const railPolishUrl=new URL('./desktop-rail-collapse-polish.js?v=20260915-rail4-polish',source).href;
+  const railUrl=new URL('./desktop-rail-nav.js?v=20261026-audit1',source).href;
+  const railPolishUrl=new URL('./desktop-rail-collapse-polish.js?v=20261026-audit1',source).href;
   import(railUrl)
     .then(()=>import(railPolishUrl))
     .catch(error=>console.warn('77waxing desktop rail unavailable',error));
@@ -140,6 +140,6 @@
 
 (()=>{
   const source=document.currentScript?.src||location.href;
-  const footerUrl=new URL('./footer-enhancements.js?v=20261023-perf1',source).href;
+  const footerUrl=new URL('./footer-enhancements.js?v=20261026-audit1',source).href;
   import(footerUrl).catch(error=>console.warn('77waxing footer unavailable',error));
 })();

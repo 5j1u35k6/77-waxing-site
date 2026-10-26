@@ -34,7 +34,7 @@
     },
     '/services/skin-care/':{
       title:'基隆清粉刺・肌膚管理｜臉部保養・粉刺護理｜77waxing',
-      description:'基隆清粉刺與肌膚管理服務，提供臉部保養、粉刺清潔、撥筋與身體肌膚保養，依當日肌膚狀況評估。',
+      description:'基隆清粉刺與肌膚管理服務，提供臉部保養、粉刺清潔、鬆筋與身體肌膚保養，依當日肌膚狀況評估。',
       serviceType:'清粉刺與肌膚管理'
     },
     '/services/bust-care/':{

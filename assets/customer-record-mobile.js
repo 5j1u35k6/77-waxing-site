@@ -1,6 +1,6 @@
-import { operationErrorText } from "./interface-copy.js?v=20261025-copy2";
-import { recordRequest, encodeRecordFile, validRecordEndpoint } from "./customer-record-upload-api.js?v=20261025-copy2";
-import { showUploadQueue } from "./customer-record-progress.js?v=20261025-copy2";
+import { operationErrorText } from "./interface-copy.js?v=20261026-audit1";
+import { recordRequest, encodeRecordFile, validRecordEndpoint } from "./customer-record-upload-api.js?v=20261026-audit1";
+import { showUploadQueue } from "./customer-record-progress.js?v=20261026-audit1";
 const args=new URLSearchParams(location.hash.slice(1));history.replaceState(null,"",location.pathname);
 const endpoint=args.get("endpoint"),sessionId=args.get("session"),uploadKey=args.get("key");
 const input=document.querySelector('input'),button=document.querySelector('button'),status=document.querySelector('[role="status"]');

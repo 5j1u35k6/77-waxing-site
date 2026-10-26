@@ -1,7 +1,9 @@
 import { getApp, getApps } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";
-import { mergeStoredCustomerRecords, customerRecordKey } from "./customer-record-list.js?v=20261023-tw1";
+import { mergeStoredCustomerRecords, customerRecordKey } from "./customer-record-list.js?v=20261026-audit1";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
-import { collection, doc, getDoc, getDocFromServer, getFirestore, onSnapshot, orderBy, query, serverTimestamp, setDoc } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
+import { collection, doc, getDoc, getDocFromServer, getFirestore, onSnapshot, orderBy, query, serverTimestamp, setDoc, where } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
+import { analyzeCustomers, renderCustomerAnalytics } from './customer-analytics.js?v=20261026-audit1';
+import { mountCustomerNotes, clearCustomerNotes } from './customer-notes.js?v=20261026-audit1';
 
 const pad = (n)=>String(n).padStart(2,"0");
 const dateKey = (d)=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
@@ -19,6 +21,7 @@ let calendarDate=new Date();
 let initialized=false;
 let unsubBookings=null;
 let storedCustomerRecords=[];
+let privateUnsubscribers=[],sidebarTimer=null,dataGeneration=0,audienceDays=90;
 
 function activeAdminRoot(){return document.querySelector("body.admin-page #admin-preview");}
 function dash(){return activeAdminRoot()?.querySelector(".dash");}
@@ -37,10 +40,10 @@ function setBaseVisibility(showDashboard){
 function escapeHtml(value){return String(value??"").replace(/[&<>"']/g,(c)=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));}
 function rocBirthday(value){const m=String(value||"").match(/^(\d{4})-(\d{2})-(\d{2})$/);return m?`民國 ${Number(m[1])-1911}/${Number(m[2])}/${Number(m[3])}`:"—";}
 function customerKey(row){return customerRecordKey(row);}
-function customerModal(row){const related=bookings.filter(b=>customerKey(b)===row.key).sort((a,b)=>`${b.preferredDate||""} ${b.preferredTime||""}`.localeCompare(`${a.preferredDate||""} ${a.preferredTime||""}`));let modal=document.querySelector('[data-customer-history-modal]');if(!modal){modal=document.createElement('div');modal.className='admin-customer-modal';modal.dataset.customerHistoryModal='1';document.body.appendChild(modal);}modal.innerHTML=`<section class="admin-customer-dialog" role="dialog" aria-modal="true"><header class="admin-customer-dialog-head"><div><small>CUSTOMER HISTORY</small><h3>${escapeHtml(row.name)}</h3></div><button type="button" class="admin-customer-close" data-close-customer-history>×</button></header><div class="admin-customer-body"><div class="admin-customer-contact"><article><small>手機</small><b>${escapeHtml(row.phone||"—")}</b></article><article><small>生日</small><b>${escapeHtml(rocBirthday(row.birthday))}</b></article><article><small>LINE 綁定</small><b>${escapeHtml(row.lineId||"—")}</b></article><article><small>信箱</small><b>${escapeHtml(row.email||"—")}</b></article></div><section class="admin-customer-history"><h4>預約歷史</h4><div class="admin-customer-history-list">${related.map(b=>`<article class="admin-history-row"><time>${escapeHtml(b.preferredDate||"—")}</time><strong>${escapeHtml(b.preferredTime||"—")}</strong><span>${escapeHtml(b.serviceName||"—")}</span><small>${escapeHtml(statusText(b.status))}</small></article>`).join("")||'<div class="admin-history-empty">目前沒有預約紀錄。</div>'}</div></section></div></section>`;modal.hidden=false;modal.querySelector('[data-close-customer-history]').onclick=()=>{modal.hidden=true;};}
+function customerModal(row){const related=bookings.filter(b=>customerKey(b)===row.key).sort((a,b)=>`${b.preferredDate||""} ${b.preferredTime||""}`.localeCompare(`${a.preferredDate||""} ${a.preferredTime||""}`));let modal=document.querySelector('[data-customer-history-modal]');if(!modal){modal=document.createElement('div');modal.className='admin-customer-modal';modal.dataset.customerHistoryModal='1';document.body.appendChild(modal);}modal.innerHTML=`<section class="admin-customer-dialog" role="dialog" aria-modal="true"><header class="admin-customer-dialog-head"><div><small>CUSTOMER HISTORY</small><h3>${escapeHtml(row.name)}</h3></div><button type="button" class="admin-customer-close" data-close-customer-history>×</button></header><div class="admin-customer-body"><div class="admin-customer-contact"><article><small>手機</small><b>${escapeHtml(row.phone||"—")}</b></article><article><small>生日</small><b>${escapeHtml(rocBirthday(row.birthday))}</b></article><article><small>LINE 綁定</small><b>${escapeHtml(row.lineId||"—")}</b></article><article><small>信箱</small><b>${escapeHtml(row.email||"—")}</b></article></div><section class="admin-customer-history"><h4>預約歷史</h4><div class="admin-customer-history-list">${related.map(b=>`<article class="admin-history-row"><time>${escapeHtml(b.preferredDate||"—")}</time><strong>${escapeHtml(b.preferredTime||"—")}</strong><span>${escapeHtml(String(b.serviceName || "—").replace(/\u64a5筋/g, '鬆筋'))}</span><small>${escapeHtml(statusText(b.status))}</small></article>`).join("")||'<div class="admin-history-empty">目前沒有預約紀錄。</div>'}</div></section></div></section>`;modal.hidden=false;mountCustomerNotes(modal.querySelector('.admin-customer-body'),db,auth,row);modal.querySelector('[data-close-customer-history]').onclick=()=>{modal.hidden=true;};}
 
 function bookingCard(row){
-  return `<article class="cal-booking status-${escapeHtml(row.status)}"><b>${escapeHtml(row.preferredTime||"—")}</b><span>${escapeHtml(row.customerName||"未命名")}</span><small>${escapeHtml(row.serviceName||"—")} · ${statusText(row.status)}</small></article>`;
+  return `<article class="cal-booking status-${escapeHtml(row.status)}" data-booking-id="${escapeHtml(row.id)}"><b>${escapeHtml(row.preferredTime||"—")}</b><span>${escapeHtml(row.customerName||"未命名")}</span><small>${escapeHtml(String(row.serviceName || "—").replace(/\u64a5筋/g, '鬆筋'))} · ${escapeHtml(statusText(row.status))}</small></article>`;
 }
 function rowsForDate(key){return bookings.filter((b)=>b.preferredDate===key&&!["cancelled"].includes(b.status)).sort((a,b)=>String(a.preferredTime||"").localeCompare(String(b.preferredTime||"")));}
 
@@ -58,7 +61,7 @@ function renderCalendar(){
     body=`<div class="admin-week-calendar">${Array.from({length:7},(_,i)=>{const d=addDays(start,i);const key=dateKey(d);const rows=rowsForDate(key);return `<section class="week-day ${key===dateKey(new Date())?"today":""}"><header><small>週${"日一二三四五六"[d.getDay()]}</small><b>${d.getMonth()+1}/${d.getDate()}</b></header><div>${rows.length?rows.map(bookingCard).join(""):"<span class='empty'>—</span>"}</div></section>`;}).join("")}</div>`;
   } else {
     const first=startOfMonth(calendarDate);title=monthTitle(first);const offset=first.getDay();const start=addDays(first,-offset);
-    body=`<div class="admin-month-weekdays">${"日一二三四五六".split("").map(x=>`<span>${x}</span>`).join("")}</div><div class="admin-month-calendar">${Array.from({length:42},(_,i)=>{const d=addDays(start,i);const key=dateKey(d);const rows=rowsForDate(key);return `<section class="month-day ${d.getMonth()!==first.getMonth()?"other":""} ${key===dateKey(new Date())?"today":""}"><header>${d.getDate()}</header><div>${rows.slice(0,3).map((r)=>`<button type="button" class="month-event" data-calendar-date="${key}"><b>${escapeHtml(r.preferredTime||"")}</b> ${escapeHtml(r.customerName||"")}</button>`).join("")}${rows.length>3?`<small>+${rows.length-3} 筆</small>`:""}</div></section>`;}).join("")}</div>`;
+    body=`<div class="admin-month-weekdays">${"日一二三四五六".split("").map(x=>`<span>${x}</span>`).join("")}</div><div class="admin-month-calendar">${Array.from({length:42},(_,i)=>{const d=addDays(start,i);const key=dateKey(d);const rows=rowsForDate(key);return `<section class="month-day ${d.getMonth()!==first.getMonth()?"other":""} ${key===dateKey(new Date())?"today":""}"><header>${d.getDate()}</header><div>${rows.slice(0,3).map((r)=>`<button type="button" class="month-event" data-booking-id="${escapeHtml(r.id)}" data-calendar-date="${key}"><b>${escapeHtml(r.preferredTime||"")}</b> ${escapeHtml(r.customerName||"")}</button>`).join("")}${rows.length>3?`<small>+${rows.length-3} 筆</small>`:""}</div></section>`;}).join("")}</div>`;
   }
   w.innerHTML=`<div class="admin-view-head"><div><span class="tag">CALENDAR</span><h3>預約行事曆</h3></div><div class="calendar-mode">${modeButtons}</div></div><div class="calendar-toolbar"><div><button data-cal-nav="prev">‹</button><button data-cal-today>今天</button><button data-cal-nav="next">›</button></div><strong>${title}</strong></div>${body}`;
   w.querySelectorAll("[data-cal-mode]").forEach(btn=>btn.onclick=()=>{calendarMode=btn.dataset.calMode;renderCalendar();});
@@ -71,18 +74,22 @@ function linkedLineName(booking){const profile=memberProfiles.get(booking.ownerU
 function renderCustomers(){
   const w=ensureWorkspace();if(!w)return;setBaseVisibility(false);
   const map=new Map();
-  bookings.forEach((b)=>{const key=customerKey(b);if(!key)return;const lineId=linkedLineName(b);const current=map.get(key)||{key,name:b.customerName||"未命名",phone:b.customerPhone||"",birthday:b.customerBirthday||"",lineId,email:b.customerEmail||"",count:0,last:"",services:new Set()};current.count+=1;if(`${b.preferredDate||""} ${b.preferredTime||""}`>current.last)current.last=`${b.preferredDate||""} ${b.preferredTime||""}`;["name","phone","birthday","lineId","email"].forEach(field=>{const source={name:b.customerName,phone:b.customerPhone,birthday:b.customerBirthday,lineId,email:b.customerEmail}[field];if(source)current[field]=source;});if(b.serviceName)current.services.add(b.serviceName);map.set(key,current);});
+  bookings.forEach((b)=>{const key=customerKey(b);if(!key)return;const lineId=linkedLineName(b);const current=map.get(key)||{key,name:b.customerName||"未命名",phone:b.customerPhone||"",birthday:b.customerBirthday||"",lineId,email:b.customerEmail||"",count:0,last:"",services:new Set()};current.count+=1;if(`${b.preferredDate||""} ${b.preferredTime||""}`>current.last)current.last=`${b.preferredDate||""} ${b.preferredTime||""}`;["name","phone","birthday","lineId","email"].forEach(field=>{const source={name:b.customerName,phone:b.customerPhone,birthday:b.customerBirthday,lineId,email:b.customerEmail}[field];if(source)current[field]=source;});if(b.serviceName)current.services.add(String(b.serviceName).replace(/\u64a5筋/g,'鬆筋'));map.set(key,current);});
   mergeStoredCustomerRecords(map,storedCustomerRecords);
   const rows=[...map.values()].sort((a,b)=>b.last.localeCompare(a.last));
-  w.innerHTML=`<div class="admin-view-head"><div><span class="tag">CUSTOMERS</span><h3>顧客資料</h3></div><button class="btn dark" type="button" data-paper-import>＋ 新增紙本轉電子紀錄</button></div><p class="muted">可依姓名、手機或 LINE 綁定 尋找顧客；點選姓名可檢視完整預約歷史。</p><label class="customer-search">搜尋顧客<input type="search" data-customer-search placeholder="姓名、手機或 LINE 綁定"></label><div class="customer-table-wrap"><table><thead><tr><th>姓名</th><th>手機號碼</th><th>生日</th><th>LINEID</th><th>信箱</th><th>預約次數</th><th>最近預約時間</th><th>曾預約服務操作</th></tr></thead><tbody data-customer-rows></tbody></table></div><div class="paper-import-note" data-paper-note hidden>紙本轉電子入口已建立；下一步會補上紙本欄位與匯入表單。</div>`;
+  w.innerHTML=`<div class="admin-view-head"><div><span class="tag">CUSTOMERS</span><h3>顧客資料</h3></div><button class="btn dark" type="button" data-paper-import>新增紀錄</button></div><p class="muted">可依姓名、手機或 LINE 綁定 尋找顧客；點選姓名可檢視完整預約歷史。</p><label class="customer-search">搜尋顧客<input type="search" data-customer-search placeholder="姓名、手機或 LINE 綁定"></label><div class="customer-table-wrap"><table><thead><tr><th>姓名</th><th>手機號碼</th><th>生日</th><th>LINEID</th><th>信箱</th><th>預約次數</th><th>最近預約時間</th><th>曾預約服務操作</th></tr></thead><tbody data-customer-rows></tbody></table></div><div class="paper-import-note" data-paper-note hidden>請選擇輸入或上傳方式。</div>`;
   const body=w.querySelector('[data-customer-rows]');const draw=(term='')=>{const q=term.trim().toLowerCase();const visible=rows.filter(r=>!q||[r.name,r.phone,r.lineId].some(v=>String(v||'').toLowerCase().includes(q)));body.innerHTML=visible.map((r,i)=>`<tr><td><button class="admin-customer-link" data-customer-index="${i}">${escapeHtml(r.name)}</button></td><td>${escapeHtml(r.phone||"—")}</td><td>${escapeHtml(rocBirthday(r.birthday))}</td><td>${escapeHtml(r.lineId||"—")}</td><td>${escapeHtml(r.email||"—")}</td><td>${r.count} 次</td><td>${escapeHtml(r.last||"—")}</td><td>${escapeHtml([...r.services].join("、")||"—")}</td></tr>`).join('')||"<tr><td colspan='8' class='muted'>找不到符合的顧客資料。</td></tr>";body.querySelectorAll('[data-customer-index]').forEach(btn=>btn.onclick=()=>customerModal(visible[Number(btn.dataset.customerIndex)]));};draw();w.querySelector('[data-customer-search]').oninput=e=>draw(e.target.value);
   w.querySelector("[data-paper-import]").onclick=()=>{const note=w.querySelector("[data-paper-note]");note.hidden=false;note.scrollIntoView({behavior:"smooth",block:"nearest"});};
 }
 
+function renderAudience(){const w=ensureWorkspace();if(!w)return;setBaseVisibility(false);renderCustomerAnalytics(w,analyzeCustomers(bookings,storedCustomerRecords,memberProfiles,{days:audienceDays}),days=>{audienceDays=days;renderAudience();});}
+
 async function renderSettings(){
+  const generation=dataGeneration;
   const w=ensureWorkspace();if(!w)return;setBaseVisibility(false);
   let live=settings;
   try{const snap=await getDoc(doc(db,"settings","general"));if(snap.exists())live={...live,...snap.data()};}catch{}
+  if(generation!==dataGeneration||currentView!=="settings")return;
   const start=live.bookingStartTime||"08:00",end=live.bookingEndTime||"20:00",max=Number(live.maxAdvanceDays||60),enabled=live.bookingEnabled!==false,notice=live.bookingNotice||"";
   const timeOptions=Array.from({length:25},(_,i)=>{const mins=480+i*30;return `${pad(Math.floor(mins/60))}:${pad(mins%60)}`;});
   w.innerHTML=`<div class="admin-view-head"><div><span class="tag">SETTINGS</span><h3>網站設定</h3></div></div><div class="settings-grid"><label class="setting-switch"><span><b>開放線上預約</b><small>關閉時顧客無法選擇服務與時段</small></span><input type="checkbox" name="bookingEnabled" ${enabled?"checked":""}><i></i></label><label>每日最早可約時間<select name="bookingStartTime">${timeOptions.map(t=>`<option ${t===start?"selected":""}>${t}</option>`).join("")}</select></label><label>每日最晚開始時間<select name="bookingEndTime">${timeOptions.map(t=>`<option ${t===end?"selected":""}>${t}</option>`).join("")}</select></label><label>最遠可預約天數<input name="maxAdvanceDays" type="number" min="7" max="180" value="${max}"></label><label class="full">預約頁公告<textarea name="bookingNotice" rows="4" placeholder="例如：近期較忙，送出後請等待確認。">${escapeHtml(notice)}</textarea></label></div><div class="actions"><button class="btn dark" type="button" data-save-settings>儲存網站設定</button><span class="muted" data-settings-message></span></div>`;
@@ -145,6 +152,7 @@ function renderView(view){
   if(view==="dashboard"){setBaseVisibility(true);return;}
   if(view==="calendar")return renderCalendar();
   if(view==="customers")return renderCustomers();
+  if(view==="audience")return renderAudience();
   if(view==="services"||view==="pricing")return delegateCatalog(view);
   if(view==="slots"){setBaseVisibility(false);const w=ensureWorkspace();if(w){w.hidden=false;w.innerHTML=`<div class="admin-view-head"><div><span class="tag">AVAILABILITY</span><h3>時段功能</h3></div></div><p class="muted">正在載入時段功能…</p>`;}setTimeout(()=>window.dispatchEvent(new HashChangeEvent("hashchange")),0);return;}
   if(view==="settings")return renderSettings();
@@ -157,23 +165,48 @@ function renderView(view){
 
 function bindSidebar(){
   const root=activeAdminRoot();if(!root)return false;const sidebar=root.querySelector(".sidebar");if(!sidebar)return false;
-  const map={"總覽":"dashboard","預約管理":"bookings","預約行事曆":"calendar","顧客資料":"customers","服務功能":"services","時段功能":"slots","價格功能":"pricing","網站設定":"settings"};
+  const map={"總覽":"dashboard","預約管理":"bookings","預約行事曆":"calendar","顧客資料":"customers","客群分析":"audience","服務功能":"services","服務管理":"services","時段功能":"slots","價格功能":"pricing","網站設定":"settings"};
   sidebar.querySelectorAll("a").forEach(link=>{const view=map[(link.textContent||"").trim()];if(!view||link.dataset.adminV2Bound)return;link.dataset.adminV2Bound="1";link.addEventListener("click",(event)=>{event.preventDefault();event.stopImmediatePropagation();sidebar.querySelectorAll("a").forEach(a=>a.classList.remove("on"));link.classList.add("on");history.replaceState(null,"",`${location.pathname}#${view}`);renderView(view);},true);});
   return true;
 }
 
-function startData(){
-  if(unsubBookings)return;
-  unsubBookings=onSnapshot(query(collection(db,"bookings"),orderBy("preferredDate","asc")),snap=>{bookings=snap.docs.map(d=>({id:d.id,...d.data()}));if(currentView==="calendar")renderCalendar();if(currentView==="customers")renderCustomers();});
-  onSnapshot(collection(db,"memberProfiles"),snap=>{memberProfiles=new Map(snap.docs.map(d=>[d.id,d.data()]));if(currentView==="customers")renderCustomers();});
-  onSnapshot(collection(db,"customers"),snap=>{storedCustomerRecords=snap.docs.map(d=>({id:d.id,...d.data()})).filter(r=>r.kind==="waxing_customer_record");if(currentView==="customers")renderCustomers();},()=>{console.warn("無法讀取已儲存顧客資料表，請確認管理員權限。");});
-  onSnapshot(doc(db,"settings","general"),snap=>{settings=snap.exists()?snap.data():{};});
+function stopPrivateData(){
+  dataGeneration++;
+  if(sidebarTimer){clearInterval(sidebarTimer);sidebarTimer=null;}
+  privateUnsubscribers.forEach(unsubscribe=>unsubscribe());privateUnsubscribers=[];unsubBookings=null;
+  bookings=[];memberProfiles=new Map();storedCustomerRecords=[];settings={};
+  clearCustomerNotes();
+  document.querySelector('[data-customer-history-modal]')?.remove();
 }
-
+function startData(generation){
+  if(unsubBookings||generation!==dataGeneration)return;
+  const active=()=>generation===dataGeneration;
+  const refresh=()=>{if(currentView==="calendar")renderCalendar();if(currentView==="customers")renderCustomers();if(currentView==="audience")renderAudience();};
+  unsubBookings=onSnapshot(query(collection(db,"bookings"),orderBy("preferredDate","asc")),snap=>{if(!active())return;bookings=snap.docs.map(d=>({id:d.id,...d.data()}));refresh();});
+  privateUnsubscribers.push(unsubBookings);
+  privateUnsubscribers.push(onSnapshot(collection(db,"memberProfiles"),snap=>{if(!active())return;memberProfiles=new Map(snap.docs.map(d=>[d.id,d.data()]));refresh();}));
+  privateUnsubscribers.push(onSnapshot(query(collection(db,"customers"),where("kind","==","waxing_customer_record")),snap=>{if(!active())return;storedCustomerRecords=snap.docs.map(d=>({id:d.id,...d.data()})).filter(r=>r.kind==="waxing_customer_record");refresh();},()=>{if(active())console.warn("無法讀取已儲存顧客資料表，請確認管理員權限。");}));
+  privateUnsubscribers.push(onSnapshot(doc(db,"settings","general"),snap=>{if(active())settings=snap.exists()?snap.data():{};}));
+}
 function init(){
   if(initialized)return; if(!getApps().length)return;
   const app=getApp();auth=getAuth(app);db=getFirestore(app);initialized=true;
-  onAuthStateChanged(auth,(user)=>{if(!user||user.isAnonymous)return;const timer=setInterval(()=>{if(bindSidebar()){clearInterval(timer);startData();const hash=(location.hash||"#dashboard").slice(1);const allowed=["dashboard","bookings","calendar","customers","services","slots","pricing","settings"];renderView(allowed.includes(hash)?hash:"dashboard");}},120);});
+  onAuthStateChanged(auth,async user=>{
+    stopPrivateData();const generation=dataGeneration;
+    if(!user||user.isAnonymous)return;
+    const permission=await getDoc(doc(db,"admins",user.uid)).catch(()=>null);
+    if(generation!==dataGeneration||auth.currentUser?.uid!==user.uid||!permission?.exists())return;
+    let attempts=0;
+    sidebarTimer=setInterval(()=>{
+      if(generation!==dataGeneration||++attempts>125){clearInterval(sidebarTimer);sidebarTimer=null;return;}
+      if(bindSidebar()){
+        clearInterval(sidebarTimer);sidebarTimer=null;startData(generation);
+        const hash=(location.hash||"#dashboard").slice(1);
+        const allowed=["dashboard","bookings","calendar","customers","audience","services","slots","pricing","settings"];
+        renderView(allowed.includes(hash)?hash:"dashboard");
+      }
+    },120);
+  });
 }
 
 const boot=setInterval(()=>{if(getApps().length){clearInterval(boot);init();}},100);

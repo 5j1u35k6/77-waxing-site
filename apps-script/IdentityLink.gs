@@ -257,7 +257,9 @@ function migrateMemberOwnership_(sourceUid, targetUid) {
   if (sourceProfile) {
     const mergeable = [
       'displayName', 'email', 'phone', 'phoneCountry', 'gender',
-      'avatarUrl', 'lineUserId', 'linePicture', 'provider'
+      'birthday', 'avatarUrl', 'googleEmail', 'googleAvatarUrl',
+      'lineId', 'lineUserId', 'lineName', 'linePicture', 'provider',
+      'phoneDialCode', 'phoneInternational', 'createdAt', 'lastBookingAt'
     ];
     const patch = { uid:target };
     mergeable.forEach(key => {

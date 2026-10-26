@@ -1,10 +1,14 @@
 import { getApp, getApps } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
 import { collection, doc, getFirestore, onSnapshot, query, serverTimestamp, setDoc, where } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
+import { mountCustomerNotes } from './customer-notes.js?v=20261026-audit1';
+import { customerRecordKey } from './customer-record-list.js?v=20261026-audit1';
+import { normalizeRecordPhone } from './customer-record-data.js?v=20261026-audit1';
 
 const VERSION = "20260911-0931";
 let db = null;
 let auth = null;
+let privateListeners=[],authGeneration=0,slotGeneration=0;
 let bookings = [];
 let general = {};
 let slotDate = taipeiToday();
@@ -17,7 +21,7 @@ let enhanceQueued = false;
 
 const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
 const pad = (value) => String(value).padStart(2, "0");
-const normalizePhone = (value) => String(value || "").replace(/[^0-9+]/g, "").trim();
+const normalizePhone = value => normalizeRecordPhone(value);
 const normalizeEmail = (value) => String(value || "").trim().toLowerCase();
 const route = () => ((location.hash || "#dashboard").slice(1) || "dashboard");
 const adminRoot = () => document.querySelector("body.admin-page #admin-preview");
@@ -125,8 +129,9 @@ function openCustomerModal(bookingId) {
   const phoneHtml = phone !== "—" ? `<a href="tel:${esc(String(phone).replace(/[^0-9+]/g, ""))}">${esc(phone)}</a>` : "<b>—</b>";
   const emailHtml = email !== "—" ? `<a href="mailto:${esc(email)}">${esc(email)}</a>` : "<b>—</b>";
   const modal = ensureCustomerModal();
-  modal.innerHTML = `<section class="admin-customer-dialog" role="dialog" aria-modal="true" aria-label="顧客聯絡資訊與過去預約紀錄"><header class="admin-customer-dialog-head"><div><small>CUSTOMER PROFILE</small><h3>${esc(selected.customerName || "未命名")}</h3></div><button type="button" class="admin-customer-close" data-customer-close aria-label="關閉">×</button></header><div class="admin-customer-body"><div class="admin-customer-contact"><article><small>姓名</small><b>${esc(selected.customerName || "—")}</b></article><article><small>電話</small>${phoneHtml}</article><article><small>性別</small><b>${esc(gender)}</b></article><article><small>信箱</small>${emailHtml}</article><article><small>LINE ID</small><b>${esc(lineId)}</b></article></div><section class="admin-customer-history"><h4>過去預約紀錄</h4><div class="admin-customer-history-list">${history.length ? history.map((row) => `<article class="admin-history-row"><time>${esc(row.preferredDate || "—")}</time><strong>${esc(timeRange(row))}</strong><span title="${esc(row.serviceName || "—")}">${esc(row.serviceName || "—")}</span><small>${esc(statusText(row.status))}</small></article>`).join("") : `<div class="admin-history-empty">目前沒有更早的預約紀錄。</div>`}</div></section></div></section>`;
+  modal.innerHTML = `<section class="admin-customer-dialog" role="dialog" aria-modal="true" aria-label="顧客聯絡資訊與過去預約紀錄"><header class="admin-customer-dialog-head"><div><small>CUSTOMER PROFILE</small><h3>${esc(selected.customerName || "未命名")}</h3></div><button type="button" class="admin-customer-close" data-customer-close aria-label="關閉">×</button></header><div class="admin-customer-body"><div class="admin-customer-contact"><article><small>姓名</small><b>${esc(selected.customerName || "—")}</b></article><article><small>電話</small>${phoneHtml}</article><article><small>性別</small><b>${esc(gender)}</b></article><article><small>信箱</small>${emailHtml}</article><article><small>LINE ID</small><b>${esc(lineId)}</b></article></div><section class="admin-customer-history"><h4>過去預約紀錄</h4><div class="admin-customer-history-list">${history.length ? history.map((row) => `<article class="admin-history-row"><time>${esc(row.preferredDate || "—")}</time><strong>${esc(timeRange(row))}</strong><span title="${esc(String(row.serviceName || "—").replace(/\u64a5筋/g,"鬆筋"))}">${esc(String(row.serviceName || "—").replace(/\u64a5筋/g,"鬆筋"))}</span><small>${esc(statusText(row.status))}</small></article>`).join("") : `<div class="admin-history-empty">目前沒有更早的預約紀錄。</div>`}</div></section></div></section>`;
   modal.hidden = false;
+  mountCustomerNotes(modal.querySelector('.admin-customer-body'),db,auth,{key:customerRecordKey(selected),name:selected.customerName,phone:selected.customerPhone,email:selected.customerEmail});
   modal.querySelector("[data-customer-close]")?.focus();
 }
 
@@ -242,12 +247,14 @@ async function saveManualState(nextTimes, nextMeta) {
 }
 function subscribeSlotDate(dateValue) {
   if (!db) return;
+  const generation=++slotGeneration;
   if (unsubSlotLocks) unsubSlotLocks();
   if (unsubManual) unsubManual();
   slotLocks = new Map();
   manualTimes = new Set();
   manualMeta = {};
   unsubSlotLocks = onSnapshot(query(collection(db, "availabilityLocks"), where("date", "==", dateValue)), (snapshot) => {
+    if(generation!==slotGeneration)return;
     slotLocks = new Map();
     snapshot.docs.forEach((snapshotDoc) => {
       const value = snapshotDoc.data() || {};
@@ -257,6 +264,7 @@ function subscribeSlotDate(dateValue) {
     renderSlotGrid();
   }, (error) => console.error("slot locks", error));
   unsubManual = onSnapshot(doc(db, "settings", manualDocId(dateValue)), (snapshot) => {
+    if(generation!==slotGeneration)return;
     const value = snapshot.exists() ? snapshot.data() : {};
     manualTimes = new Set(Array.isArray(value.blockedTimes) ? value.blockedTimes.map(String) : []);
     manualMeta = value.blockMeta && typeof value.blockMeta === "object" ? value.blockMeta : {};
@@ -320,16 +328,16 @@ function scheduleEnhance() {
   });
 }
 
-function startData() {
+function startData(generation) {
   if (!db) return;
-  onSnapshot(collection(db, "bookings"), (snapshot) => {
-    bookings = snapshot.docs.map((snapshotDoc) => ({ id: snapshotDoc.id, ...snapshotDoc.data() }));
-    scheduleEnhance();
-  }, (error) => console.error("admin functions bookings", error));
-  onSnapshot(doc(db, "settings", "general"), (snapshot) => {
-    general = snapshot.exists() ? snapshot.data() : {};
-    if (route() === "slots") renderSlotGrid();
-  }, (error) => console.error("admin functions settings", error));
+  privateListeners.push(onSnapshot(collection(db, "bookings"), snapshot => {
+    if(generation!==authGeneration)return;
+    bookings = snapshot.docs.map(snapshotDoc => ({ id:snapshotDoc.id, ...snapshotDoc.data() }));scheduleEnhance();
+  }, error => console.error("admin functions bookings",error)));
+  privateListeners.push(onSnapshot(doc(db,"settings","general"),snapshot=>{
+    if(generation!==authGeneration)return;
+    general=snapshot.exists()?snapshot.data():{};if(route()==="slots")renderSlotGrid();
+  },error=>console.error("admin functions settings",error)));
 }
 
 function init() {
@@ -352,8 +360,12 @@ function init() {
     db = getFirestore(getApp());
     auth = getAuth(getApp());
     const ready = (user) => {
+      const generation=++authGeneration;++slotGeneration;
+      privateListeners.forEach(unsubscribe=>unsubscribe());privateListeners=[];
+      if(unsubSlotLocks)unsubSlotLocks();if(unsubManual)unsubManual();unsubSlotLocks=null;unsubManual=null;
+      bookings=[];general={};slotLocks=new Map();manualTimes=new Set();manualMeta={};closeCustomerModal();
       if (!user || user.isAnonymous) return;
-      if (!bookings.length) startData();
+      startData(generation);
       if (route() === "slots") renderSlotView();
     };
     ready(auth.currentUser);

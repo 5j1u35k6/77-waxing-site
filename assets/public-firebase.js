@@ -1,7 +1,7 @@
 import { getApps, initializeApp } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";
 import { getAuth } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
 import { getFirestore } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
-import { firebaseConfig, firebaseConfigured } from "./firebase-config.js";
+import { firebaseConfig, firebaseConfigured } from "./firebase-config.js?v=20261026-audit1";
 
 export const PUBLIC_FIREBASE_APP_NAME = "77waxing-public";
 

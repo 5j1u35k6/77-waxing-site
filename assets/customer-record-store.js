@@ -1,5 +1,5 @@
 import { doc, getDocFromServer, runTransaction, serverTimestamp } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
-import { recordPayload, RECORD_KIND } from './customer-record-data.js?v=20261023-record-page';
+import { recordPayload, RECORD_KIND } from './customer-record-data.js?v=20261026-audit1';
 
 export async function saveCustomerRecord(db,user,id,data,signaturePng=''){
   if(!user||user.isAnonymous)throw new Error('請先登入管理員帳號。');

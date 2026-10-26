@@ -16,39 +16,25 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 24
-      - name: Check asset JavaScript syntax
+      - name: Check every website and backend JavaScript file
         shell: bash
         run: |
           set -euo pipefail
-          for file in assets/*.js; do
-            if grep -Eq '^[[:space:]]*(import|export)[[:space:]]' "$file"; then
-              temp="/tmp/$(basename "${file%.js}")-asset.mjs"
-              cp "$file" "$temp"
-              node --check "$temp"
-            else
-              node --check "$file"
-            fi
-          done
-      - name: Check shop frontend syntax
-        shell: bash
+          while IFS= read -r -d '' file; do
+            node --input-type=module --check < "$file"
+          done < <(find assets shop cloudflare -name '*.js' -print0)
+          for file in apps-script/*.gs; do node --input-type=module --check < "$file"; done
+      - name: Check four-platform bug regressions and customer tools
         run: |
-          set -euo pipefail
-          cp shop/app.js /tmp/77waxing-shop-app.mjs
-          node --check /tmp/77waxing-shop-app.mjs
-      - name: Check shop admin syntax
-        shell: bash
-        run: |
-          set -euo pipefail
-          cp shop/admin.js /tmp/77waxing-shop-admin.mjs
-          node --check /tmp/77waxing-shop-admin.mjs
-          cp shop/admin-media.js /tmp/77select-shop-admin-media.mjs
-          node --check /tmp/77select-shop-admin-media.mjs
-      - name: Check Apps Script syntax
-        shell: bash
-        run: |
-          set -euo pipefail
-          cp apps-script/Code.gs /tmp/apps-script-code.js
-          node --check /tmp/apps-script-code.js
+          node tests/static-integrity.cjs
+          node tests/public-bug-regression.cjs
+          node tests/admin-bug-regression.cjs
+          node tests/admin-auth-regression.cjs
+          node tests/backend-bug-regression.cjs
+          node tests/email-auth-regression.cjs
+          node tests/shop-bug-regression.cjs --unit-only
+          node tests/customer-insights-notes.cjs
+          node --experimental-vm-modules tests/customer-record-store.mjs
       - name: Check performance and transactional safety
         run: |
           node tests/performance-regression.cjs

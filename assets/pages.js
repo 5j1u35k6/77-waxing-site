@@ -91,7 +91,7 @@ function firstVisit(){
   `<section class="section soft"><div class="wrap narrow"><ol class="flow"><li><b>抵達與接待</b><small>確認預約項目與當天身體狀況。</small></li><li><b>需求諮詢</b><small>第一次、怕痛或有特別在意的地方都可以先說。</small></li><li><b>服務前說明</b><small>開始前確認服務範圍與流程。</small></li><li><b>一對一施作</b><small>過程中有任何不適都可以即時調整。</small></li><li><b>術後照護</b><small>完成後確認居家照護方式與後續建議。</small></li></ol></div></section>`;
 }
 function space(){
-  return '';
+  return hero('SPACE','工作室空間','到店前，可先與我們確認交通與環境需求。')+`<section class="section"><div class="wrap narrow"><h2>安排一次安心的到店體驗</h2><p>如需了解位置或到店安排，歡迎在預約時告訴我們。</p><a class="btn" href="${B}/booking/" data-route>前往預約</a></div></section>`;
 }
 function courses(){
   return hero('COURSES','專業教學','教學內容與開課資訊會在確認後於此更新。')+
@@ -131,7 +131,7 @@ function ensureBrandIntro(path){
   brandIntroRequested=true;
   if(document.querySelector('script[data-home-brand-intro]'))return;
   const script=document.createElement('script');
-  script.src=`${B}/assets/home-warm-intro.js?v=20260911-1015`;
+  script.src=`${B}/assets/home-warm-intro.js?v=20261026-audit1`;
   script.dataset.homeBrandIntro='1';
   document.body.appendChild(script);
 }

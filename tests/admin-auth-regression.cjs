@@ -1,0 +1,28 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
+const read=file=>fs.readFileSync(path.resolve(__dirname,'..',file),'utf8').replace(/^import\s[\s\S]*?;\r?\n/gm,'');
+const emptyDoc={querySelector:()=>null,querySelectorAll:()=>[],body:{},addEventListener(){}};
+const c=vm.createContext({console,document:emptyDoc,location:{hostname:'example.test'},firebaseConfigured:false,MutationObserver:class{observe(){}},setTimeout(){},window:{addEventListener(){}},Promise});
+vm.runInContext(read('assets/admin-firebase.js'),c);
+(async()=>{
+ c.firebaseConfigured=true;
+ let verifyResolve,shown=[];
+ c.verifyAdmin=()=>new Promise(resolve=>verifyResolve=resolve);
+ c.showAdminDashboard=()=>shown.push('private');c.renderAdminLogin=()=>shown.push('login');
+ vm.runInContext('auth={currentUser:{uid:"A"},authStateReady:async()=>{}}',c);
+ const root={dataset:{},innerHTML:'old private data',querySelector:()=>null};
+ const pending=c.mountAdmin(root);await new Promise(resolve=>setImmediate(resolve));
+ assert.ok(verifyResolve);
+ vm.runInContext('auth.currentUser=null',c);await c.mountAdmin(root);
+ assert.deepEqual(shown,['login']);
+ verifyResolve(true);await pending;assert.deepEqual(shown,['login'],'stale admin permission cannot restore a logged-out dashboard');
+ assert.equal(root.dataset.firebaseMounted,'signed-out');
+ let removed=0;
+ const doc={...emptyDoc,querySelector:()=>({remove(){removed++}})};
+ const data=vm.createContext({console,document:doc,MutationObserver:class{observe(){}},setInterval(){return 1},clearInterval(){},setTimeout(){},window:{},location:{hash:'#customers'},getApps:()=>[],clearCustomerNotes(){}});
+ vm.runInContext(read('assets/admin-core.js'),data);
+ data.track=()=>removed++;
+ vm.runInContext('bookings=[{customerName:"private"}];memberProfiles=new Map([["A",{}]]);storedCustomerRecords=[{}];privateUnsubscribers=[track,track,track,track];unsubBookings=track;',data);
+ data.stopPrivateData();assert.equal(removed,5,'all four private subscriptions and body modal are disposed');
+ assert.equal(vm.runInContext('bookings.length+memberProfiles.size+storedCustomerRecords.length',data),0);
+ console.log('PASS: logout clears admin UI; stale permission cannot restore it; four private listeners and customer cache are disposed');
+})().catch(error=>{console.error(error);process.exitCode=1});

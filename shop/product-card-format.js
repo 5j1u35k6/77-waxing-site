@@ -1,5 +1,5 @@
 import { collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
-import { getPublicFirebase } from "../assets/public-firebase.js?v=20260913-shop2";
+import { getPublicFirebase } from "../assets/public-firebase.js?v=20261026-audit1";
 
 const { db } = getPublicFirebase();
 const products = new Map();
@@ -92,19 +92,19 @@ function formatCard(card) {
      the detail button made interaction fragile because multiple storefront layers
      observe the card DOM. We only restyle the existing control now. */
   detailButton.type = "button";
-  detailButton.textContent = "詳情";
-  detailButton.classList.remove("secondary-btn");
-  detailButton.classList.add("primary-btn", "product-detail-only");
-  actions.classList.add("single-detail-action", "card-format-actions");
+  if (detailButton.textContent !== "詳情") detailButton.textContent = "詳情";
+  if (detailButton.classList.contains("secondary-btn")) detailButton.classList.remove("secondary-btn");
+  for (const name of ["primary-btn", "product-detail-only"]) if (!detailButton.classList.contains(name)) detailButton.classList.add(name);
+  for (const name of ["single-detail-action", "card-format-actions"]) if (!actions.classList.contains(name)) actions.classList.add(name);
 
   if (buyButton) {
-    buyButton.hidden = true;
+    if (!buyButton.hidden) buyButton.hidden = true;
     buyButton.tabIndex = -1;
     buyButton.setAttribute("aria-hidden", "true");
-    buyButton.classList.add("card-format-buy-sentinel");
+    if (!buyButton.classList.contains("card-format-buy-sentinel")) buyButton.classList.add("card-format-buy-sentinel");
   }
 
-  body.classList.add("card-format-v2");
+  if (!body.classList.contains("card-format-v2")) body.classList.add("card-format-v2");
   if (card.dataset.cardFormatSignature === signature && body.querySelector(".card-format-generated")) return;
 
   body.querySelectorAll(".card-format-generated").forEach((node) => node.remove());

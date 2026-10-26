@@ -1,4 +1,5 @@
 (()=>{
+  const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const booking=()=>document.querySelector('#booking');
   const currentCategoryKey=()=>booking()?.querySelector('[data-booking-category].on')?.dataset.bookingCategory||'';
   let lastBookingView='';
@@ -58,10 +59,10 @@
     panel.dataset.signature=signature;
     panel.dataset.category=config.key;
     if(!config.items.length){
-      panel.innerHTML=`<div class="booking-addon-head"><h3>加購項目</h3><p>${config.label}目前沒有加購項目。</p></div>`;
+      panel.innerHTML=`<div class="booking-addon-head"><h3>加購項目</h3><p>${esc(config.label)}目前沒有加購項目。</p></div>`;
       return;
     }
-    panel.innerHTML=`<div class="booking-addon-head"><h3>加購項目</h3><p>按照你揀嘅服務，77waxing 推薦仲可以加購以下項目㗎～</p></div><div class="booking-addon-options">${config.items.map(item=>`<label class="booking-addon-option"><input type="checkbox" data-booking-addon-option value="${String(item.name).replace(/"/g,'&quot;')}" ${previouslySelected.has(item.name)?'checked':''}><span><b>${item.name}</b><small>${item.price}</small></span></label>`).join('')}</div>`;
+    panel.innerHTML=`<div class="booking-addon-head"><h3>加購項目</h3><p>按照你揀嘅服務，77waxing 推薦仲可以加購以下項目㗎～</p></div><div class="booking-addon-options">${config.items.map(item=>`<label class="booking-addon-option"><input type="checkbox" data-booking-addon-option value="${esc(item.name)}" ${previouslySelected.has(item.name)?'checked':''}><span><b>${esc(item.name)}</b><small>${esc(item.price)}</small></span></label>`).join('')}</div>`;
   }
 
   function selectedAddons(){
@@ -78,7 +79,7 @@
     if(!addons.length)return;
     const row=document.createElement('div');
     row.dataset.addonSummary='1';
-    row.innerHTML=`<small>加購項目</small><b>${addons.join('、')}</b>`;
+    row.innerHTML=`<small>加購項目</small><b>${esc(addons.join('、'))}</b>`;
     const serviceRow=[...summary.children].find(node=>node.querySelector('small')?.textContent.trim()==='服務項目');
     if(serviceRow)serviceRow.after(row);else summary.prepend(row);
   }

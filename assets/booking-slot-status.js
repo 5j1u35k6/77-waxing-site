@@ -1,6 +1,6 @@
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
 import { doc, onSnapshot } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
-import { getPublicFirebase } from "./public-firebase.js?v=20260912-1330";
+import { getPublicFirebase } from "./public-firebase.js?v=20261026-audit1";
 
 const TIMES = [];
 for (let minutes = 480; minutes <= 1200; minutes += 30) TIMES.push(`${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`);
@@ -120,7 +120,7 @@ function schedule() {
   requestAnimationFrame(augment);
 }
 function hasValidPickedSlot() {
-  return Boolean(document.querySelector("#booking [data-dayrail] .slot.pick:not(.blocked):not(.held):not(:disabled)"));
+  return Boolean(document.querySelector("#booking:not(.booking-closed) [data-dayrail] .daycol:not([hidden]) .slot.pick:not([hidden]):not(.blocked):not(.held):not(:disabled)"));
 }
 function returnToSlotStep() {
   const root = document.querySelector("#booking");

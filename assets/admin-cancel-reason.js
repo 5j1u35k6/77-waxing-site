@@ -1,5 +1,8 @@
 import { getApp, getApps } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";
 import { doc, getDoc, getFirestore, runTransaction, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
+import { readBookingLocks } from "./admin-booking-locks.js?v=20261026-audit1";
+
+const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, character => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[character]));
 
 const REASONS = {
   conflict: "目前該時段已有安排，這次無法接受此預約。",
@@ -75,7 +78,7 @@ async function openCancelDialog(bookingId){
     return alert('讀取預約資料失敗，請稍後再試。');
   }
   host.hidden=false;
-  host.innerHTML=`<div class="cancel-reason-backdrop" data-cancel-close></div><section class="cancel-reason-card" role="dialog" aria-modal="true" aria-labelledby="cancel-reason-title"><h3 id="cancel-reason-title">取消預約原因</h3><p class="cancel-reason-meta">${String(row.customerName||'顧客')} · ${String(row.preferredDate||'')} ${String(row.preferredTime||'')}</p><p class="cancel-reason-help">請選擇取消原因；確認後會儲存於預約紀錄，並寄送取消通知給顧客。</p><div class="cancel-reason-options"><label><input type="radio" name="cancelReason" value="conflict" checked><span><b>時段無法安排</b><small>目前該時段已有安排，這次無法接受此預約。</small></span></label><label><input type="radio" name="cancelReason" value="reschedule"><span><b>需要顧客改約</b><small>請顧客重新選擇其他可預約時段。</small></span></label><label><input type="radio" name="cancelReason" value="safety_or_fit"><span><b>服務／安全評估不適合</b><small>本次預約目前無法受理，請顧客直接聯繫 77waxing。</small></span></label><label><input type="radio" name="cancelReason" value="other"><span><b>其他原因</b><small>自行輸入要讓顧客看到的原因。</small></span></label></div><textarea class="cancel-reason-other" rows="3" data-cancel-other placeholder="請輸入要讓顧客看到的取消原因" disabled hidden></textarea><p class="cancel-reason-message" data-cancel-message></p><div class="cancel-reason-actions"><button type="button" data-cancel-close>返回</button><button type="button" class="dark" data-cancel-confirm>確認取消</button></div></section>`;
+  host.innerHTML=`<div class="cancel-reason-backdrop" data-cancel-close></div><section class="cancel-reason-card" role="dialog" aria-modal="true" aria-labelledby="cancel-reason-title"><h3 id="cancel-reason-title">取消預約原因</h3><p class="cancel-reason-meta">${escapeHtml(row.customerName||'顧客')} · ${escapeHtml(row.preferredDate||'')} ${escapeHtml(row.preferredTime||'')}</p><p class="cancel-reason-help">請選擇取消原因；確認後會儲存於預約紀錄，並寄送取消通知給顧客。</p><div class="cancel-reason-options"><label><input type="radio" name="cancelReason" value="conflict" checked><span><b>時段無法安排</b><small>目前該時段已有安排，這次無法接受此預約。</small></span></label><label><input type="radio" name="cancelReason" value="reschedule"><span><b>需要顧客改約</b><small>請顧客重新選擇其他可預約時段。</small></span></label><label><input type="radio" name="cancelReason" value="safety_or_fit"><span><b>服務／安全評估不適合</b><small>本次預約目前無法受理，請顧客直接聯繫 77waxing。</small></span></label><label><input type="radio" name="cancelReason" value="other"><span><b>其他原因</b><small>自行輸入要讓顧客看到的原因。</small></span></label></div><textarea class="cancel-reason-other" rows="3" data-cancel-other placeholder="請輸入要讓顧客看到的取消原因" disabled hidden></textarea><p class="cancel-reason-message" data-cancel-message></p><div class="cancel-reason-actions"><button type="button" data-cancel-close>返回</button><button type="button" class="dark" data-cancel-confirm>確認取消</button></div></section>`;
   const close=()=>{host.hidden=true;host.innerHTML='';};
   host.querySelectorAll('[data-cancel-close]').forEach(el=>el.onclick=close);
   const other=host.querySelector('[data-cancel-other]');
@@ -102,9 +105,10 @@ async function openCancelDialog(bookingId){
       await runTransaction(firestore,async tx=>{
         const fresh=await tx.get(bookingRef);
         if(!fresh.exists()) throw new Error('BOOKING_NOT_FOUND');
-        const lockIds=Array.isArray(fresh.data().lockIds)?fresh.data().lockIds:[];
+        if(!['pending_confirmation','pending_payment','confirmed'].includes(fresh.data().status))throw new Error('BOOKING_STATUS_CHANGED');
+        const locks=await readBookingLocks(tx,firestore,bookingId,fresh.data());
         tx.update(bookingRef,{status:'cancelled',rejectionReasonCode:code,rejectionPublicReason:publicReason,cancelledAt:serverTimestamp(),updatedAt:serverTimestamp()});
-        lockIds.forEach(lockId=>tx.delete(doc(firestore,'availabilityLocks',lockId)));
+        locks.filter(lock=>lock.owned).forEach(lock=>tx.delete(lock.ref));
       });
       window.dispatchEvent(new CustomEvent('77waxing:booking-status-changed',{detail:{bookingId,status:'cancelled'}}));
       close();

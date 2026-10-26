@@ -1,4 +1,4 @@
-import { recordOptions, recordTerms } from './customer-record-fields.js?v=20261023-paper';
+import { recordOptions, recordTerms } from './customer-record-fields.js?v=20261026-audit1';
 
 const input=(label,name,type='text',extra='')=>`<label class="record-field">${label}<input name="${name}" type="${type}" ${type==='text'?'maxlength="200"':''} ${extra}>${type==='date'?`<small class="paper-hint" data-roc-for="${name}"></small>`:''}</label>`;
 const checks=(title,name)=>`<fieldset class="paper-choices"><legend>${title}</legend><div>${recordOptions[name].map(value=>`<label><input type="checkbox" name="${name}" value="${value}">${value}${value==='天然類'?'（例：鹽巴）':''}</label>`).join('')}</div></fieldset>`;

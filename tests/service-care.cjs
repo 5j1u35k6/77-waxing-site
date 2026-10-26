@@ -24,7 +24,7 @@ for(const guide of Object.values(care.guides))for(const stage of ['before','duri
 const sent=[];vm.runInContext(fs.readFileSync(path.join(root,'apps-script/Code.gs'),'utf8'),context);
 context.send_=(to,subject,html)=>sent.push({to,subject,html});
 for(const status of ['pending_confirmation','pending_payment','confirmed']){
-  sent.length=0;context.sendForStatus_({status,serviceName:'男士熱蠟｜腹部',customerEmail:'example@example.invalid',customerName:'測試',preferredDate:'2026-10-30',preferredTime:'20:00',durationMinutes:90},{storeEmail:'store@example.invalid'});
+  sent.length=0;context.sendForStatus_({status,depositRequired:status==='confirmed'?false:true,serviceName:'男士熱蠟｜腹部',customerEmail:'example@example.invalid',customerName:'測試',preferredDate:'2026-10-30',preferredTime:'20:00',durationMinutes:90},{storeEmail:'store@example.invalid'});
   const mail=sent.find(v=>v.to==='example@example.invalid');assert.match(mail.html,/施作前注意事項/);assert.match(mail.html,/0.5 公分/);assert.doesNotMatch(mail.html,/隆乳/);assert.match(mail.html,/20:00–21:30/);
   assert.doesNotMatch(mail.subject+mail.html,/訂金/);
   if(status==='pending_payment'){assert.match(mail.subject,/請完成定金付款/);assert.match(mail.html,/待付定金/);assert.match(mail.html,/請依下方資訊完成定金付款/);}
