@@ -57,3 +57,25 @@ vm.runInContext('catalog.push({key:"new",name:"<img src=x onerror=alert(1)>"});r
 assert.match(panel.innerHTML, /&lt;img src=x onerror=alert\(1\)&gt;/);
 assert.doesNotMatch(panel.innerHTML, /<img src=x/);
 console.log('PASS: completed monthly service distribution, current catalog / legacy aliases, status updates, deleted categories, Taipei month boundary and escaped rendering');
+
+// Snapshot data can arrive before the authenticated admin shell is mounted.
+let ready = false, writes = 0, mountedObserver;
+const latePanel = { hidden:false, querySelector:()=>null, get innerHTML(){return this.html||''}, set innerHTML(value){this.html=value;writes++} };
+const lateHost = { querySelector:selector=>selector==='[data-dashboard-v3]'?latePanel:null, querySelectorAll:()=>[] };
+const subscriptions=[];
+const late = vm.createContext({ Intl, Date:FixedDate, Map,
+ document:{body:{},querySelector:()=>ready?lateHost:null,querySelectorAll:()=>[],addEventListener(){}},
+ location:{hash:'#dashboard'},getApps:()=>[{}],getApp:()=>({}),getFirestore:()=>({}),
+ collection:(_db,name)=>name,doc:(_db,collection,id)=>collection+'/'+id,
+ onSnapshot:(ref,callback)=>subscriptions.push({ref,callback}),
+ MutationObserver:class{constructor(callback){mountedObserver=callback}observe(){}},
+ setTimeout(){},addEventListener(){},requestAnimationFrame:callback=>callback(),
+});
+vm.runInContext(source('assets/admin-service-distribution.js')+'\n'+source('assets/admin-dashboard.js'),late);
+subscriptions.find(s=>s.ref==='bookings').callback({docs:[{id:'completed',data:()=>booking('男仕熱蠟｜腹部')}]});
+subscriptions.find(s=>s.ref==='services/catalog-main').callback({exists:()=>true,data:()=>({categories:catalog})});
+assert.equal(writes,0);
+ready=true;mountedObserver();
+assert.match(latePanel.innerHTML,/男仕熱蠟<\/b><small>1 筆/);
+mountedObserver();assert.equal(writes,1,'observer must settle after mounting');
+console.log('PASS: dashboard mounts after early data snapshots without a second navigation or mutation loop');
