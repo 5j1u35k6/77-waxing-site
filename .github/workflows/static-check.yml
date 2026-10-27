@@ -29,6 +29,7 @@ jobs:
           node tests/static-integrity.cjs
           node tests/public-bug-regression.cjs
           node tests/admin-bug-regression.cjs
+          node tests/admin-service-distribution.cjs
           node tests/admin-auth-regression.cjs
           node tests/backend-bug-regression.cjs
           node tests/email-auth-regression.cjs
