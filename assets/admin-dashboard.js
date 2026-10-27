@@ -1,5 +1,6 @@
 import { getApp, getApps } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";
-import { collection, getFirestore, onSnapshot } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
+import { collection, doc, getFirestore, onSnapshot } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
+import { completedServiceDistribution, taipeiMonth } from './admin-service-distribution.js?v=20261027-service1';
 
 const pad=n=>String(n).padStart(2,'0');
 const dateKey=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
@@ -8,15 +9,15 @@ const addDays=(date,amount)=>{const d=new Date(date);d.setDate(d.getDate()+amoun
 const addMinutes=(time,amount)=>{const [h,m]=String(time||'').split(':').map(Number);if(!Number.isFinite(h)||!Number.isFinite(m))return '';const total=h*60+m+amount;return `${pad(Math.floor(total/60)%24)}:${pad(total%60)}`};
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
 const statusLabel=status=>({pending_confirmation:'待確認',pending_payment:'待付款',confirmed:'已確認',completed:'已完成',cancelled:'已取消',no_show:'未到店'}[status]||status||'—');
-const SERVICE_CATEGORIES=['女性熱蠟','男士熱蠟','肌膚管理','美胸保養'];
 let rows=[];
+let catalog=[];
 let lastSignature='';
 
 function root(){return document.querySelector('body.admin-page #admin-preview .dash')}
 function ensure(){const host=root();if(!host)return null;let el=host.querySelector('[data-dashboard-v3]');if(!el){el=document.createElement('section');el.className='admin-dashboard-v3';el.dataset.dashboardV3='1';host.prepend(el);}return el;}
 function range(r){const start=String(r.preferredTime||'').slice(0,5);const duration=Number(r.actualDurationMinutes??r.durationMinutes??0);const lockTimes=Array.isArray(r.lockTimes)?r.lockTimes:[];const fallback=lockTimes.length?addMinutes(lockTimes[lockTimes.length-1],30):String(r.slotEnd||'').slice(0,5);const end=start&&duration?addMinutes(start,duration):fallback;return end?`${start}–${end}`:(start||'—')}
 function currentView(){return (location.hash||'#dashboard').slice(1)||'dashboard'}
-function monthPrefix(date=new Date()){return `${date.getFullYear()}-${pad(date.getMonth()+1)}`}
+function monthPrefix(date=new Date()){return taipeiMonth(date)}
 function dayLabel(date){return `週${'日一二三四五六'[date.getDay()]}`}
 function activeRows(){return rows.filter(r=>!['cancelled','no_show'].includes(r.status))}
 function sidebarLink(label){return [...document.querySelectorAll('.sidebar a')].find(a=>(a.textContent||'').trim()===label)}
@@ -64,17 +65,12 @@ function render(force=false){
   const weekTotal=weekCounts.reduce((sum,n)=>sum+n,0);
   const weekMax=Math.max(1,...weekCounts);
 
-  const serviceMap=new Map(SERVICE_CATEGORIES.map(name=>[name,0]));
-  monthRows.forEach(r=>{
-    const raw=String(r.serviceName||'').split('｜')[0].trim();
-    const name=SERVICE_CATEGORIES.includes(raw)?raw:null;
-    if(name)serviceMap.set(name,(serviceMap.get(name)||0)+1);
-  });
-  const services=SERVICE_CATEGORIES.map(name=>[name,serviceMap.get(name)||0]);
+  const distribution=completedServiceDistribution(rows,catalog,month);
+  const services=distribution.services.map(({name,count})=>[name,count]);
   const serviceMax=Math.max(1,...services.map(([,count])=>count));
-  const hasMonthData=monthRows.length>0;
+  const hasMonthData=distribution.total>0;
 
-  const signature=JSON.stringify({now,todayRows:todayRows.map(r=>[r.id,r.status,r.preferredTime,r.durationMinutes]),monthRows:monthRows.map(r=>[r.id,r.status,r.serviceName,r.isFirstVisit,r.customerPhone]),pending:pending.map(r=>r.id),unpaid:unpaid.map(r=>r.id),next:next?.id||'',weekCounts});
+  const signature=JSON.stringify({now,services,todayRows:todayRows.map(r=>[r.id,r.status,r.preferredTime,r.durationMinutes]),monthRows:monthRows.map(r=>[r.id,r.status,r.serviceName,r.isFirstVisit,r.customerPhone]),pending:pending.map(r=>r.id),unpaid:unpaid.map(r=>r.id),next:next?.id||'',weekCounts});
   if(!force&&signature===lastSignature)return;lastSignature=signature;
 
   panel.innerHTML=`
@@ -107,9 +103,10 @@ function render(force=false){
       </section>
 
       <section class="dashboard-service-panel ${!hasMonthData?'is-empty':''}">
-        <div class="dashboard-v3-title"><div><small>MIX</small><h4>本月服務分布</h4></div></div>
+        <div class="dashboard-v3-title"><div><small>MIX</small><h4>本月服務分布</h4></div><b>${distribution.total} 筆已完成</b></div>
+        <p class="dashboard-inline-empty">依預約日期統計本月已完成服務；待確認、待付款、已確認、已取消及未到店不列入。</p>
         <div class="dashboard-service-bars">${services.map(([name,count])=>`<div><span><b>${esc(name)}</b><small>${count} 筆</small></span><i><em style="width:${count===0?0:Math.max(4,Math.round(count/serviceMax*100))}%"></em></i></div>`).join('')}</div>
-        ${!hasMonthData?`<p class="dashboard-inline-empty">本月尚無預約資料，服務分類仍固定顯示。</p>`:''}
+        ${!hasMonthData?`<p class="dashboard-inline-empty">本月尚無已完成服務。</p>`:''}
       </section>
 
       <section class="dashboard-customer-panel ${monthCustomers.length===0?'is-empty':''}">
@@ -129,6 +126,10 @@ function start(){
   if(!getApps().length)return setTimeout(start,80);
   const db=getFirestore(getApp());
   onSnapshot(collection(db,'bookings'),snap=>{rows=snap.docs.map(d=>({id:d.id,...d.data()}));render();});
+  onSnapshot(doc(db,'services','catalog-main'),snap=>{
+    catalog=snap.exists()&&Array.isArray(snap.data()?.categories)?snap.data().categories:[];
+    render();
+  },()=>{catalog=[];render();});
   document.addEventListener('click',event=>{if(event.target.closest?.('.sidebar a'))setTimeout(syncAfterNavigation,0);},true);
   addEventListener('hashchange',syncAfterNavigation);
   addEventListener('popstate',syncAfterNavigation);
