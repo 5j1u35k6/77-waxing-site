@@ -12,6 +12,7 @@ const statusLabel=status=>({pending_confirmation:'待確認',pending_payment:'�
 let rows=[];
 let catalog=[];
 let lastSignature='';
+let lastHost=null;
 
 function root(){return document.querySelector('body.admin-page #admin-preview .dash')}
 function ensure(){const host=root();if(!host)return null;let el=host.querySelector('[data-dashboard-v3]');if(!el){el=document.createElement('section');el.className='admin-dashboard-v3';el.dataset.dashboardV3='1';host.prepend(el);}return el;}
@@ -31,6 +32,7 @@ function goto(label){
 
 function render(force=false){
   const host=root();const panel=ensure();if(!host||!panel)return;
+  if(host!==lastHost){lastHost=host;lastSignature="";}
   const isDashboard=currentView()==='dashboard';panel.hidden=!isDashboard;if(!isDashboard)return;
   const metrics=host.querySelector('.metrics');
   const original=[...host.querySelectorAll('.panel')].find(x=>!x.matches('.admin-v2-workspace')&&!x.closest('[data-dashboard-v3]'));
@@ -125,6 +127,8 @@ function syncAfterNavigation(){lastSignature='';requestAnimationFrame(()=>render
 function start(){
   if(!getApps().length)return setTimeout(start,80);
   const db=getFirestore(getApp());
+  const mountObserver=new MutationObserver(()=>{const host=root();if(host&&host!==lastHost)render();});
+  mountObserver.observe(document.body,{childList:true,subtree:true});
   onSnapshot(collection(db,'bookings'),snap=>{rows=snap.docs.map(d=>({id:d.id,...d.data()}));render();});
   onSnapshot(doc(db,'services','catalog-main'),snap=>{
     catalog=snap.exists()&&Array.isArray(snap.data()?.categories)?snap.data().categories:[];
