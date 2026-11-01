@@ -9,7 +9,7 @@ const DEFAULT_EMAIL_URL = "https://script.google.com/macros/s/AKfycbx6iC26KXbHWY
 const DEFAULT_SETTINGS = {
   storeName: "77waxing",
   heroEyebrow: "77WAXING SELECT",
-  heroTitle: "把日常保養需要的，簡單整理給你。",
+  heroTitle: "77select",
   heroDescription: "產品內容會由 77waxing 後台持續更新；價格、庫存與交付方式以訂單確認內容為準。",
   storeEmail: "77waxing.mail@gmail.com",
   enablePickup: true,
@@ -101,11 +101,13 @@ async function loadSettings() {
   const snap = await getDoc(doc(db, "shopSettings", "public")).catch(() => null);
   settings = snap?.exists() ? { ...DEFAULT_SETTINGS, ...snap.data() } : { ...DEFAULT_SETTINGS };
   $("#hero-eyebrow").textContent = settings.heroEyebrow || DEFAULT_SETTINGS.heroEyebrow;
-  $("#hero-title").textContent = settings.heroTitle || DEFAULT_SETTINGS.heroTitle;
+  const heroTitle = settings.heroTitle;
+  $("#hero-title").textContent = typeof heroTitle === "string" && heroTitle.trim() ? heroTitle : DEFAULT_SETTINGS.heroTitle;
   $("#hero-description").textContent = settings.heroDescription || DEFAULT_SETTINGS.heroDescription;
   const email = settings.storeEmail || DEFAULT_SETTINGS.storeEmail;
   $("#store-email-link").textContent = email;
   $("#store-email-link").href = `mailto:${email}`;
+  document.documentElement.classList.remove("shop-hero-pending");
 }
 async function loadProducts() {
   const snap = await getDocs(query(collection(db, "shopProducts"), where("active", "==", true)));
