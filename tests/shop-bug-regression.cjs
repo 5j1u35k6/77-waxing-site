@@ -13,6 +13,50 @@ const part = (file, start, end) => {
 const snap = (data, id = '') => ({ id, exists: () => data != null, data: () => data });
 
 async function unitTests() {
+  const heroHtml = read('shop/index.html');
+  assert.doesNotMatch(heroHtml, /把日常保養需要的，簡單整理給你/);
+  assert.match(heroHtml, /<h1 id="hero-title">77select<\/h1>/);
+  assert.match(heroHtml, /\.shop-hero-pending #hero-title\{visibility:hidden\}/);
+  const heroBootstrap = heroHtml.match(/<script id="shop-hero-loading">([\s\S]*?)<\/script>/)[1];
+  const heroDefaults = part('shop/app.js', 'const DEFAULT_SETTINGS =', 'const STATUS =');
+  const heroSource = part('shop/app.js', 'async function loadSettings()', 'async function loadProducts()');
+  const makeHero = (getDoc) => {
+    const classes = new Set(), nodes = new Map(), timers = [];
+    const context = vm.createContext({
+      document: { documentElement: { classList: { add: name => classes.add(name), remove: name => classes.delete(name) } } },
+      window: { setTimeout: (callback, delay) => { assert.equal(delay, 10000); timers.push(callback); } },
+      DEFAULT_EMAIL_URL: 'https://example.invalid/email', settings: {}, db: {}, doc: () => ({}), getDoc,
+      $: selector => { if (!nodes.has(selector)) nodes.set(selector, { textContent: selector === '#hero-title' ? '77select' : '' }); return nodes.get(selector); },
+    });
+    vm.runInContext(heroBootstrap + heroDefaults + heroSource, context);
+    return { context, classes, nodes, timers };
+  };
+  let resolveHero;
+  const slowHero = makeHero(() => new Promise(resolve => { resolveHero = resolve; }));
+  const heroRequest = slowHero.context.loadSettings();
+  assert.equal(slowHero.classes.has('shop-hero-pending'), true, 'hide the placeholder before settings arrive');
+  assert.equal(slowHero.nodes.size, 0, 'a pending request cannot write a default advertisement');
+  const configuredTitle = '讓 保 養 回 歸 簡 單，讓 選 擇 更 有 方 向。';
+  resolveHero(snap({ heroTitle: configuredTitle }));
+  await heroRequest;
+  assert.equal(slowHero.nodes.get('#hero-title').textContent, configuredTitle, 'preserve the exact configured spacing');
+  assert.equal(slowHero.classes.has('shop-hero-pending'), false);
+  slowHero.timers[0]();
+  assert.equal(slowHero.nodes.get('#hero-title').textContent, configuredTitle, 'late fallback timer cannot overwrite settings');
+  for (const value of [null, {}, { heroTitle: '' }, { heroTitle: '   ' }, { heroTitle: 123 }]) {
+    const state = makeHero(async () => snap(value));
+    await state.context.loadSettings();
+    assert.equal(state.nodes.get('#hero-title').textContent, '77select', 'missing or invalid title falls back to brand');
+    assert.equal(state.classes.has('shop-hero-pending'), false);
+  }
+  const failedHero = makeHero(async () => { throw Error('offline'); });
+  await failedHero.context.loadSettings();
+  assert.equal(failedHero.nodes.get('#hero-title').textContent, '77select');
+  assert.equal(failedHero.classes.has('shop-hero-pending'), false);
+  const blockedModule = makeHero(async () => snap(null));
+  blockedModule.timers[0]();
+  assert.equal(blockedModule.classes.has('shop-hero-pending'), false, 'unavailable module cannot leave heading hidden forever');
+
   const guard = vm.createContext({ console: { warn() {} }, localStorage: { setItem() { throw Error('full'); } } });
   vm.runInContext(read('shop/checkout-guard.js').replace(/\bexport /g, ''), guard);
   const form = {};
