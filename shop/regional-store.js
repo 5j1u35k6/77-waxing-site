@@ -3,6 +3,7 @@ import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.18.0/f
 import { collection, doc, getDoc, getDocFromServer, getDocs, onSnapshot, query, serverTimestamp, setDoc, where } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
 import { getPublicFirebase } from "../assets/public-firebase.js?v=20261026-audit1";
 import { beginCheckout, finishCheckout, cartFingerprint, validateOrderData, savePreference } from "./checkout-guard.js?v=20261026-audit1";
+import { allProducts, catalogCategories, catalogCategory, filterProducts } from "./series.js?v=20261123-select1";
 
 const { auth, db } = getPublicFirebase();
 const CART_KEY = "77select_cart_v4";
@@ -221,10 +222,10 @@ function renderProducts() {
   const grid = $("#product-grid");
   if (!grid) return;
   renderingProducts = true;
-  const activeCategory = $("#category-filters .filter-btn.on")?.dataset.category || "全部商品";
-  const visible = activeCategory === "全部商品" ? products : products.filter((p) => (p.category || "其他") === activeCategory);
+  const activeCategory = $("#category-filters .filter-btn.on")?.dataset.category || allProducts;
+  const visible = filterProducts(products, activeCategory);
   if (!visible.length) {
-    grid.innerHTML = `<div class="empty-state">目前沒有可訂購商品。</div>`;
+    grid.innerHTML = `<div class="empty-state" data-regional-empty>${activeCategory === allProducts ? "目前沒有可訂購的商品。" : "此系列目前尚無商品。"}</div>`;
     renderingProducts = false;
     return;
   }
@@ -241,7 +242,7 @@ function renderProducts() {
         <div class="product-top"><h3 class="product-title">${esc(product.name)}</h3><div class="product-price">${priceText}</div></div>
         ${hasBulk ? `<div class="bulk-badge">多件優惠</div>` : ""}
         <p class="product-desc">${esc(product.description || "")}</p>
-        <div class="product-meta"><span>${esc(product.category || "其他")}</span><span>${variants.length} 種規格${stock > 0 ? `｜共 ${stock} 件` : "｜目前售完"}</span></div>
+        <div class="product-meta"><span>${esc(catalogCategory(product.category))}</span><span>${variants.length} 種規格${stock > 0 ? `｜共 ${stock} 件` : "｜目前售完"}</span></div>
         <div class="product-actions"><button class="primary-btn" data-regional-buy="${esc(product.id)}" ${stock <= 0 ? "disabled" : ""}>${stock <= 0 ? "售完" : variants.length > 1 || hasBulk ? "選擇規格" : "加入購物車"}</button><button class="secondary-btn" data-regional-detail="${esc(product.id)}">詳情</button></div>
       </div>
     </article>`;
@@ -252,10 +253,10 @@ function renderProducts() {
 function renderFilters() {
   const host = $("#category-filters");
   if (!host) return;
-  const current = host.querySelector(".filter-btn.on")?.dataset.category || "全部商品";
-  const categories = ["全部商品", ...new Set(products.map((p) => String(p.category || "其他").trim()).filter(Boolean))];
-  const chosen = categories.includes(current) ? current : "全部商品";
-  host.innerHTML = categories.map((name) => `<button class="filter-btn${name === chosen ? " on" : ""}" type="button" data-regional-category="${esc(name)}" data-category="${esc(name)}">${esc(name)}</button>`).join("");
+  const current = host.querySelector(".filter-btn.on")?.dataset.category || allProducts;
+  const categories = catalogCategories(products);
+  const chosen = categories.includes(current) ? current : allProducts;
+  host.innerHTML = categories.map((name) => `<button class="filter-btn${name === chosen ? " on" : ""}" type="button" data-regional-category="${esc(name)}" data-category="${esc(name)}" aria-pressed="${name === chosen}">${esc(name)}</button>`).join("");
 }
 
 function renderProductDetail() {
@@ -276,7 +277,7 @@ function renderProductDetail() {
   body.innerHTML = `<div class="product-detail regional-product-detail regional-product-detail-v2${detailMedia.length ? "" : " detail-gallery-empty"}">
     ${gallery}
     <section class="product-detail-copy product-detail-info-column">
-      <span class="eyebrow">${esc(selectedProduct.category || "PRODUCT")}</span>
+      <span class="eyebrow">${esc(catalogCategory(selectedProduct.category))}</span>
       <h2>${esc(selectedProduct.name)}</h2>
       <p>${esc(selectedProduct.description || "")}</p>
       <div class="variant-picker" role="radiogroup" aria-label="選擇商品規格">
@@ -709,7 +710,11 @@ function bindCaptureHandlers() {
     if (categoryButton) {
       event.preventDefault();
       event.stopImmediatePropagation();
-      $$("#category-filters .filter-btn").forEach((button) => button.classList.toggle("on", button === categoryButton));
+      $$("#category-filters .filter-btn").forEach((button) => {
+        const selected = button === categoryButton;
+        button.classList.toggle("on", selected);
+        button.setAttribute("aria-pressed", String(selected));
+      });
       renderProducts();
       return;
     }
@@ -796,7 +801,12 @@ function keepRegionalViewsAuthoritative() {
   const grid = $("#product-grid");
   if (grid) {
     new MutationObserver(() => {
-      if (!renderingProducts && products.length && !grid.querySelector("[data-regional-buy]")) queueMicrotask(renderProducts);
+      if (!renderingProducts && products.length && !grid.querySelector("[data-regional-buy], [data-regional-empty]")) {
+        queueMicrotask(() => {
+          renderFilters();
+          renderProducts();
+        });
+      }
     }).observe(grid, { childList: true, subtree: true });
   }
   const orders = $("#orders-list");

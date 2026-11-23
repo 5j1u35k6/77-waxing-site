@@ -1,5 +1,6 @@
 import { collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
 import { getPublicFirebase } from "../assets/public-firebase.js?v=20261026-audit1";
+import { catalogCategory } from "./series.js?v=20261123-select1";
 
 const { db } = getPublicFirebase();
 const products = new Map();
@@ -85,7 +86,7 @@ function formatCard(card) {
   const code = marketCode();
   const range = priceRange(product, code);
   const bulk = hasBulkDiscount(product, code);
-  const category = String(product.category || "其他").trim() || "其他";
+  const category = catalogCategory(product.category);
   const signature = `${code}|${range}|${category}|${bulk ? 1 : 0}`;
 
   /* Keep the regional storefront's original controls in place. Moving/replacing

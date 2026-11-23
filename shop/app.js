@@ -3,6 +3,7 @@ import { browserLocalPersistence, onAuthStateChanged, setPersistence, signInAnon
 import { addDoc, collection, doc, getDoc, getDocs, onSnapshot, query, serverTimestamp, setDoc, where } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
 import { getPublicFirebase } from "../assets/public-firebase.js?v=20261026-audit1";
 import { beginCheckout, finishCheckout, cartFingerprint, validateOrderData, savePreference } from "./checkout-guard.js?v=20261026-audit1";
+import { allProducts, catalogCategories, catalogCategory, filterProducts } from "./series.js?v=20261123-select1";
 
 const { auth, db } = getPublicFirebase();
 const DEFAULT_EMAIL_URL = "https://script.google.com/macros/s/AKfycbx6iC26KXbHWYte5XhLGNRMmG16Yydx2vPHDxYpmp4rmWn3plk__6Qwwr7Y09hLptTW/exec";
@@ -35,8 +36,9 @@ const STATUS = {
 
 let settings = { ...DEFAULT_SETTINGS };
 let products = [];
+let productsLoaded = false;
 let cart = loadCart();
-let category = "全部商品";
+let category = allProducts;
 let currentUser = null;
 let ordersUnsub = null;
 let messagesUnsub = null;
@@ -86,7 +88,11 @@ function toast(message, type = "ok") {
 function setTab(name) {
   $$("[data-tab]").forEach((button) => button.classList.toggle("on", button.dataset.tab === name));
   $$("[data-view]").forEach((section) => section.classList.toggle("hidden", section.dataset.view !== name));
-  window.scrollTo({ top: 0, behavior: "smooth" });
+  $$(".select-nav [data-tab]").forEach((button) => {
+    if (button.dataset.tab === name) button.setAttribute("aria-current", "page");
+    else button.removeAttribute("aria-current");
+  });
+  window.scrollTo({ top: 0, behavior: "instant" });
 }
 function openLayer(selector) {
   $(selector).classList.remove("hidden");
@@ -114,6 +120,8 @@ async function loadProducts() {
   products = snap.docs
     .map((row) => ({ id: row.id, ...row.data() }))
     .sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0) || String(a.name || "").localeCompare(String(b.name || ""), "zh-Hant"));
+  productsLoaded = true;
+  category = $("#category-filters .filter-btn.on")?.dataset.category || category;
   renderFilters();
   renderProducts();
   reconcileCart();
@@ -134,21 +142,37 @@ function reconcileCart() {
   if (changed) saveCart(); else renderCart();
 }
 function renderFilters() {
-  const categories = ["全部商品", ...new Set(products.map((p) => String(p.category || "其他").trim()).filter(Boolean))];
-  if (!categories.includes(category)) category = "全部商品";
-  $("#category-filters").innerHTML = categories.map((name) => `<button class="filter-btn${name === category ? " on" : ""}" data-category="${esc(name)}">${esc(name)}</button>`).join("");
-  $$("[data-category]").forEach((button) => {
-    button.onclick = () => { category = button.dataset.category; renderFilters(); renderProducts(); };
+  const categories = catalogCategories(products);
+  if (!categories.includes(category)) category = allProducts;
+  $("#category-filters").innerHTML = categories.map((name) => `<button class="filter-btn${name === category ? " on" : ""}" type="button" data-category="${esc(name)}" aria-pressed="${name === category}">${esc(name)}</button>`).join("");
+  $$("#category-filters [data-category]").forEach((button) => {
+    button.onclick = () => selectCategory(button.dataset.category);
   });
+}
+function selectCategory(name) {
+  category = name;
+  renderFilters();
+  if (productsLoaded) renderProducts();
+}
+function selectSeriesFromHome(event) {
+  const button = event.target.closest?.("[data-select-series]");
+  if (!button) return;
+  const name = button.dataset.selectSeries;
+  const filter = $$("#category-filters [data-category]").find((item) => item.dataset.category === name);
+  if (filter) {
+    filter.click();
+  } else {
+    selectCategory(name);
+  }
 }
 function mediaMarkup(product) {
   if (!product.imageUrl) return `<div class="product-media">77waxing</div>`;
   return `<div class="product-media"><img src="${esc(product.imageUrl)}" alt="${esc(product.name)}" loading="lazy"></div>`;
 }
 function renderProducts() {
-  const visible = category === "全部商品" ? products : products.filter((p) => (p.category || "其他") === category);
+  const visible = filterProducts(products, category);
   if (!visible.length) {
-    $("#product-grid").innerHTML = `<div class="empty-state">目前沒有可訂購商品。後台新增或上架商品後會自動顯示在這裡。</div>`;
+    $("#product-grid").innerHTML = `<div class="empty-state">${category === allProducts ? "目前沒有可訂購的商品。" : "此系列目前尚無商品。"}</div>`;
     return;
   }
   $("#product-grid").innerHTML = visible.map((p) => {
@@ -158,7 +182,7 @@ function renderProducts() {
       <div class="product-body">
         <div class="product-top"><h3 class="product-title">${esc(p.name)}</h3><div class="product-price">${money(p.price)}</div></div>
         <p class="product-desc">${esc(p.description || "")}</p>
-        <div class="product-meta"><span>${esc(p.category || "其他")}</span><span>${stock > 0 ? `庫存 ${stock}` : "目前售完"}</span></div>
+        <div class="product-meta"><span>${esc(catalogCategory(p.category))}</span><span>${stock > 0 ? `庫存 ${stock}` : "目前售完"}</span></div>
         <div class="product-actions"><button class="primary-btn" data-add="${p.id}" ${stock <= 0 ? "disabled" : ""}>${stock <= 0 ? "售完" : "加入購物車"}</button><button class="secondary-btn" data-detail="${p.id}">詳情</button></div>
       </div>
     </article>`;
@@ -172,7 +196,7 @@ function openProduct(id) {
   selectedProduct = product;
   $("#product-detail-body").innerHTML = `<div class="product-detail">
     ${mediaMarkup(product)}
-    <div><span class="eyebrow">${esc(product.category || "PRODUCT")}</span><h2>${esc(product.name)}</h2><div class="product-price">${money(product.price)}</div><p>${esc(product.description || "")}</p>${product.spec ? `<div class="spec">${esc(product.spec)}</div>` : ""}<p class="order-date">${Number(product.stock || 0) > 0 ? `目前庫存：${Number(product.stock)}` : "目前售完"}</p></div>
+    <div><span class="eyebrow">${esc(catalogCategory(product.category))}</span><h2>${esc(product.name)}</h2><div class="product-price">${money(product.price)}</div><p>${esc(product.description || "")}</p>${product.spec ? `<div class="spec">${esc(product.spec)}</div>` : ""}<p class="order-date">${Number(product.stock || 0) > 0 ? `目前庫存：${Number(product.stock)}` : "目前售完"}</p></div>
   </div>`;
   $("#product-detail-add").disabled = Number(product.stock || 0) <= 0;
   $("#product-detail-add").textContent = Number(product.stock || 0) > 0 ? "加入購物車" : "目前售完";
@@ -452,8 +476,13 @@ async function ensureAuth() {
   if (!auth.currentUser) await signInAnonymously(auth);
 }
 function bindUI() {
-  $$("[data-tab]").forEach((button) => { button.onclick = () => setTab(button.dataset.tab); });
-  $("#hero-shop").onclick = () => setTab("shop");
+  document.addEventListener("click", selectSeriesFromHome, true);
+  $$("[data-tab]").forEach((button) => {
+    button.onclick = () => {
+      setTab(button.dataset.tab);
+      if (button.dataset.tab === "products") $("#shop-catalog-title")?.focus({ preventScroll: true });
+    };
+  });
   $("#cart-open").onclick = () => openLayer("#cart-wrap");
   $("#cart-close").onclick = () => closeLayer("#cart-wrap");
   $("#cart-backdrop").onclick = () => closeLayer("#cart-wrap");
