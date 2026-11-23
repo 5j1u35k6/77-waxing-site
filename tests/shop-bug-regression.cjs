@@ -240,6 +240,7 @@ async function browserTests() {
       });
       await page.goto(origin + entry);
       await page.waitForFunction(() => document.querySelector('[data-regional-detail]') && window.__shop.authCallbacks.length >= 4);
+      await page.getByRole('button', { name: '更多商品', exact: true }).click();
       await page.waitForTimeout(400);
       await page.evaluate(() => {
         const oldCallbacks = window.__shop.subscriptions.filter(sub => sub.ref.col === 'shopOrders');
@@ -254,6 +255,9 @@ async function browserTests() {
       assert.doesNotMatch(await page.locator('#orders-list').innerText(), /B-old/, 'logout clears orders immediately');
       await page.evaluate(() => window.__shop.switchUser('B'));
       const addQuantity = async (productId, count) => {
+        if (!(await page.locator('#shop-catalog').isVisible())) {
+          await page.getByRole('button', { name: '更多商品', exact: true }).click();
+        }
         await page.locator(`[data-regional-detail="${productId}"]`).click();
         await page.waitForTimeout(80);
         for (let i = 1; i < count; i++) await page.locator('[data-detail-qty="1"]').click();
