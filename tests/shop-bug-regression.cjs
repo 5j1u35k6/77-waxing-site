@@ -208,7 +208,9 @@ async function browserTests() {
         const saved = JSON.parse(sessionStorage.getItem('shop-regression-fixture') || 'null');
         const state = window.__shop = {
           auth: { currentUser: null }, authCallbacks: [], subscriptions: [], writes: [],
-          products: { p: { active: true, name: '測試商品', category: '黑瓶♾️修護系列', stock: 10, variants: [{ id: 'v', name: '一般', capacity: '100ml', priceTWD: 100, priceHKD: 30, stock: 10 }] },
+          products: { p: { active: true, name: '測試商品', category: '黑瓶♾️修護系列', stock: 10,
+            imageUrl: '/77-waxing-site/shop/select-series-repair.jpg', slogan: '保養標語', precautions: '商品注意事項', addOnProductIds: ['other'],
+            variants: [{ id: 'v', name: '一般', capacity: '100ml', priceTWD: 100, priceHKD: 30, stock: 10 }, { id: 'v-alt', name: '加大', capacity: '200ml', priceTWD: 140, priceHKD: 40, stock: 10 }] },
             other: { active: true, name: '另一件商品', category: '保養', stock: 10, variants: [{ id: 'v2', name: '一般', capacity: '50ml', priceTWD: 80, priceHKD: 25, stock: 10 }] } },
           settings: { enablePickup: true, enableCashPickup: true, enableTransfer: true, promotions: [], homeContent: { about: '首頁品牌介紹', featuredProductIds: ['p', '', 'other'] } },
           orders: { 'A-old': { orderNo: 'A-old', ownerUid: 'A', items: [], total: 111, status: 'pending' }, 'B-old': { orderNo: 'B-old', ownerUid: 'B', items: [], total: 222, status: 'pending' } },
@@ -249,6 +251,15 @@ async function browserTests() {
       await page.goto(origin + entry);
       await page.locator('.select-featured-product').first().waitFor({ state: 'visible' });
       assert.match(await page.locator('.select-about-content').innerText(), /首頁品牌介紹/);
+      assert.ok(await page.locator('.select-hero').evaluate(hero => hero.getBoundingClientRect().bottom >= innerHeight - 1), 'hero fills the first screen under the header');
+      assert.ok(await page.locator('#cart-count').evaluate(badge => {
+        badge.textContent = '10';
+        const bounds = badge.getBoundingClientRect();
+        const range = document.createRange();
+        range.selectNodeContents(badge);
+        const text = range.getBoundingClientRect();
+        return text.top >= bounds.top && text.bottom <= bounds.bottom && text.left >= bounds.left && text.right <= bounds.right;
+      }), 'the badge frames both digits vertically and horizontally');
       assert.equal(await page.locator('.select-featured-product').count(), 2, 'homepage reads the featured product settings without occupying every slot');
       for (const grid of ['.select-featured-grid', '.select-collection-grid']) {
         assert.equal((await page.locator(grid).evaluate(el => getComputedStyle(el).gridTemplateColumns)).split(' ').length, 1, `${grid}: one card per phone row`);
@@ -260,6 +271,10 @@ async function browserTests() {
         const state = await page.locator('main').count() ? await page.locator('main').innerText() : await page.locator('body').innerText();
         throw new Error(`Could not open the collection at ${page.url()}\n${state}\n${errors.join('\n')}`, { cause: error });
       });
+      assert.ok(await page.locator('[data-regional-detail="p"] .select-catalog-photo').evaluate(photo => {
+        const dimensions = photo.getBoundingClientRect();
+        return Math.abs(dimensions.width - dimensions.height) <= 1;
+      }), 'phone product tiles use a large square photo');
       assert.equal(await page.locator('[data-regional-detail="other"]').count(), 0, 'legacy category remains searchable under the new series name');
       await page.reload();
       await page.locator('[data-regional-detail="p"]').waitFor({ state: 'visible' });
@@ -331,6 +346,22 @@ async function browserTests() {
       const cart = await page.evaluate(() => JSON.parse(localStorage.getItem('77select_cart_v4')));
       assert.equal(cart.length, 1, 'a promotion checkout clears the live regional cart');
       assert.equal(cart[0].productId, 'other');
+      await page.getByRole('link', { name: '更多商品', exact: true }).click();
+      await page.locator('[data-regional-detail="p"]').click();
+      await page.locator('#product-add-ons-title').waitFor({ state: 'visible' });
+      assert.ok(await page.evaluate(() => {
+        const positions = ['.select-product-gallery', '#product-page-title', '.select-product-slogan', '#product-precautions-title', '#product-detail-price', '#product-detail-qty-picker', '#product-add-ons-title']
+          .map(selector => document.querySelector(selector).getBoundingClientRect().top);
+        return positions.every((position, index) => index === 0 || position > positions[index - 1]);
+      }), 'product details follow the intended reading order on a phone');
+      const addOn = page.getByRole('combobox', { name: '加購 另一件商品' });
+      assert.match(await addOn.innerText(), /NT\$80/);
+      await addOn.selectOption('v2');
+      await page.locator('[data-regional-variant="v-alt"]').click();
+      assert.equal(await addOn.inputValue(), 'v2', 'changing the main variant keeps the selected add-on');
+      await page.locator('#product-detail-add').click();
+      const bundledCart = await page.evaluate(() => JSON.parse(localStorage.getItem('77select_cart_v4')));
+      assert.deepEqual(bundledCart.map(row => [row.productId, row.variantId, row.qty, row.price]), [['other', 'v2', 2, 80], ['p', 'v-alt', 1, 140]], 'configured extras and main variant join the same cart using live prices');
       const mutations = await page.evaluate(() => new Promise(resolve => {
         let count = 0;
         const observer = new MutationObserver(records => { count += records.length; });
