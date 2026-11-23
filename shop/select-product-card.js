@@ -1,4 +1,4 @@
-import { productHref } from "./select-routes.js?v=20261123-select2";
+import { productHref } from "./select-routes.js?v=20261124-series1";
 
 const escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (character) =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[character]);

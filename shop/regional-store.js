@@ -3,11 +3,11 @@ import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.18.0/f
 import { collection, doc, getDoc, getDocFromServer, getDocs, onSnapshot, query, serverTimestamp, setDoc, where } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
 import { getPublicFirebase } from "../assets/public-firebase.js?v=20261026-audit1";
 import { beginCheckout, finishCheckout, cartFingerprint, validateOrderData, savePreference } from "./checkout-guard.js?v=20261026-audit1";
-import { allProducts, catalogCategories, catalogCategory, filterProducts } from "./series.js?v=20261123-select2";
-import { collectionHref, productHref, storeHomeHref, storeRoute } from "./select-routes.js?v=20261123-select2";
-import { renderSelectHomeProducts } from "./select-home-content.js?v=20261123-select2";
-import { setProductPageMetadata } from "./seo.js?v=20261123-select2";
-import { selectProductCard } from "./select-product-card.js?v=20261123-mobile1";
+import { allProducts, catalogCategories, catalogCategory, filterProducts } from "./series.js?v=20261124-series1";
+import { collectionHref, productHref, storeHomeHref, storeRoute } from "./select-routes.js?v=20261124-series1";
+import { renderSelectHomeProducts } from "./select-home-content.js?v=20261124-series1";
+import { setProductPageMetadata } from "./seo.js?v=20261124-series1";
+import { selectProductCard } from "./select-product-card.js?v=20261124-series1";
 
 const { auth, db } = getPublicFirebase();
 const CART_KEY = "77select_cart_v4";
@@ -189,13 +189,12 @@ function ensureMarketBadge() {
     badge = document.createElement("span");
     badge.id = "market-badge";
     badge.className = "market-badge";
-    const cartButton = $("#cart-open");
-    cartButton?.parentElement?.insertBefore(badge, cartButton);
   }
-  if (badge) {
-    badge.textContent = market.label;
-    badge.setAttribute("aria-label", `目前地區：${market.label}`);
-  }
+  const headerNav = $(".select-header .select-nav");
+  if (headerNav && badge.parentElement !== headerNav) headerNav.append(badge);
+  badge.textContent = market.label;
+  badge.setAttribute("role", "status");
+  badge.setAttribute("aria-label", `目前地區：${market.label}`);
   document.documentElement.dataset.market = market.code;
 }
 

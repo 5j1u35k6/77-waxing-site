@@ -1,4 +1,5 @@
-import { productHref } from "./select-routes.js?v=20261123-select2";
+import { productHref, storeRoute } from "./select-routes.js?v=20261124-series1";
+import { collectionKey, seriesSlogan } from "./series.js?v=20261124-series1";
 
 const copySections = {
   about: ".select-about-content",
@@ -9,9 +10,23 @@ const heroImage = document.querySelector(".select-hero-media img");
 const defaultHeroImage = heroImage?.getAttribute("src");
 const defaultSeriesCovers = [...document.querySelectorAll(".select-collection[data-shop-collection]")]
   .map((link) => ({ link, cover: link.firstElementChild.cloneNode(true) }));
+const collectionSlogan = document.querySelector("[data-catalog-slogan]");
+const catalogSeriesKey = storeRoute.view === "products" ? collectionKey(storeRoute.category) : null;
 const featuredSlots = [...document.querySelectorAll(".select-featured-slot")];
 let featuredIds = [];
 let publicProducts = new Map();
+
+function renderSeriesSlogans(overrides) {
+  for (const { link } of defaultSeriesCovers) {
+    const slogan = link.querySelector("[data-series-slogan]");
+    if (slogan) slogan.textContent = seriesSlogan(link.dataset.shopCollection, overrides);
+  }
+  if (collectionSlogan) {
+    const text = seriesSlogan(catalogSeriesKey, overrides);
+    collectionSlogan.textContent = text;
+    collectionSlogan.hidden = !text;
+  }
+}
 
 function httpsImage(value) {
   const url = typeof value === "string" ? value.trim() : "";
@@ -73,6 +88,7 @@ function renderFeatured() {
 
 export function renderSelectHomeSettings(settings = {}) {
   const content = settings && typeof settings === "object" ? settings : {};
+  renderSeriesSlogans(content.seriesSlogans);
   if (heroImage) {
     const url = httpsImage(content.heroImageUrl);
     heroImage.src = url || defaultHeroImage;

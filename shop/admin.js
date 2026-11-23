@@ -3,7 +3,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/12.18.0/fireba
 import { browserLocalPersistence, getAuth, onAuthStateChanged, setPersistence, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
 import { addDoc, collection, deleteDoc, doc, getDoc, getFirestore, onSnapshot, runTransaction, serverTimestamp, setDoc, updateDoc } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
 import { firebaseConfig } from "../assets/firebase-config.js?v=20261026-audit1";
-import { allProducts, catalogCategories, catalogCategory, categoryFromCollectionKey, filterProducts } from "./series.js?v=20261123-select2";
+import { allProducts, catalogCategories, catalogCategory, categoryFromCollectionKey, filterProducts, seriesSlogan } from "./series.js?v=20261124-series1";
 
 const app = initializeApp(firebaseConfig, "77waxing-shop-admin");
 const auth = getAuth(app);
@@ -29,6 +29,7 @@ const DEFAULT_SETTINGS = {
 const STATUS = { pending: "待確認", confirmed: "已確認", packing: "備貨中", ready: "待自取", shipped: "已出貨", completed: "已完成", cancelled: "已取消" };
 const STOREFRONT_URL = "https://5j1u35k6.github.io/77select/";
 const MAX_ADD_ON_PRODUCTS = 8;
+const MAX_SERIES_SLOGAN_LENGTH = 80;
 const SERIES_COVERS = [
   ["black-bottle", "./select-series-repair.jpg"],
   ["25-plus", "./select-series-25-plus.jpg"],
@@ -745,8 +746,13 @@ function renderHomepage() {
     </section>
     <section class="admin-editor-section" aria-labelledby="home-series-title">
       <h3 id="home-series-title">商品系列</h3>
+      <p class="order-date">首頁系列卡片和系列頁會顯示相同標語。留空會恢復預設標語。</p>
       <div class="admin-home-series">
-        ${SERIES_COVERS.map(([id, label, defaultImage]) => homepageImageField(`h-cover-${id}`, `${label}封面網址`, home.seriesImages?.[id], defaultImage)).join("")}
+        ${SERIES_COVERS.map(([id, label, defaultImage]) => `<div class="field">
+          ${homepageImageField(`h-cover-${id}`, `${label}封面網址`, home.seriesImages?.[id], defaultImage)}
+          <label for="h-slogan-${id}">${esc(label)}標語</label>
+          <input id="h-slogan-${id}" maxlength="${MAX_SERIES_SLOGAN_LENGTH}" value="${esc(seriesSlogan(id, home.seriesSlogans))}" placeholder="${esc(seriesSlogan(id))}">
+        </div>`).join("")}
       </div>
     </section>
     <section class="admin-editor-section" aria-labelledby="home-reviews-title">
@@ -789,6 +795,15 @@ async function saveHomepage(event) {
     return flash("請使用可公開瀏覽的 HTTPS 圖片網址。", "error");
   }
 
+  const seriesSlogans = Object.fromEntries(SERIES_COVERS.flatMap(([id]) => {
+    const input = form.querySelector(`#h-slogan-${id}`);
+    const text = input.value.trim();
+    return text === input.defaultValue ? [] : [[id, text]];
+  }));
+  if (Object.values(seriesSlogans).some((text) => text.length > MAX_SERIES_SLOGAN_LENGTH)) {
+    return flash(`系列標語最多可輸入 ${MAX_SERIES_SLOGAN_LENGTH} 個字。`, "error");
+  }
+
   const featuredProductIds = [0, 1, 2].map((index) => value(`h-feature-${index}`));
   const selectedProducts = featuredProductIds.filter(Boolean);
   if (new Set(selectedProducts).size !== selectedProducts.length) {
@@ -800,6 +815,7 @@ async function saveHomepage(event) {
     about: value("h-about"),
     featuredProductIds,
     seriesImages,
+    ...(Object.keys(seriesSlogans).length ? { seriesSlogans } : {}),
     reviews: value("h-reviews"),
     faq: value("h-faq"),
   };
@@ -810,6 +826,11 @@ async function saveHomepage(event) {
     await setDoc(doc(db, "shopSettings", "public"), { heroTitle, homeContent, updatedAt: serverTimestamp() }, { merge: true });
     await audit("homepage_update", "public");
     if (!form.isConnected) return;
+    for (const id of Object.keys(seriesSlogans)) {
+      const input = form.querySelector(`#h-slogan-${id}`);
+      input.value = seriesSlogan(id, seriesSlogans);
+      input.defaultValue = input.value;
+    }
     form.dataset.dirty = "";
     flash("首頁內容已儲存。");
   } catch (error) {

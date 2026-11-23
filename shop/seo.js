@@ -1,5 +1,5 @@
-import { allProducts } from "./series.js?v=20261123-select2";
-import { canonicalStoreHref, storeRoute } from "./select-routes.js?v=20261123-select2";
+import { allProducts } from "./series.js?v=20261124-series1";
+import { canonicalStoreHref, storeRoute } from "./select-routes.js?v=20261124-series1";
 
 const URL='https://5j1u35k6.github.io/77select/';
 

@@ -1,9 +1,25 @@
+export const blackBottleSeries = "黑瓶♾\uFE0E修護系列";
+
 const series = [
-  ["black-bottle", "黑瓶無限修護系列", ["黑瓶♾️修護系列", "黑瓶♾修護系列", "黑瓶∞修護系列", "極致呵護無香系列"]],
+  ["black-bottle", blackBottleSeries, ["黑瓶無限修護系列", "黑瓶♾️修護系列", "黑瓶♾修護系列", "黑瓶∞修護系列", "極致呵護無香系列"]],
   ["25-plus", "25+系列", ["新生·激光系列"]],
   ["body-polish", "身體拋光系列", ["纖皙·金緻油系列", "超激白系列"]],
   ["five-minutes", "5分鐘出門系列", []],
 ];
+
+const defaultSlogans = new Map([
+  ["black-bottle", "日常清潔與保養，從簡單的步驟開始。"],
+  ["25-plus", "給每天留一點時間，慢慢養成保養習慣。"],
+  ["body-polish", "把沐浴後的幾分鐘，留給身體保養。"],
+  ["five-minutes", "出門前留五分鐘，把日常照顧好。"],
+]);
+
+export function seriesSlogan(key, overrides) {
+  const fallback = defaultSlogans.get(key);
+  if (!fallback) return "";
+  const custom = overrides?.[key];
+  return (typeof custom === "string" && custom.trim()) || fallback;
+}
 
 const labels = new Map(series.flatMap(([, label, aliases]) =>
   [label, ...aliases].map((name) => [name, label])

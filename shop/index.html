@@ -32,7 +32,7 @@
   <link rel="stylesheet" href="./marketplace-responsive.css?v=20261026-audit1">
   <link rel="stylesheet" href="./cart-summary-polish.css?v=20261026-audit1">
   <link rel="stylesheet" href="./checkout-submit-fix.css?v=20261026-audit1">
-  <link rel="stylesheet" href="./select-home.css?v=20261123-select3">
+  <link rel="stylesheet" href="./select-home.css?v=20261124-series1">
   <link rel="stylesheet" href="./select-product-page.css?v=20261123-select3">
   <link rel="stylesheet" href="./select-ai.css?v=20261123-select2">
 <link rel="preconnect" href="https://www.gstatic.com" crossorigin><link rel="preconnect" href="https://firestore.googleapis.com" crossorigin><link rel="preconnect" href="https://identitytoolkit.googleapis.com" crossorigin><link rel="modulepreload" href="https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js" crossorigin><link rel="modulepreload" href="https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js" crossorigin><link rel="modulepreload" href="https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js" crossorigin></head>
@@ -54,6 +54,7 @@
           <path d="M20.5 10.9c0 4-3.8 7.1-8.5 7.1-1 0-2-.1-2.8-.4l-4.1 2 .9-3.6a6.6 6.6 0 0 1-2.5-5.1c0-4 3.8-7.2 8.5-7.2s8.5 3.2 8.5 7.2Z"/><path d="M8 11h.1m3.9 0h.1m3.9 0h.1" stroke-width="2"/>
         </svg>
       </button>
+      <span id="market-badge" class="market-badge" role="status" aria-label="目前地區"></span>
     </nav>
   </header>
 
@@ -89,21 +90,33 @@
       <section class="select-section select-collections" aria-labelledby="select-collections-title">
         <h2 id="select-collections-title">商品系列</h2>
         <div class="select-collection-grid">
-          <a class="select-collection" href="./?collection=black-bottle" data-shop-collection="black-bottle">
+          <a class="select-collection" href="./?collection=black-bottle" data-shop-collection="black-bottle" aria-labelledby="series-name-black-bottle" aria-describedby="series-slogan-black-bottle">
             <img src="./select-series-repair.jpg" width="599" height="900" alt="" loading="lazy">
-            <span class="select-collection-label">黑瓶無限修護系列</span>
+            <span class="select-collection-label">
+              <span id="series-name-black-bottle">黑瓶♾︎修護系列</span>
+              <small class="select-collection-slogan" id="series-slogan-black-bottle" data-series-slogan></small>
+            </span>
           </a>
-          <a class="select-collection" href="./?collection=25-plus" data-shop-collection="25-plus">
+          <a class="select-collection" href="./?collection=25-plus" data-shop-collection="25-plus" aria-labelledby="series-name-25-plus" aria-describedby="series-slogan-25-plus">
             <img src="./select-series-25-plus.jpg" width="599" height="900" alt="" loading="lazy">
-            <span class="select-collection-label">25+系列</span>
+            <span class="select-collection-label">
+              <span id="series-name-25-plus">25+系列</span>
+              <small class="select-collection-slogan" id="series-slogan-25-plus" data-series-slogan></small>
+            </span>
           </a>
-          <a class="select-collection" href="./?collection=body-polish" data-shop-collection="body-polish">
+          <a class="select-collection" href="./?collection=body-polish" data-shop-collection="body-polish" aria-labelledby="series-name-body-polish" aria-describedby="series-slogan-body-polish">
             <img src="./select-series-body.jpg" width="599" height="900" alt="" loading="lazy">
-            <span class="select-collection-label">身體拋光系列</span>
+            <span class="select-collection-label">
+              <span id="series-name-body-polish">身體拋光系列</span>
+              <small class="select-collection-slogan" id="series-slogan-body-polish" data-series-slogan></small>
+            </span>
           </a>
-          <a class="select-collection" href="./?collection=five-minutes" data-shop-collection="five-minutes">
+          <a class="select-collection" href="./?collection=five-minutes" data-shop-collection="five-minutes" aria-labelledby="series-name-five-minutes" aria-describedby="series-slogan-five-minutes">
             <span class="select-collection-cover" aria-hidden="true"></span>
-            <span class="select-collection-label">5分鐘出門系列</span>
+            <span class="select-collection-label">
+              <span id="series-name-five-minutes">5分鐘出門系列</span>
+              <small class="select-collection-slogan" id="series-slogan-five-minutes" data-series-slogan></small>
+            </span>
           </a>
         </div>
       </section>
@@ -144,7 +157,11 @@
     <section id="shop-catalog" class="section hidden" data-view="products" aria-labelledby="shop-catalog-title">
       <div class="wrap">
         <div class="section-head">
-          <div class="select-catalog-heading"><h1 id="shop-catalog-title" tabindex="-1">商品目錄</h1><span id="market-badge" class="market-badge" aria-label="目前地區"></span><p id="connection-state" hidden></p></div>
+          <div class="select-catalog-heading">
+            <h1 id="shop-catalog-title" tabindex="-1">商品目錄</h1>
+            <p class="select-catalog-slogan" data-catalog-slogan hidden></p>
+            <p id="connection-state" hidden></p>
+          </div>
           <div id="category-filters" class="filters" aria-label="商品分類"></div>
         </div>
         <div id="product-grid" class="product-grid"><div class="empty-state">正在載入商品…</div></div>
@@ -283,13 +300,13 @@
       <a href="/77-waxing-site/privacy/">隱私權政策</a>
     </div>
   </footer>
-  <script type="module" src="./app.js?v=20261123-select3"></script>
-  <script type="module" src="./regional-store.js?v=20261123-select3"></script>
-  <script type="module" src="./public-enhancements.js?v=20261123-select2"></script>
+  <script type="module" src="./app.js?v=20261124-series1"></script>
+  <script type="module" src="./regional-store.js?v=20261124-series1"></script>
+  <script type="module" src="./public-enhancements.js?v=20261124-series1"></script>
   <script type="module" src="./quantity-checkout-polish.js?v=20261123-select2"></script>
   <script type="module" src="./promotion-storefront.js?v=20261026-audit1"></script>
   <script type="module" src="./checkout-submit-fix.js?v=20261026-audit1"></script>
   <script type="module" src="./cart-summary-polish.js?v=20261026-audit1"></script>
-  <script type="module" src="./select-ai.js?v=20261123-select2"></script>
+  <script type="module" src="./select-ai.js?v=20261124-series1"></script>
 </body>
 </html>

@@ -3,10 +3,10 @@ import { browserLocalPersistence, onAuthStateChanged, setPersistence, signInAnon
 import { addDoc, collection, doc, getDoc, getDocs, onSnapshot, query, serverTimestamp, setDoc, where } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
 import { getPublicFirebase } from "../assets/public-firebase.js?v=20261026-audit1";
 import { beginCheckout, finishCheckout, cartFingerprint, validateOrderData, savePreference } from "./checkout-guard.js?v=20261026-audit1";
-import { allProducts, catalogCategories, categoryFromCollectionKey, filterProducts } from "./series.js?v=20261123-select2";
-import { collectionHref, storeHomeHref, storeRoute } from "./select-routes.js?v=20261123-select2";
-import { renderSelectHomeSettings } from "./select-home-content.js?v=20261123-select2";
-import { selectProductCard } from "./select-product-card.js?v=20261123-mobile1";
+import { allProducts, catalogCategories, categoryFromCollectionKey, filterProducts } from "./series.js?v=20261124-series1";
+import { collectionHref, storeHomeHref, storeRoute } from "./select-routes.js?v=20261124-series1";
+import { renderSelectHomeSettings } from "./select-home-content.js?v=20261124-series1";
+import { selectProductCard } from "./select-product-card.js?v=20261124-series1";
 
 const { auth, db } = getPublicFirebase();
 const DEFAULT_EMAIL_URL = "https://script.google.com/macros/s/AKfycbx6iC26KXbHWYte5XhLGNRMmG16Yydx2vPHDxYpmp4rmWn3plk__6Qwwr7Y09hLptTW/exec";

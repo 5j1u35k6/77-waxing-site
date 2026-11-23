@@ -1,4 +1,4 @@
-import { categoryFromCollectionKey, collectionKey } from "./series.js?v=20261123-select2";
+import { categoryFromCollectionKey, collectionKey } from "./series.js?v=20261124-series1";
 
 const primaryStorePath = "/77select/";
 

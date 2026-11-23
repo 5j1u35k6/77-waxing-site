@@ -1,5 +1,6 @@
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
 import { getPublicFirebase } from "../assets/public-firebase.js?v=20261026-audit1";
+import { blackBottleSeries } from "./series.js?v=20261124-series1";
 
 const topics = [
   {
@@ -38,7 +39,7 @@ const topics = [
   {
     label: "挑選商品",
     questions: [
-      { title: "你想了解哪個系列？", options: ["黑瓶無限修護系列", "25+系列", "身體拋光系列", "5分鐘出門系列", "還不確定，想先看看分類"] },
+      { title: "你想了解哪個系列？", options: [blackBottleSeries, "25+系列", "身體拋光系列", "5分鐘出門系列", "還不確定，想先看看分類"] },
       { title: "挑選時，你最想先知道什麼？", options: ["系列裡有哪些商品", "清潔和保養的商品怎麼分", "怎麼安排簡單的日常保養"] },
     ],
     followUps: [
@@ -279,7 +280,7 @@ function initGuide(panel, endpoint, auth) {
       if (request !== controller || auth.currentUser?.uid !== user.uid) return;
 
       const reply = answer.trim()
-        .replace(/黑瓶\s*[♾∞][\uFE0E\uFE0F]?\s*修護系列/gu, "黑瓶無限修護系列")
+        .replace(/黑瓶\s*(?:無限|[♾∞][\uFE0E\uFE0F]?)\s*修護系列/gu, blackBottleSeries)
         .slice(0, 1800);
       history.push({ role: "user", content: question }, { role: "assistant", content: reply });
       if (followUp) completedFollowUps.add(followUp);
