@@ -13,6 +13,14 @@ const part = (file, start, end) => {
 const snap = (data, id = '') => ({ id, exists: () => data != null, data: () => data });
 
 async function unitTests() {
+  const series = await import(`data:text/javascript;base64,${Buffer.from(read('shop/series.js')).toString('base64')}`);
+  assert.equal(series.blackBottleSeries, '黑瓶\u267E\uFE0E修護系列', 'infinity uses text presentation');
+  for (const name of ['黑瓶無限修護系列', '黑瓶♾️修護系列', '極致呵護無香系列']) {
+    assert.equal(series.collectionKey(name), 'black-bottle', 'existing names retain their collection URL');
+  }
+  assert.equal(series.seriesSlogan('black-bottle', { 'black-bottle': '  店家標語  ' }), '店家標語');
+  assert.equal(series.seriesSlogan('black-bottle', { 'black-bottle': '' }), series.seriesSlogan('black-bottle'));
+  assert.equal(series.seriesSlogan('all'), '', 'only the individual series display slogans');
   const heroHtml = read('shop/index.html');
   assert.doesNotMatch(heroHtml, /把日常保養需要的，簡單整理給你/);
   assert.match(heroHtml, /<h1 id="hero-title">77select<\/h1>/);
@@ -212,7 +220,7 @@ async function browserTests() {
             imageUrl: '/77-waxing-site/shop/select-series-repair.jpg', slogan: '保養標語', precautions: '商品注意事項', addOnProductIds: ['other'],
             variants: [{ id: 'v', name: '一般', capacity: '100ml', priceTWD: 100, priceHKD: 30, stock: 10 }, { id: 'v-alt', name: '加大', capacity: '200ml', priceTWD: 140, priceHKD: 40, stock: 10 }] },
             other: { active: true, name: '另一件商品', category: '保養', stock: 10, variants: [{ id: 'v2', name: '一般', capacity: '50ml', priceTWD: 80, priceHKD: 25, stock: 10 }] } },
-          settings: { enablePickup: true, enableCashPickup: true, enableTransfer: true, promotions: [], homeContent: { about: '首頁品牌介紹', featuredProductIds: ['p', '', 'other'] } },
+          settings: { enablePickup: true, enableCashPickup: true, enableTransfer: true, promotions: [], homeContent: { about: '首頁品牌介紹', featuredProductIds: ['p', '', 'other'], seriesSlogans: { 'black-bottle': '店家標語 <日常保養>' } } },
           orders: { 'A-old': { orderNo: 'A-old', ownerUid: 'A', items: [], total: 111, status: 'pending' }, 'B-old': { orderNo: 'B-old', ownerUid: 'B', items: [], total: 222, status: 'pending' } },
           ...(saved ? { writes: saved.writes, settings: saved.settings, orders: saved.orders } : {}),
         };
@@ -251,6 +259,13 @@ async function browserTests() {
       await page.goto(origin + entry);
       await page.locator('.select-featured-product').first().waitFor({ state: 'visible' });
       assert.match(await page.locator('.select-about-content').innerText(), /首頁品牌介紹/);
+      const seriesLabel = '黑瓶\u267E\uFE0E修護系列';
+      const blackBottle = page.getByRole('link', { name: seriesLabel, exact: true });
+      assert.equal(await blackBottle.locator('[data-series-slogan]').innerText(), '店家標語 <日常保養>');
+      assert.equal((await page.locator('[data-series-slogan]').allTextContents()).filter(Boolean).length, 4, 'all home series use custom or default slogans');
+      const marketBadge = page.getByLabel('目前地區：台灣', { exact: true });
+      await marketBadge.waitFor({ state: 'visible' });
+      assert.ok(await marketBadge.evaluate(el => el.previousElementSibling?.dataset.tab === 'contact'), 'market badge follows contact in the header');
       assert.ok(await page.locator('.select-hero').evaluate(hero => hero.getBoundingClientRect().bottom >= innerHeight - 1), 'hero fills the first screen under the header');
       assert.ok(await page.locator('#cart-count').evaluate(badge => {
         badge.textContent = '10';
@@ -265,8 +280,10 @@ async function browserTests() {
         assert.equal((await page.locator(grid).evaluate(el => getComputedStyle(el).gridTemplateColumns)).split(' ').length, 1, `${grid}: one card per phone row`);
       }
       assert.match(await page.getByRole('link', { name: '隱私權政策' }).getAttribute('href'), /\/privacy\//);
-      await page.getByRole('link', { name: '黑瓶無限修護系列', exact: true }).click();
+      await blackBottle.click();
       await page.waitForURL(/\?collection=black-bottle$/);
+      await page.locator('[data-catalog-slogan]').filter({ hasText: '店家標語 <日常保養>' }).waitFor({ state: 'visible' });
+      assert.equal(await page.locator('#shop-catalog-title').innerText(), seriesLabel);
       await page.locator('[data-regional-detail="p"]').waitFor({ state: 'visible' }).catch(async (error) => {
         const state = await page.locator('main').count() ? await page.locator('main').innerText() : await page.locator('body').innerText();
         throw new Error(`Could not open the collection at ${page.url()}\n${state}\n${errors.join('\n')}`, { cause: error });
