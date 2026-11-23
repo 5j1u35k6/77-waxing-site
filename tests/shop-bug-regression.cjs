@@ -26,6 +26,7 @@ async function unitTests() {
       document: { documentElement: { classList: { add: name => classes.add(name), remove: name => classes.delete(name) } } },
       window: { setTimeout: (callback, delay) => { assert.equal(delay, 10000); timers.push(callback); } },
       DEFAULT_EMAIL_URL: 'https://example.invalid/email', settings: {}, db: {}, doc: () => ({}), getDoc,
+      renderSelectHomeSettings() {},
       $: selector => { if (!nodes.has(selector)) nodes.set(selector, { textContent: selector === '#hero-title' ? '77select' : '' }); return nodes.get(selector); },
     });
     vm.runInContext(heroBootstrap + heroDefaults + heroSource, context);
@@ -179,7 +180,7 @@ export async function getDocFromServer(ref){await new Promise(r=>setTimeout(r,40
 export async function getDocs(ref){return {docs:docs(ref)};}
 export async function getDocsFromServer(ref){await new Promise(r=>setTimeout(r,40));return getDocs(ref);}
 export function onSnapshot(ref,cb,error){const sub={ref,cb,error,active:true};s.subscriptions.push(sub);queueMicrotask(()=>cb(ref.id?wrap(s.settings,ref.id):{docs:docs(ref)}));return()=>{sub.active=false;};}
-export async function setDoc(ref,data){s.writes.push({ref,data});await new Promise(r=>setTimeout(r,80));if(ref.col==='shopOrders'){s.orders[ref.id]=data;s.emit('shopOrders');}}
+export async function setDoc(ref,data){s.writes.push({ref,data});await new Promise(r=>setTimeout(r,80));if(ref.col==='shopOrders'){s.orders[ref.id]=data;s.emit('shopOrders');}s.persist();}
 export const addDoc=async()=>({id:'qa'});
 `;
 
@@ -187,7 +188,8 @@ async function browserTests() {
   const { chromium } = require('playwright');
   const baseDirectory = path.resolve(root, '..');
   const server = http.createServer((request, response) => {
-    const file = path.resolve(baseDirectory, '.' + new URL(request.url, 'http://test').pathname);
+    const pathname = new URL(request.url, 'http://test').pathname;
+    const file = path.resolve(baseDirectory, '.' + pathname, ...(pathname.endsWith('/') ? ['index.html'] : []));
     if (!file.startsWith(baseDirectory + path.sep) || !fs.existsSync(file) || !fs.statSync(file).isFile()) return response.writeHead(404).end();
     response.setHeader('Content-Type', file.endsWith('.js') ? 'text/javascript' : file.endsWith('.css') ? 'text/css' : 'text/html');
     response.end(fs.readFileSync(file));
@@ -197,20 +199,23 @@ async function browserTests() {
   const browser = await chromium.launch({ headless: true, executablePath: process.env.TEST_BROWSER_PATH || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' });
   try {
     for (const entry of ['/77-waxing-site/shop/index.html', '/77select/index.html']) {
-      const context = await browser.newContext();
+      const context = await browser.newContext({ viewport: { width: 375, height: 812 } });
       const page = await context.newPage();
+      page.setDefaultTimeout(10000);
       const errors = [];
       page.on('pageerror', error => errors.push(error.message));
       await page.addInitScript(() => {
+        const saved = JSON.parse(sessionStorage.getItem('shop-regression-fixture') || 'null');
         const state = window.__shop = {
-          auth: { currentUser: { uid: 'A', isAnonymous: false, getIdToken: async () => 'test-token' } }, authCallbacks: [], subscriptions: [], writes: [],
-          products: { p: { active: true, name: '測試商品', category: '保養', stock: 10, variants: [{ id: 'v', name: '一般', capacity: '100ml', priceTWD: 100, priceHKD: 30, stock: 10 }] },
+          auth: { currentUser: null }, authCallbacks: [], subscriptions: [], writes: [],
+          products: { p: { active: true, name: '測試商品', category: '黑瓶♾️修護系列', stock: 10, variants: [{ id: 'v', name: '一般', capacity: '100ml', priceTWD: 100, priceHKD: 30, stock: 10 }] },
             other: { active: true, name: '另一件商品', category: '保養', stock: 10, variants: [{ id: 'v2', name: '一般', capacity: '50ml', priceTWD: 80, priceHKD: 25, stock: 10 }] } },
-          settings: { enablePickup: true, enableCashPickup: true, enableTransfer: true, promotions: [] },
+          settings: { enablePickup: true, enableCashPickup: true, enableTransfer: true, promotions: [], homeContent: { about: '首頁品牌介紹', featuredProductIds: ['p', '', 'other'] } },
           orders: { 'A-old': { orderNo: 'A-old', ownerUid: 'A', items: [], total: 111, status: 'pending' }, 'B-old': { orderNo: 'B-old', ownerUid: 'B', items: [], total: 222, status: 'pending' } },
+          ...(saved ? { writes: saved.writes, settings: saved.settings, orders: saved.orders } : {}),
         };
         localStorage.setItem('77select_market_v1', JSON.stringify({ code: 'TW', expires: Date.now() + 600000 }));
-        localStorage.setItem('77select_cart_v4', '[]');
+        if (!saved) localStorage.setItem('77select_cart_v4', '[]');
         state.emit = col => state.subscriptions.filter(sub => sub.active && sub.ref.col === col).forEach(sub => {
           if (col === 'shopSettings') return sub.cb({ exists: () => true, data: () => state.settings });
           const source = col === 'shopOrders' ? state.orders : state.products;
@@ -220,7 +225,10 @@ async function browserTests() {
         state.switchUser = uid => {
           state.auth.currentUser = uid ? { uid, isAnonymous: false, getIdToken: async () => 'test-token' } : null;
           state.authCallbacks.forEach(callback => callback(state.auth.currentUser));
+          state.persist();
         };
+        state.persist = () => sessionStorage.setItem('shop-regression-fixture', JSON.stringify({ uid: state.auth.currentUser?.uid ?? null, writes: state.writes, settings: state.settings, orders: state.orders }));
+        state.switchUser(saved ? saved.uid : 'A');
       });
       await context.route('**/*', async route => {
         const url = new URL(route.request().url());
@@ -239,8 +247,26 @@ async function browserTests() {
         return route.continue();
       });
       await page.goto(origin + entry);
+      await page.locator('.select-featured-product').first().waitFor({ state: 'visible' });
+      assert.match(await page.locator('.select-about-content').innerText(), /首頁品牌介紹/);
+      assert.equal(await page.locator('.select-featured-product').count(), 2, 'homepage reads the featured product settings without occupying every slot');
+      for (const grid of ['.select-featured-grid', '.select-collection-grid']) {
+        assert.equal((await page.locator(grid).evaluate(el => getComputedStyle(el).gridTemplateColumns)).split(' ').length, 1, `${grid}: one card per phone row`);
+      }
+      assert.match(await page.getByRole('link', { name: '隱私權政策' }).getAttribute('href'), /\/privacy\//);
+      await page.getByRole('link', { name: '黑瓶無限修護系列', exact: true }).click();
+      await page.waitForURL(/\?collection=black-bottle$/);
+      await page.locator('[data-regional-detail="p"]').waitFor({ state: 'visible' }).catch(async (error) => {
+        const state = await page.locator('main').count() ? await page.locator('main').innerText() : await page.locator('body').innerText();
+        throw new Error(`Could not open the collection at ${page.url()}\n${state}\n${errors.join('\n')}`, { cause: error });
+      });
+      assert.equal(await page.locator('[data-regional-detail="other"]').count(), 0, 'legacy category remains searchable under the new series name');
+      await page.reload();
+      await page.locator('[data-regional-detail="p"]').waitFor({ state: 'visible' });
+      await page.getByRole('link', { name: '更多商品', exact: true }).click();
+      await page.waitForURL(/\?collection=all$/);
       await page.waitForFunction(() => document.querySelector('[data-regional-detail]') && window.__shop.authCallbacks.length >= 4);
-      await page.getByRole('button', { name: '更多商品', exact: true }).click();
+      assert.equal((await page.locator('#product-grid').evaluate(el => getComputedStyle(el).gridTemplateColumns)).split(' ').length, 1, 'catalog also shows one item per phone row');
       await page.waitForTimeout(400);
       await page.evaluate(() => {
         const oldCallbacks = window.__shop.subscriptions.filter(sub => sub.ref.col === 'shopOrders');
@@ -256,10 +282,13 @@ async function browserTests() {
       await page.evaluate(() => window.__shop.switchUser('B'));
       const addQuantity = async (productId, count) => {
         if (!(await page.locator('#shop-catalog').isVisible())) {
-          await page.getByRole('button', { name: '更多商品', exact: true }).click();
+          await page.getByRole('link', { name: '更多商品', exact: true }).click();
         }
         await page.locator(`[data-regional-detail="${productId}"]`).click();
-        await page.waitForTimeout(80);
+        await page.waitForURL(url => url.searchParams.get('product') === productId);
+        await page.locator('#shop-product-page').waitFor({ state: 'visible' });
+        await page.locator('#product-detail-add').waitFor({ state: 'visible' });
+        assert.equal(await page.locator('#product-modal-wrap').count(), 0);
         for (let i = 1; i < count; i++) await page.locator('[data-detail-qty="1"]').click();
         await page.locator('#product-detail-add').click();
         await page.waitForTimeout(80);
@@ -283,6 +312,7 @@ async function browserTests() {
       assert.equal(await page.evaluate(() => window.__shop.writes.length), 1, 'rapid submits create one ordinary order');
       await page.evaluate(() => {
         window.__shop.settings.promotions = [{ id: 'two', active: true, promotionType: 'any_qty_bundle', groups: [{ minQty: 2, items: [{ productId: 'p', variantId: 'v' }] }], discount: { bundlePriceTWD: 150, bundlePriceHKD: 50 } }];
+        window.__shop.persist();
         window.__shop.emit('shopSettings');
       });
       await addQuantity('p', 2);
