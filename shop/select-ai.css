@@ -40,7 +40,7 @@
 }
 
 .select-ai-gate .select-link-button:focus-visible,
-.select-ai-panel :is(button, textarea, .select-ai-log):focus-visible {
+.select-ai-panel :is(button, .select-ai-log):focus-visible {
   outline: 2px solid #835737;
   outline-offset: 3px;
 }
@@ -49,7 +49,7 @@
   max-height: min(48vh, 360px);
   overflow-y: auto;
   overscroll-behavior: contain;
-  margin-bottom: 16px;
+  margin: 0;
   padding: 0 4px 3px 0;
 }
 
@@ -78,31 +78,42 @@
   font-size: .875rem;
 }
 
-.select-ai-form {
+.select-ai-guide {
   display: grid;
-  gap: 9px;
+  gap: 14px;
 }
 
-.select-ai-form label {
-  font-weight: 600;
+.select-ai .select-ai-guide :is(h3, h4, .select-ai-progress) {
+  margin: 0;
 }
 
-.select-ai-form textarea {
-  width: 100%;
-  min-width: 0;
-  min-height: 85px;
-  resize: vertical;
-  padding: 10px 12px;
-  border: 1px solid #a9907d;
-  border-radius: 8px;
-  background: #fff;
-  color: inherit;
-  font: inherit;
+.select-ai-guide h3 {
+  scroll-margin-top: 96px;
+  font-size: clamp(1.125rem, 3vw, 1.4rem);
+  line-height: 1.45;
+}
+
+.select-ai .select-ai-progress {
+  color: #684d3c;
+  font-size: .875rem;
+}
+
+.select-ai-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.select-ai-answers {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-inline-start: 1.4em;
 }
 
 .select-ai .select-ai-privacy,
 .select-ai .select-ai-status {
-  margin: 0;
+  margin: 14px 0 0;
   color: #5e4336;
   font-size: .875rem;
   line-height: 1.55;
@@ -115,13 +126,27 @@
   gap: 10px;
 }
 
-.select-ai-actions button {
+.select-ai-guide button {
   min-height: 44px;
   padding: 7px 15px;
   border: 1px solid #593e31;
   border-radius: 6px;
   font: inherit;
   cursor: pointer;
+}
+
+.select-ai-guide .select-ai-option {
+  padding: 10px 13px;
+  border-color: #ae927c;
+  background: #fffaf4;
+  color: #3b2a22;
+  text-align: start;
+  overflow-wrap: anywhere;
+}
+
+.select-ai-option:hover:enabled,
+.select-ai-clear:hover {
+  background: #efdfd2;
 }
 
 .select-ai-send {
@@ -134,13 +159,19 @@
   color: #593e31;
 }
 
-.select-ai-send:disabled {
+.select-ai-guide button:disabled {
   opacity: .68;
   cursor: wait;
 }
 
 @media (max-width: 760px) {
   .select-section.select-ai {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .select-ai-options {
     grid-template-columns: minmax(0, 1fr);
   }
 }

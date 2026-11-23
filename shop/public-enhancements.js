@@ -1,4 +1,4 @@
-import "./seo.js?v=20261026-audit1";
+import "./seo.js?v=20261123-select2";
 import "../assets/member-auth.js?v=20261026-audit1";
 import "../assets/google-auth-ui.js?v=20261026-audit1";
 import "../assets/member-auth-popup-fix.js?v=20261026-audit1";
@@ -22,31 +22,6 @@ function ensureMemberShopStyle() {
     @media(max-width:430px){.shop-member-button{max-width:94px;padding:8px 9px}}
   `;
   document.head.appendChild(style);
-}
-
-function normalizeProductCardActions() {
-  document.querySelectorAll(".regional-product-card .product-actions").forEach((actions) => {
-    const detail = actions.querySelector("[data-regional-detail]");
-    if (!detail) return;
-
-    // Keep the original buy control in the DOM as a hidden sentinel.
-    // regional-store.js watches for data-regional-buy; removing it causes the
-    // legacy card renderer to rebuild the card repeatedly and can make the
-    // visible detail button appear unresponsive.
-    const buyButtons = actions.querySelectorAll("[data-regional-buy]");
-    buyButtons.forEach((button) => {
-      if (!button.hidden) button.hidden = true;
-      button.tabIndex = -1;
-      button.setAttribute("aria-hidden", "true");
-      if (!button.classList.contains("card-format-buy-sentinel")) button.classList.add("card-format-buy-sentinel");
-    });
-
-    if (detail.textContent.trim() !== "詳情") detail.textContent = "詳情";
-    if (detail.classList.contains("secondary-btn")) detail.classList.remove("secondary-btn");
-    if (!detail.classList.contains("primary-btn")) detail.classList.add("primary-btn");
-    if (!detail.classList.contains("product-detail-only")) detail.classList.add("product-detail-only");
-    if (!actions.classList.contains("single-detail-action")) actions.classList.add("single-detail-action");
-  });
 }
 
 function normalizeMarketBadge() {
@@ -138,7 +113,6 @@ function apply77selectBranding() {
   }
 
   normalizeMarketBadge();
-  normalizeProductCardActions();
   polishOrderCards();
   applyMemberBranding();
 }

@@ -3,6 +3,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/12.18.0/fireba
 import { browserLocalPersistence, getAuth, onAuthStateChanged, setPersistence, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
 import { addDoc, collection, deleteDoc, doc, getDoc, getFirestore, onSnapshot, runTransaction, serverTimestamp, setDoc, updateDoc } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
 import { firebaseConfig } from "../assets/firebase-config.js?v=20261026-audit1";
+import { catalogCategory, categoryFromCollectionKey } from "./series.js?v=20261123-select2";
 
 const app = initializeApp(firebaseConfig, "77waxing-shop-admin");
 const auth = getAuth(app);
@@ -26,14 +27,23 @@ const DEFAULT_SETTINGS = {
   appsScriptEmailUrl: DEFAULT_EMAIL_URL,
 };
 const STATUS = { pending: "待確認", confirmed: "已確認", packing: "備貨中", ready: "待自取", shipped: "已出貨", completed: "已完成", cancelled: "已取消" };
+const STOREFRONT_URL = "https://5j1u35k6.github.io/77select/";
+const SERIES_COVERS = [
+  ["black-bottle", "./select-series-repair.jpg"],
+  ["25-plus", "./select-series-25-plus.jpg"],
+  ["body-polish", "./select-series-body.jpg"],
+  ["five-minutes", ""],
+].map(([key, image]) => [key, categoryFromCollectionKey(key), image]);
 
 let currentUser = null;
 let products = [];
 let orders = [];
 let messages = [];
 let settings = { ...DEFAULT_SETTINGS };
+let settingsReady = false;
 let currentView = "dashboard";
 let editingProductId = null;
+let addingProduct = false;
 let listeners = [];
 let filteredOrderCache = [];
 let authVersion = 0;
@@ -44,6 +54,21 @@ const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&
 const money = (value) => `NT$${Number(value || 0).toLocaleString("zh-TW")}`;
 const bool = (selector) => Boolean($(selector)?.checked);
 const num = (selector, fallback = 0) => Number($(selector)?.value || fallback);
+
+function publicImageUrl(value) {
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && !url.username && !url.password ? url.href : "";
+  } catch {
+    return "";
+  }
+}
+
+function publicProductUrl(id) {
+  const url = new URL(STOREFRONT_URL);
+  url.searchParams.set("product", id);
+  return url.href;
+}
 
 function timestampMillis(value) {
   const firebaseMillis = value?.toMillis?.();
@@ -110,7 +135,7 @@ function loginMarkup() {
   return `<main class="admin-login"><section class="admin-login-card"><span class="eyebrow">SHOP ADMIN</span><h1>77waxing 產品訂購後台</h1><form id="login-form"><div class="field"><label>Email</label><input name="email" type="email" autocomplete="username" required></div><div class="field" style="margin-top:12px"><label>密碼</label><input name="password" type="password" autocomplete="current-password" required></div><button class="primary-btn" style="width:100%;margin-top:18px" type="submit">登入</button><div id="login-message" class="login-message"></div></form><p class="order-date">請使用商店管理員帳號登入。</p></section></main>`;
 }
 function shellMarkup() {
-  return `<div class="admin-shell"><aside class="admin-side"><a class="shop-brand" href="./" target="_blank" rel="noopener"><b>77</b>waxing<small>SHOP ADMIN</small></a><nav class="admin-nav"><button data-view="dashboard">總覽</button><button data-view="products">商品</button><button data-view="orders">訂單</button><button data-view="messages">顧客問答</button><button data-view="settings">商店設定</button></nav></aside><main class="admin-main"><div class="admin-top"><div><span class="eyebrow">PRODUCT ORDER</span><h1 id="admin-title">產品訂購後台</h1></div><div style="text-align:right"><div class="live-dot">● 即時同步</div><button id="logout" class="mini-btn" type="button">登出</button></div></div><div id="admin-message" class="admin-message"></div><section id="admin-view"></section></main></div>`;
+  return `<div class="admin-shell"><aside class="admin-side"><a class="shop-brand" href="${STOREFRONT_URL}" target="_blank" rel="noopener"><b>77</b>select<small>SHOP ADMIN</small></a><nav class="admin-nav"><button data-view="dashboard">總覽</button><button data-view="homepage">首頁</button><button data-view="products">商品</button><button data-view="orders">訂單</button><button data-view="messages">顧客問答</button><button data-view="settings">商店設定</button></nav></aside><main class="admin-main"><div class="admin-top"><div><span class="eyebrow">PRODUCT ORDER</span><h1 id="admin-title">產品訂購後台</h1></div><div style="text-align:right"><div class="live-dot">● 即時同步</div><button id="logout" class="mini-btn" type="button">登出</button></div></div><div id="admin-message" class="admin-message" role="status"></div><section id="admin-view"></section></main></div>`;
 }
 async function renderLogin() {
   cleanupListeners();
@@ -143,11 +168,21 @@ function mountAdmin() {
   showView(currentView);
 }
 function showView(view) {
+  if (view !== "products") {
+    editingProductId = null;
+    addingProduct = false;
+  }
   currentView = view;
-  $$("[data-view]").forEach((button) => button.classList.toggle("on", button.dataset.view === view));
-  const titles = { dashboard: "營運總覽", products: "商品管理", orders: "訂單管理", messages: "顧客問答", settings: "商店設定" };
+  $$("[data-view]").forEach((button) => {
+    const active = button.dataset.view === view;
+    button.classList.toggle("on", active);
+    if (active) button.setAttribute("aria-current", "page");
+    else button.removeAttribute("aria-current");
+  });
+  const titles = { dashboard: "營運總覽", homepage: "首頁編輯", products: "商品管理", orders: "訂單管理", messages: "顧客問答", settings: "商店設定" };
   $("#admin-title").textContent = titles[view] || "產品訂購後台";
   if (view === "dashboard") renderDashboard();
+  else if (view === "homepage") renderHomepage();
   else if (view === "products") renderProducts();
   else if (view === "orders") renderOrders();
   else if (view === "messages") renderMessages();
@@ -161,7 +196,7 @@ function scheduleRerender() {
 }
 function rerender() {
   if (!$("#admin-view")) return;
-  if ($("#promotion-form") || $("#product-form")?.dataset.dirty === "1") return;
+  if ($("#promotion-form") || $("#product-form") || $("#homepage-form")?.dataset.dirty === "1") return;
   showView(currentView);
 }
 function subscribeData() {
@@ -184,6 +219,8 @@ function subscribeData() {
   listeners.push(onSnapshot(doc(db, "shopSettings", "public"), (snap) => {
     if (version !== authVersion) return;
     settings = snap.exists() ? { ...DEFAULT_SETTINGS, ...snap.data() } : { ...DEFAULT_SETTINGS };
+    settingsReady = true;
+    if (currentView === "homepage" && $("#homepage-form")?.dataset.dirty !== "1") renderHomepage();
     if (currentView === "settings" && $("#settings-form")?.dataset.dirty !== "1") renderSettings();
   }));
 }
@@ -198,14 +235,109 @@ function renderDashboard() {
 }
 
 function productForm(product = {}) {
-  return `<form id="product-form" class="panel" style="margin-bottom:18px"><div class="admin-section-head"><div><h2>${product.id ? "編輯商品" : "新增商品"}</h2><p class="order-date">請上傳商品圖片，或填寫可公開瀏覽的圖片網址。</p></div>${product.id ? `<button id="cancel-product-edit" class="mini-btn" type="button">取消編輯</button>` : ""}</div><div class="settings-grid"><div class="field"><label>商品名稱</label><input id="p-name" value="${esc(product.name || "")}" maxlength="120" required></div><div class="field"><label>分類</label><input id="p-category" value="${esc(product.category || "")}" maxlength="80" required></div><div class="field"><label>價格 NT$</label><input id="p-price" type="number" min="0" step="1" value="${Number(product.price || 0)}" required></div><div class="field"><label>庫存</label><input id="p-stock" type="number" min="0" step="1" value="${Number(product.stock || 0)}" required></div><div class="field"><label>排序</label><input id="p-sort" type="number" step="1" value="${Number(product.sortOrder || 0)}"></div><div class="field"><label>圖片網址</label><input id="p-image" type="url" value="${esc(product.imageUrl || "")}" placeholder="https://..."></div><div class="field wide"><label>商品說明</label><textarea id="p-description" rows="3" maxlength="1200">${esc(product.description || "")}</textarea></div><div class="field wide"><label>規格／成分／使用提醒</label><textarea id="p-spec" rows="3" maxlength="1500">${esc(product.spec || "")}</textarea></div><label class="check-line wide"><input id="p-active" type="checkbox" ${product.active !== false ? "checked" : ""}><span>上架顯示</span></label></div><button class="primary-btn" style="margin-top:16px" type="submit">${product.id ? "儲存商品" : "新增商品"}</button></form>`;
+  const storedCategory = product.category || "";
+  const displayCategory = storedCategory ? catalogCategory(storedCategory) : "";
+  return `<form id="product-form" class="panel admin-product-form" data-product-id="${esc(product.id || "")}">
+    <div class="admin-section-head">
+      <div>
+        <h2>${product.id ? "編輯商品" : "新增商品"}</h2>
+        <p class="order-date">依商品頁順序編輯圖片、購買資訊和商品說明。</p>
+      </div>
+      <div class="admin-editor-actions">
+        ${product.id && product.active ? `<a class="mini-btn admin-editor-link" href="${esc(publicProductUrl(product.id))}" target="_blank" rel="noopener">開啟商品頁</a>` : ""}
+        <button id="cancel-product-edit" class="mini-btn" type="button">返回商品清單</button>
+      </div>
+    </div>
+    <div class="admin-product-layout">
+      <section class="admin-editor-section admin-product-gallery" aria-labelledby="product-gallery-title">
+        <h3 id="product-gallery-title">商品圖片</h3>
+        <div class="field">
+          <label for="p-image">主圖網址</label>
+          <input id="p-image" type="url" value="${esc(product.imageUrl || "")}" placeholder="https://...">
+        </div>
+      </section>
+      <section class="admin-editor-section admin-product-purchase" aria-labelledby="product-purchase-title">
+        <h3 id="product-purchase-title">購買資訊</h3>
+        <div class="field">
+          <label for="p-category">商品系列</label>
+          <input id="p-category" list="admin-product-series" value="${esc(displayCategory)}" data-stored-category="${esc(storedCategory)}" data-display-category="${esc(displayCategory)}" maxlength="80" required>
+          <datalist id="admin-product-series">${SERIES_COVERS.map(([, label]) => `<option value="${esc(label)}"></option>`).join("")}</datalist>
+        </div>
+        <div class="field">
+          <label for="p-name">商品名稱</label>
+          <input id="p-name" value="${esc(product.name || "")}" maxlength="120" required>
+        </div>
+        <div class="field">
+          <label for="p-description">商品簡介</label>
+          <textarea id="p-description" rows="3" maxlength="1200">${esc(product.description || "")}</textarea>
+        </div>
+        <div class="field"><label for="p-price">價格 NT$</label><input id="p-price" type="number" min="0" step="1" value="${Number(product.price || 0)}" required></div>
+        <div class="field"><label for="p-stock">庫存</label><input id="p-stock" type="number" min="0" step="1" value="${Number(product.stock || 0)}" required></div>
+        <div data-product-variants></div>
+      </section>
+    </div>
+    <section class="admin-editor-section admin-product-spec" aria-labelledby="product-spec-title">
+      <h3 id="product-spec-title">規格與使用說明</h3>
+      <div class="field">
+        <label for="p-spec">規格、成分及使用提醒</label>
+        <textarea id="p-spec" rows="6" maxlength="1500">${esc(product.spec || "")}</textarea>
+      </div>
+    </section>
+    <section class="admin-editor-section admin-product-status" aria-labelledby="product-status-title">
+      <h3 id="product-status-title">上架與排序</h3>
+      <div class="settings-grid">
+        <label class="check-line"><input id="p-active" type="checkbox" ${product.active !== false ? "checked" : ""}><span>上架顯示</span></label>
+        <div class="field"><label for="p-sort">商品目錄排序</label><input id="p-sort" type="number" step="1" value="${Number(product.sortOrder || 0)}"></div>
+      </div>
+    </section>
+    <div class="admin-editor-actions"><button class="primary-btn" type="submit">${product.id ? "儲存商品" : "新增商品"}</button></div>
+  </form>`;
 }
+
 function renderProducts() {
   const editing = editingProductId ? products.find((row) => row.id === editingProductId) : null;
-  $("#admin-view").innerHTML = `${productForm(editing || {})}<div class="table-wrap"><table class="admin-table"><thead><tr><th>商品</th><th>分類</th><th>價格</th><th>庫存</th><th>排序</th><th>狀態</th><th>操作</th></tr></thead><tbody>${products.map((p) => `<tr><td><b>${esc(p.name)}</b></td><td>${esc(p.category || "—")}</td><td>${money(p.price)}</td><td>${Number(p.stock || 0)}</td><td>${Number(p.sortOrder || 0)}</td><td>${p.active ? "上架" : "下架"}</td><td><div class="admin-actions"><button class="mini-btn" data-edit="${p.id}">編輯</button><button class="mini-btn" data-toggle="${p.id}">${p.active ? "下架" : "上架"}</button><button class="mini-btn" data-delete="${p.id}">永久刪除</button></div></td></tr>`).join("") || `<tr><td colspan="7">尚無商品。</td></tr>`}</tbody></table></div>`;
-  $("#product-form").onsubmit = saveProduct;
-  if ($("#cancel-product-edit")) $("#cancel-product-edit").onclick = () => { editingProductId = null; renderProducts(); };
-  $$("[data-edit]").forEach((button) => { button.onclick = () => { editingProductId = button.dataset.edit; renderProducts(); window.scrollTo(0, 0); }; });
+  const view = $("#admin-view");
+  if (editing || addingProduct) {
+    view.innerHTML = productForm(editing || {});
+    const form = $("#product-form");
+    form.productRecord = editing || {};
+    form.onsubmit = saveProduct;
+    $("#cancel-product-edit").onclick = () => {
+      editingProductId = null;
+      addingProduct = false;
+      renderProducts();
+      window.scrollTo(0, 0);
+    };
+    return;
+  }
+
+  view.innerHTML = `<div class="admin-section-head">
+    <h2>商品清單</h2>
+    <button id="new-product" class="primary-btn" type="button">新增商品</button>
+  </div>
+  <div class="table-wrap"><table class="admin-table">
+    <thead><tr><th>商品</th><th>系列</th><th>價格</th><th>庫存</th><th>排序</th><th>狀態</th><th>操作</th></tr></thead>
+    <tbody>${products.map((p) => `<tr>
+      <td><b>${esc(p.name)}</b></td><td>${esc(catalogCategory(p.category))}</td>
+      <td>${money(p.price)}</td><td>${Number(p.stock || 0)}</td><td>${Number(p.sortOrder || 0)}</td>
+      <td>${p.active ? "上架" : "下架"}</td>
+      <td><div class="admin-actions">
+        <button class="mini-btn" type="button" data-edit="${esc(p.id)}">編輯</button>
+        <button class="mini-btn" type="button" data-toggle="${esc(p.id)}">${p.active ? "下架" : "上架"}</button>
+        <button class="mini-btn" type="button" data-delete="${esc(p.id)}">永久刪除</button>
+      </div></td>
+    </tr>`).join("") || `<tr><td colspan="7">尚無商品。</td></tr>`}</tbody>
+  </table></div>`;
+  $("#new-product").onclick = () => {
+    addingProduct = true;
+    renderProducts();
+    window.scrollTo(0, 0);
+  };
+  $$("[data-edit]").forEach((button) => { button.onclick = () => {
+    editingProductId = button.dataset.edit;
+    renderProducts();
+    window.scrollTo(0, 0);
+  }; });
   $$("[data-toggle]").forEach((button) => { button.onclick = async () => {
     const product = products.find((row) => row.id === button.dataset.toggle);
     if (!product) return;
@@ -220,11 +352,14 @@ function renderProducts() {
     if (editingProductId === product.id) editingProductId = null;
   }; });
 }
+
 async function saveProduct(event) {
   event.preventDefault();
+  const category = $("#p-category");
+  const displayCategory = category.value.trim();
   const data = {
     name: $("#p-name").value.trim(),
-    category: $("#p-category").value.trim(),
+    category: displayCategory === category.dataset.displayCategory ? category.dataset.storedCategory : displayCategory,
     price: Math.max(0, Math.round(num("#p-price"))),
     stock: Math.max(0, Math.round(num("#p-stock"))),
     sortOrder: Math.round(num("#p-sort")),
@@ -245,6 +380,8 @@ async function saveProduct(event) {
     flash("商品已新增。");
   }
   editingProductId = null;
+  addingProduct = false;
+  renderProducts();
 }
 
 function renderOrders() {
@@ -376,8 +513,145 @@ function renderMessages() {
   }; });
 }
 
+function homepageImageField(id, label, value, defaultImage = "") {
+  const preview = publicImageUrl(value) || defaultImage;
+  return `<div class="field admin-home-image">
+    <div class="admin-home-image-preview">
+      <img data-preview-image="${esc(id)}" data-default-image="${esc(defaultImage)}" ${preview ? `src="${esc(preview)}"` : "hidden"} alt="${esc(label)}">
+      <span ${preview ? "hidden" : ""}>尚無圖片</span>
+    </div>
+    <label for="${esc(id)}">${esc(label)}</label>
+    <input id="${esc(id)}" type="url" value="${esc(value || "")}" maxlength="2000" placeholder="https://…">
+  </div>`;
+}
+
+function renderHomepage() {
+  const view = $("#admin-view");
+  if (!settingsReady) {
+    view.innerHTML = '<p class="panel" role="status">正在載入首頁內容…</p>';
+    return;
+  }
+
+  const home = settings.homeContent || {};
+  const featured = Array.isArray(home.featuredProductIds) ? home.featuredProductIds : [];
+  const activeProducts = products.filter((product) => product.active === true);
+  view.innerHTML = `<form id="homepage-form" class="panel admin-home-form">
+    <div class="admin-section-head">
+      <h2>首頁內容</h2>
+      <a class="mini-btn admin-editor-link" href="${STOREFRONT_URL}" target="_blank" rel="noopener">開啟商店首頁</a>
+    </div>
+    <section class="admin-editor-section" aria-labelledby="home-banner-title">
+      <h3 id="home-banner-title">首頁主視覺</h3>
+      <div class="admin-home-hero">
+        ${homepageImageField("h-hero-image", "主視覺圖片網址", home.heroImageUrl, "./select-studio-hero.jpg")}
+        <div class="field">
+          <label for="h-title">首頁主標題</label>
+          <textarea id="h-title" rows="3" maxlength="160" required>${esc(settings.heroTitle)}</textarea>
+        </div>
+      </div>
+    </section>
+    <section class="admin-editor-section" aria-labelledby="home-about-title">
+      <h3 id="home-about-title" lang="en">ABOUT 77 Select</h3>
+      <div class="field"><label for="h-about">品牌介紹</label><textarea id="h-about" rows="5" maxlength="4000">${esc(home.about)}</textarea></div>
+    </section>
+    <section class="admin-editor-section" aria-labelledby="home-featured-title">
+      <h3 id="home-featured-title">明星商品</h3>
+      <div class="admin-home-featured">
+        ${[0, 1, 2].map((index) => {
+          const currentId = featured[index] || "";
+          const inactive = currentId && !activeProducts.some((product) => product.id === currentId);
+          return `<div class="field">
+            <label for="h-feature-${index}">商品 ${index + 1}</label>
+            <select id="h-feature-${index}">
+              <option value="">保留空位</option>
+              ${inactive ? `<option value="${esc(currentId)}" selected>原商品未上架</option>` : ""}
+              ${activeProducts.map((product) => `<option value="${esc(product.id)}" ${product.id === currentId ? "selected" : ""}>${esc(product.name)}</option>`).join("")}
+            </select>
+          </div>`;
+        }).join("")}
+      </div>
+    </section>
+    <section class="admin-editor-section" aria-labelledby="home-series-title">
+      <h3 id="home-series-title">商品系列</h3>
+      <div class="admin-home-series">
+        ${SERIES_COVERS.map(([id, label, defaultImage]) => homepageImageField(`h-cover-${id}`, `${label}封面網址`, home.seriesImages?.[id], defaultImage)).join("")}
+      </div>
+    </section>
+    <section class="admin-editor-section" aria-labelledby="home-reviews-title">
+      <h3 id="home-reviews-title">顧客真實感受</h3>
+      <div class="field"><label for="h-reviews">心得內容</label><textarea id="h-reviews" rows="5" maxlength="5000">${esc(home.reviews)}</textarea></div>
+    </section>
+    <section class="admin-editor-section" aria-labelledby="home-faq-title">
+      <h3 id="home-faq-title">常見問題</h3>
+      <div class="field"><label for="h-faq">問題與解答</label><textarea id="h-faq" rows="5" maxlength="5000">${esc(home.faq)}</textarea></div>
+    </section>
+    <div class="admin-editor-actions"><button class="primary-btn" type="submit">儲存首頁</button></div>
+  </form>`;
+
+  const form = $("#homepage-form");
+  form.addEventListener("change", (event) => {
+    const preview = event.target.closest(".admin-home-image")?.querySelector("[data-preview-image]");
+    if (!preview || preview.dataset.previewImage !== event.target.id) return;
+    const image = publicImageUrl(event.target.value.trim()) || preview.dataset.defaultImage;
+    if (image) preview.src = image;
+    else preview.removeAttribute("src");
+    preview.hidden = !image;
+    preview.nextElementSibling.hidden = Boolean(image);
+  });
+  form.onsubmit = saveHomepage;
+}
+
+async function saveHomepage(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const button = form.querySelector('button[type="submit"]');
+  if (button.disabled) return;
+
+  const value = (id) => form.querySelector(`#${id}`).value.trim();
+  const heroTitle = value("h-title");
+  if (!heroTitle) return flash("請填寫首頁主標題。", "error");
+
+  const heroImageUrl = value("h-hero-image");
+  const seriesImages = Object.fromEntries(SERIES_COVERS.map(([id]) => [id, value(`h-cover-${id}`)]));
+  if ([heroImageUrl, ...Object.values(seriesImages)].some((url) => url && !publicImageUrl(url))) {
+    return flash("請使用可公開瀏覽的 HTTPS 圖片網址。", "error");
+  }
+
+  const featuredProductIds = [0, 1, 2].map((index) => value(`h-feature-${index}`));
+  const selectedProducts = featuredProductIds.filter(Boolean);
+  if (new Set(selectedProducts).size !== selectedProducts.length) {
+    return flash("明星商品請選擇不同的商品。", "error");
+  }
+
+  const homeContent = {
+    heroImageUrl,
+    about: value("h-about"),
+    featuredProductIds,
+    seriesImages,
+    reviews: value("h-reviews"),
+    faq: value("h-faq"),
+  };
+
+  button.disabled = true;
+  form.inert = true;
+  try {
+    await setDoc(doc(db, "shopSettings", "public"), { heroTitle, homeContent, updatedAt: serverTimestamp() }, { merge: true });
+    await audit("homepage_update", "public");
+    if (!form.isConnected) return;
+    form.dataset.dirty = "";
+    flash("首頁內容已儲存。");
+  } catch (error) {
+    if (form.isConnected) flash(error, "error");
+  } finally {
+    if (form.isConnected) {
+      form.inert = false;
+      button.disabled = false;
+    }
+  }
+}
+
 function renderSettings() {
-  $("#admin-view").innerHTML = `<form id="settings-form" class="panel"><div class="settings-grid"><div class="field"><label>商店名稱</label><input id="s-store" value="${esc(settings.storeName)}"></div><div class="field"><label>通知 Email</label><input id="s-email" type="email" value="${esc(settings.storeEmail)}"></div><div class="field"><label>首頁小標題</label><input id="s-eyebrow" value="${esc(settings.heroEyebrow)}"></div><div class="field"><label>首頁主標題</label><input id="s-title" value="${esc(settings.heroTitle)}"></div><div class="field wide"><label>首頁說明</label><textarea id="s-description" rows="3">${esc(settings.heroDescription)}</textarea></div><label class="check-line"><input id="s-pickup" type="checkbox" ${settings.enablePickup ? "checked" : ""}><span>工作室自取</span></label><label class="check-line"><input id="s-cash" type="checkbox" ${settings.enableCashPickup ? "checked" : ""}><span>自取付款</span></label><label class="check-line"><input id="s-711" type="checkbox" ${settings.enable711 ? "checked" : ""}><span>7-11 店到店</span></label><div class="field"><label>7-11 運費</label><input id="s-fee711" type="number" min="0" value="${Number(settings.shippingFee711 || 0)}"></div><label class="check-line"><input id="s-family" type="checkbox" ${settings.enableFamily ? "checked" : ""}><span>全家店到店</span></label><div class="field"><label>全家運費</label><input id="s-feefamily" type="number" min="0" value="${Number(settings.shippingFeeFamily || 0)}"></div><label class="check-line"><input id="s-transfer" type="checkbox" ${settings.enableTransfer ? "checked" : ""}><span>銀行轉帳</span></label><div></div><div class="field wide"><label>自取說明</label><textarea id="s-pickup-note" rows="2">${esc(settings.pickupNote)}</textarea></div><div class="field wide"><label>轉帳說明</label><textarea id="s-transfer-note" rows="2">${esc(settings.transferNote)}</textarea></div><div class="field wide"><label>寄信服務網址</label><input id="s-email-url" type="url" value="${esc(settings.appsScriptEmailUrl || DEFAULT_EMAIL_URL)}"></div></div><button class="primary-btn" style="margin-top:18px" type="submit">儲存商店設定</button></form>`;
+  $("#admin-view").innerHTML = `<form id="settings-form" class="panel"><div class="settings-grid"><div class="field"><label>商店名稱</label><input id="s-store" value="${esc(settings.storeName)}"></div><div class="field"><label>通知 Email</label><input id="s-email" type="email" value="${esc(settings.storeEmail)}"></div><label class="check-line"><input id="s-pickup" type="checkbox" ${settings.enablePickup ? "checked" : ""}><span>工作室自取</span></label><label class="check-line"><input id="s-cash" type="checkbox" ${settings.enableCashPickup ? "checked" : ""}><span>自取付款</span></label><label class="check-line"><input id="s-711" type="checkbox" ${settings.enable711 ? "checked" : ""}><span>7-11 店到店</span></label><div class="field"><label>7-11 運費</label><input id="s-fee711" type="number" min="0" value="${Number(settings.shippingFee711 || 0)}"></div><label class="check-line"><input id="s-family" type="checkbox" ${settings.enableFamily ? "checked" : ""}><span>全家店到店</span></label><div class="field"><label>全家運費</label><input id="s-feefamily" type="number" min="0" value="${Number(settings.shippingFeeFamily || 0)}"></div><label class="check-line"><input id="s-transfer" type="checkbox" ${settings.enableTransfer ? "checked" : ""}><span>銀行轉帳</span></label><div></div><div class="field wide"><label>自取說明</label><textarea id="s-pickup-note" rows="2">${esc(settings.pickupNote)}</textarea></div><div class="field wide"><label>轉帳說明</label><textarea id="s-transfer-note" rows="2">${esc(settings.transferNote)}</textarea></div><div class="field wide"><label>寄信服務網址</label><input id="s-email-url" type="url" value="${esc(settings.appsScriptEmailUrl || DEFAULT_EMAIL_URL)}"></div></div><button class="primary-btn" style="margin-top:18px" type="submit">儲存商店設定</button></form>`;
   $("#settings-form").onsubmit = saveSettings;
 }
 async function saveSettings(event) {
@@ -385,9 +659,6 @@ async function saveSettings(event) {
   const data = {
     storeName: $("#s-store").value.trim() || "77waxing",
     storeEmail: $("#s-email").value.trim() || "77waxing.mail@gmail.com",
-    heroEyebrow: $("#s-eyebrow").value.trim(),
-    heroTitle: $("#s-title").value.trim(),
-    heroDescription: $("#s-description").value.trim(),
     enablePickup: bool("#s-pickup"),
     enableCashPickup: bool("#s-cash"),
     enable711: bool("#s-711"),
@@ -415,6 +686,9 @@ onAuthStateChanged(auth, async (user) => {
   products = [];
   orders = [];
   messages = [];
+  settingsReady = false;
+  editingProductId = null;
+  addingProduct = false;
   filteredOrderCache = [];
   $("#admin-app").innerHTML = '<p class="admin-login" role="status">正在確認商店後台登入狀態…</p>';
   const allowed = user && await isAdmin(user);
@@ -429,12 +703,13 @@ onAuthStateChanged(auth, async (user) => {
   }
 });
 document.addEventListener("input", (event) => {
-  const form = event.target.closest?.("#product-form, #settings-form");
+  const form = event.target.closest?.("#product-form, #settings-form, #homepage-form");
   if (form) form.dataset.dirty = "1";
 });
 document.addEventListener("77select:product-saved", () => {
   if (!$("#admin-view") || currentView !== "products") return;
   editingProductId = null;
+  addingProduct = false;
   renderProducts();
 });
 window.addEventListener("error", (event) => console.error("[77waxing shop admin]", event.error || event.message));

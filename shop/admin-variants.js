@@ -170,14 +170,17 @@ async function saveVariantProduct(event, db, auth) {
   const editingId = form.dataset.productId || null;
   const button = form.querySelector('button[type="submit"]');
   if (form.dataset.mediaProcessing === "1") return flash("商品圖片仍在處理，請完成後再儲存。", "error");
+  if (!$("#p-media-json", form)) return flash("商品圖片仍在載入，請稍後再儲存。", "error");
   if (button?.disabled) return;
 
   const variants = collectVariants(form);
   const variantError = validateVariants(variants);
   if (variantError) return flash(variantError, "error");
 
-  const name = $("#p-name")?.value.trim() || "";
-  const category = $("#p-category")?.value.trim() || "";
+  const name = $("#p-name", form).value.trim();
+  const categoryInput = $("#p-category", form);
+  const displayCategory = categoryInput.value.trim();
+  const category = displayCategory === categoryInput.dataset.displayCategory ? categoryInput.dataset.storedCategory : displayCategory;
   if (!name || !category) return flash("請填寫商品名稱與分類。", "error");
 
   const media = parseMedia(form, variants);
@@ -195,10 +198,10 @@ async function saveVariantProduct(event, db, auth) {
     stock: totalStock,
     pricingModel: "regional-variants-bulk-v2",
     supportedRegions: ["TW", "HK"],
-    sortOrder: Math.round(Number($("#p-sort")?.value || 0)),
-    description: $("#p-description")?.value.trim() || "",
-    spec: $("#p-spec")?.value.trim() || "",
-    active: Boolean($("#p-active")?.checked),
+    sortOrder: Math.round(Number($("#p-sort", form).value || 0)),
+    description: $("#p-description", form).value.trim(),
+    spec: $("#p-spec", form).value.trim(),
+    active: $("#p-active", form).checked,
     updatedAt: serverTimestamp(),
   };
 
@@ -258,10 +261,7 @@ async function saveVariantProduct(event, db, auth) {
 async function enhanceForm(form, db, auth) {
   if (form.dataset.variantEnhanced === "1") return;
   form.dataset.variantEnhanced = "1";
-  form.dataset.productId = activeEditId || "";
-
-  const intro = form.querySelector(".admin-section-head .order-date");
-  if (intro) intro.textContent = "可設定商品規格、台灣與香港售價、庫存及數量優惠，並為各規格選擇圖片。";
+  form.dataset.productId ??= activeEditId || "";
 
   const legacyPrice = $("#p-price", form)?.closest(".field");
   const legacyStock = $("#p-stock", form)?.closest(".field");
@@ -269,21 +269,22 @@ async function enhanceForm(form, db, auth) {
   legacyStock?.classList.add("legacy-variant-field");
   $("#p-sort", form)?.closest(".field")?.classList.add("compact-field");
 
-  const grid = form.querySelector(".settings-grid");
-  const descriptionField = $("#p-description", form)?.closest(".field");
-  if (!grid || !descriptionField) return;
+  const host = form.querySelector("[data-product-variants]") || form.querySelector(".settings-grid");
+  if (!host) return;
 
   const section = document.createElement("section");
   section.className = "variant-editor wide";
-  section.innerHTML = `<div class="variant-editor-head"><div><span class="variant-kicker">VARIANTS · REGIONAL PRICING · BULK</span><h3>商品規格、地區售價與數量優惠</h3><p>每個規格分別設定台灣／香港單價與庫存。若有「買 2 件以上單價較低」的優惠，填入門檻與兩地優惠價；沒有優惠則門檻填 0。</p></div><button class="secondary-btn" type="button" data-add-variant>＋ 新增規格</button></div><div class="variant-list" data-variant-list><div class="variant-loading">正在載入規格…</div></div>`;
-  grid.insertBefore(section, descriptionField);
+  section.innerHTML = `<div class="variant-editor-head"><div><h3>規格、售價與庫存</h3><p>可為各規格設定台灣／香港售價及數量優惠。</p></div><button class="secondary-btn" type="button" data-add-variant disabled>新增規格</button></div><div class="variant-list" data-variant-list><div class="variant-loading">正在載入規格…</div></div>`;
+  host.append(section);
 
   const list = section.querySelector("[data-variant-list]");
-  const product = await loadProduct(db, form.dataset.productId || null);
+  const product = form.productRecord ?? await loadProduct(db, form.dataset.productId || null);
   if (!form.isConnected) return;
   renderVariantRows(list, normalizeVariants(product));
 
-  section.querySelector("[data-add-variant]").onclick = () => {
+  const addVariant = section.querySelector("[data-add-variant]");
+  addVariant.disabled = false;
+  addVariant.onclick = () => {
     form.dataset.dirty = "1";
     const current = collectVariants(form);
     current.push({ id: variantId(), name: "", capacity: "", priceTWD: 0, priceHKD: 0, stock: 0, bulkMinQty: 0, bulkPriceTWD: 0, bulkPriceHKD: 0 });

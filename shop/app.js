@@ -3,7 +3,9 @@ import { browserLocalPersistence, onAuthStateChanged, setPersistence, signInAnon
 import { addDoc, collection, doc, getDoc, getDocs, onSnapshot, query, serverTimestamp, setDoc, where } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
 import { getPublicFirebase } from "../assets/public-firebase.js?v=20261026-audit1";
 import { beginCheckout, finishCheckout, cartFingerprint, validateOrderData, savePreference } from "./checkout-guard.js?v=20261026-audit1";
-import { allProducts, catalogCategories, catalogCategory, filterProducts } from "./series.js?v=20261123-select1";
+import { allProducts, catalogCategories, catalogCategory, categoryFromCollectionKey, filterProducts } from "./series.js?v=20261123-select2";
+import { collectionHref, productHref, storeHomeHref, storeRoute } from "./select-routes.js?v=20261123-select2";
+import { renderSelectHomeSettings } from "./select-home-content.js?v=20261123-select2";
 
 const { auth, db } = getPublicFirebase();
 const DEFAULT_EMAIL_URL = "https://script.google.com/macros/s/AKfycbx6iC26KXbHWYte5XhLGNRMmG16Yydx2vPHDxYpmp4rmWn3plk__6Qwwr7Y09hLptTW/exec";
@@ -36,15 +38,13 @@ const STATUS = {
 
 let settings = { ...DEFAULT_SETTINGS };
 let products = [];
-let productsLoaded = false;
 let cart = loadCart();
-let category = allProducts;
+const category = storeRoute.category || allProducts;
 let currentUser = null;
 let ordersUnsub = null;
 let messagesUnsub = null;
 let orderRows = [];
 let messageRows = [];
-let selectedProduct = null;
 let authVersion = 0;
 
 const $ = (selector, root = document) => root.querySelector(selector);
@@ -86,13 +86,16 @@ function toast(message, type = "ok") {
   toast.timer = setTimeout(() => el.classList.add("hidden"), 3200);
 }
 function setTab(name) {
+  document.documentElement.dataset.selectRoute = name;
   $$("[data-tab]").forEach((button) => button.classList.toggle("on", button.dataset.tab === name));
   $$("[data-view]").forEach((section) => section.classList.toggle("hidden", section.dataset.view !== name));
-  $$(".select-nav [data-tab]").forEach((button) => {
-    if (button.dataset.tab === name) button.setAttribute("aria-current", "page");
-    else button.removeAttribute("aria-current");
+  $$(".select-nav [data-tab], .select-nav [data-select-nav]").forEach((link) => {
+    const target = link.dataset.tab || link.dataset.selectNav;
+    const active = target === name;
+    link.classList.toggle("on", active);
+    if (active) link.setAttribute("aria-current", "page");
+    else link.removeAttribute("aria-current");
   });
-  window.scrollTo({ top: 0, behavior: "instant" });
 }
 function openLayer(selector) {
   $(selector).classList.remove("hidden");
@@ -113,6 +116,7 @@ async function loadSettings() {
   const email = settings.storeEmail || DEFAULT_SETTINGS.storeEmail;
   $("#store-email-link").textContent = email;
   $("#store-email-link").href = `mailto:${email}`;
+  renderSelectHomeSettings(settings.homeContent);
   document.documentElement.classList.remove("shop-hero-pending");
 }
 async function loadProducts() {
@@ -120,8 +124,6 @@ async function loadProducts() {
   products = snap.docs
     .map((row) => ({ id: row.id, ...row.data() }))
     .sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0) || String(a.name || "").localeCompare(String(b.name || ""), "zh-Hant"));
-  productsLoaded = true;
-  category = $("#category-filters .filter-btn.on")?.dataset.category || category;
   renderFilters();
   renderProducts();
   reconcileCart();
@@ -143,27 +145,7 @@ function reconcileCart() {
 }
 function renderFilters() {
   const categories = catalogCategories(products);
-  if (!categories.includes(category)) category = allProducts;
-  $("#category-filters").innerHTML = categories.map((name) => `<button class="filter-btn${name === category ? " on" : ""}" type="button" data-category="${esc(name)}" aria-pressed="${name === category}">${esc(name)}</button>`).join("");
-  $$("#category-filters [data-category]").forEach((button) => {
-    button.onclick = () => selectCategory(button.dataset.category);
-  });
-}
-function selectCategory(name) {
-  category = name;
-  renderFilters();
-  if (productsLoaded) renderProducts();
-}
-function selectSeriesFromHome(event) {
-  const button = event.target.closest?.("[data-select-series]");
-  if (!button) return;
-  const name = button.dataset.selectSeries;
-  const filter = $$("#category-filters [data-category]").find((item) => item.dataset.category === name);
-  if (filter) {
-    filter.click();
-  } else {
-    selectCategory(name);
-  }
+  $("#category-filters").innerHTML = categories.map((name) => `<a class="filter-btn${name === category ? " on" : ""}" href="${esc(collectionHref(name))}" data-category="${esc(name)}"${name === category ? ' aria-current="page"' : ""}>${esc(name)}</a>`).join("");
 }
 function mediaMarkup(product) {
   if (!product.imageUrl) return `<div class="product-media">77waxing</div>`;
@@ -178,40 +160,15 @@ function renderProducts() {
   $("#product-grid").innerHTML = visible.map((p) => {
     const stock = Number(p.stock || 0);
     return `<article class="product-card">
-      ${mediaMarkup(p)}
+      <a class="select-card-image-link" href="${esc(productHref(p.id))}" aria-label="${esc(p.name)}">${mediaMarkup(p)}</a>
       <div class="product-body">
         <div class="product-top"><h3 class="product-title">${esc(p.name)}</h3><div class="product-price">${money(p.price)}</div></div>
         <p class="product-desc">${esc(p.description || "")}</p>
         <div class="product-meta"><span>${esc(catalogCategory(p.category))}</span><span>${stock > 0 ? `庫存 ${stock}` : "目前售完"}</span></div>
-        <div class="product-actions"><button class="primary-btn" data-add="${p.id}" ${stock <= 0 ? "disabled" : ""}>${stock <= 0 ? "售完" : "加入購物車"}</button><button class="secondary-btn" data-detail="${p.id}">詳情</button></div>
+        <div class="product-actions single-detail-action"><a class="primary-btn product-detail-only" href="${esc(productHref(p.id))}">詳情</a></div>
       </div>
     </article>`;
   }).join("");
-  $$("[data-add]").forEach((button) => { button.onclick = () => addToCart(button.dataset.add); });
-  $$("[data-detail]").forEach((button) => { button.onclick = () => openProduct(button.dataset.detail); });
-}
-function openProduct(id) {
-  const product = products.find((row) => row.id === id);
-  if (!product) return;
-  selectedProduct = product;
-  $("#product-detail-body").innerHTML = `<div class="product-detail">
-    ${mediaMarkup(product)}
-    <div><span class="eyebrow">${esc(catalogCategory(product.category))}</span><h2>${esc(product.name)}</h2><div class="product-price">${money(product.price)}</div><p>${esc(product.description || "")}</p>${product.spec ? `<div class="spec">${esc(product.spec)}</div>` : ""}<p class="order-date">${Number(product.stock || 0) > 0 ? `目前庫存：${Number(product.stock)}` : "目前售完"}</p></div>
-  </div>`;
-  $("#product-detail-add").disabled = Number(product.stock || 0) <= 0;
-  $("#product-detail-add").textContent = Number(product.stock || 0) > 0 ? "加入購物車" : "目前售完";
-  openLayer("#product-modal-wrap");
-}
-function addToCart(id) {
-  const product = products.find((row) => row.id === id);
-  if (!product || Number(product.stock || 0) <= 0) return toast("此商品目前沒有庫存。", "error");
-  const existing = cart.find((row) => row.id === id);
-  const nextQty = Number(existing?.qty || 0) + 1;
-  if (nextQty > Number(product.stock || 0)) return toast("購物車數量已達目前庫存。", "error");
-  if (existing) existing.qty = nextQty;
-  else cart.push({ id: product.id, name: product.name, price: Number(product.price || 0), imageUrl: product.imageUrl || "", qty: 1 });
-  saveCart();
-  toast(`已加入 ${product.name}`);
 }
 function changeQty(id, delta) {
   const row = cart.find((item) => item.id === id);
@@ -476,10 +433,19 @@ async function ensureAuth() {
   if (!auth.currentUser) await signInAnonymously(auth);
 }
 function bindUI() {
-  document.addEventListener("click", selectSeriesFromHome, true);
+  $$("a[data-shop-home-link]").forEach((link) => {
+    link.href = storeHomeHref() + link.hash;
+  });
+  $$("a[data-shop-collection]").forEach((link) => {
+    link.href = collectionHref(categoryFromCollectionKey(link.dataset.shopCollection));
+  });
+  const title = $("#shop-catalog-title");
+  if (title && storeRoute.view === "products" && category !== allProducts) title.textContent = category;
+  setTab(storeRoute.view);
   $$("[data-tab]").forEach((button) => {
     button.onclick = () => {
       setTab(button.dataset.tab);
+      window.scrollTo({ top: 0, behavior: "instant" });
       if (button.dataset.tab === "products") $("#shop-catalog-title")?.focus({ preventScroll: true });
     };
   });
@@ -490,13 +456,10 @@ function bindUI() {
   $("#checkout-close").onclick = () => closeLayer("#checkout-wrap");
   $("#checkout-backdrop").onclick = () => closeLayer("#checkout-wrap");
   $("#checkout-form").onsubmit = submitOrder;
-  $("#product-detail-close").onclick = () => closeLayer("#product-modal-wrap");
-  $("#product-detail-backdrop").onclick = () => closeLayer("#product-modal-wrap");
-  $("#product-detail-add").onclick = () => { if (selectedProduct) addToCart(selectedProduct.id); closeLayer("#product-modal-wrap"); };
   $("#qa-form").onsubmit = submitQuestion;
   document.addEventListener("keydown", (event) => {
     if (event.key !== "Escape") return;
-    ["#cart-wrap", "#checkout-wrap", "#product-modal-wrap"].forEach((selector) => {
+    ["#cart-wrap", "#checkout-wrap"].forEach((selector) => {
       if (!$(selector).classList.contains("hidden")) closeLayer(selector);
     });
   });

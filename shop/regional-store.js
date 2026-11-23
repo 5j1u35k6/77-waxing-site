@@ -3,7 +3,10 @@ import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.18.0/f
 import { collection, doc, getDoc, getDocFromServer, getDocs, onSnapshot, query, serverTimestamp, setDoc, where } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
 import { getPublicFirebase } from "../assets/public-firebase.js?v=20261026-audit1";
 import { beginCheckout, finishCheckout, cartFingerprint, validateOrderData, savePreference } from "./checkout-guard.js?v=20261026-audit1";
-import { allProducts, catalogCategories, catalogCategory, filterProducts } from "./series.js?v=20261123-select1";
+import { allProducts, catalogCategories, catalogCategory, filterProducts } from "./series.js?v=20261123-select2";
+import { collectionHref, productHref, storeHomeHref, storeRoute } from "./select-routes.js?v=20261123-select2";
+import { renderSelectHomeProducts } from "./select-home-content.js?v=20261123-select2";
+import { setProductPageMetadata } from "./seo.js?v=20261123-select2";
 
 const { auth, db } = getPublicFirebase();
 const CART_KEY = "77select_cart_v4";
@@ -20,6 +23,7 @@ let products = [];
 let cart = loadCart();
 let selectedProduct = null;
 let selectedVariantId = null;
+let selectedQuantity = 1;
 let currentUser = null;
 let ownOrders = [];
 let orderUnsubscribe = null;
@@ -48,6 +52,7 @@ function saveCart() {
   const count = $("#cart-count");
   if (count) count.textContent = String(cart.reduce((sum, row) => sum + int(row.qty), 0));
   renderCart();
+  updateDetailPurchase();
 }
 
 function money(value, currency = market.currency) {
@@ -210,120 +215,166 @@ function cardMediaMarkup(product) {
 
 function galleryMarkup(product, variantId) {
   const media = mediaForVariant(product, variantId);
-  if (!media.length) return `<div class="product-gallery"><div class="product-gallery-main product-media">77select</div></div>`;
-  const first = media[0];
-  return `<div class="product-gallery">
-    <div class="product-gallery-main"><img data-gallery-main src="${esc(first.url)}" alt="${esc(product.name)}"></div>
-    ${media.length > 1 ? `<div class="product-gallery-thumbs">${media.map((row, index) => `<button type="button" class="gallery-thumb${index === 0 ? " on" : ""}" data-gallery-thumb="${esc(row.id)}" data-gallery-url="${esc(row.url)}" aria-label="檢視商品圖片 ${index + 1}"><img src="${esc(row.url)}" alt=""></button>`).join("")}</div>` : ""}
-  </div>`;
+  const first = media.find((row) => row.variantId === variantId) || media[0];
+  return `<section class="product-gallery select-product-gallery" aria-label="商品圖片">
+    <div class="product-gallery-main">${first ? `<img data-gallery-main src="${esc(first.url)}" alt="${esc(product.name)}">` : '<span>暫無商品圖片</span>'}</div>
+    ${media.length > 1 ? `<div class="product-gallery-thumbs">${media.map((row, index) => `<button type="button" class="gallery-thumb${row === first ? " on" : ""}" data-gallery-thumb data-gallery-url="${esc(row.url)}" aria-label="檢視商品圖片 ${index + 1}" aria-pressed="${row === first}"><img src="${esc(row.url)}" alt="" loading="lazy"></button>`).join("")}</div>` : ""}
+  </section>`;
+}
+
+function catalogPriceText(product) {
+  const amount = money(productMinPrice(product));
+  return normalizeVariants(product).length > 1 ? `${amount} 起` : amount;
+}
+
+function productCardMarkup(product) {
+  const href = esc(productHref(product.id));
+  const name = esc(product.name);
+  const variants = normalizeVariants(product);
+  const stock = totalStock(product);
+  return `<article class="product-card regional-product-card">
+    <a class="select-card-image-link" href="${href}" aria-label="${name}">${cardMediaMarkup(product)}</a>
+    <div class="product-body">
+      <div class="product-top"><h3 class="product-title">${name}</h3><div class="product-price">${catalogPriceText(product)}</div></div>
+      ${variants.some(bulkEnabled) ? '<div class="bulk-badge">多件優惠</div>' : ""}
+      <p class="product-desc">${esc(product.description || "")}</p>
+      <div class="product-meta"><span>${esc(catalogCategory(product.category))}</span><span>${variants.length} 種規格${stock > 0 ? `｜共 ${stock} 件` : "｜目前售完"}</span></div>
+      <div class="product-actions single-detail-action"><a class="primary-btn product-detail-only" data-regional-detail="${esc(product.id)}" href="${href}" aria-label="${name} 詳情">詳情</a></div>
+    </div>
+  </article>`;
 }
 
 function renderProducts() {
   const grid = $("#product-grid");
   if (!grid) return;
   renderingProducts = true;
-  const activeCategory = $("#category-filters .filter-btn.on")?.dataset.category || allProducts;
+  const activeCategory = storeRoute.category || allProducts;
   const visible = filterProducts(products, activeCategory);
-  if (!visible.length) {
-    grid.innerHTML = `<div class="empty-state" data-regional-empty>${activeCategory === allProducts ? "目前沒有可訂購的商品。" : "此系列目前尚無商品。"}</div>`;
-    renderingProducts = false;
-    return;
-  }
-
-  grid.innerHTML = visible.map((product) => {
-    const variants = normalizeVariants(product);
-    const stock = totalStock(product);
-    const minPrice = productMinPrice(product);
-    const priceText = variants.length > 1 ? `${money(minPrice)} 起` : money(minPrice);
-    const hasBulk = variants.some(bulkEnabled);
-    return `<article class="product-card regional-product-card">
-      ${cardMediaMarkup(product)}
-      <div class="product-body">
-        <div class="product-top"><h3 class="product-title">${esc(product.name)}</h3><div class="product-price">${priceText}</div></div>
-        ${hasBulk ? `<div class="bulk-badge">多件優惠</div>` : ""}
-        <p class="product-desc">${esc(product.description || "")}</p>
-        <div class="product-meta"><span>${esc(catalogCategory(product.category))}</span><span>${variants.length} 種規格${stock > 0 ? `｜共 ${stock} 件` : "｜目前售完"}</span></div>
-        <div class="product-actions"><button class="primary-btn" data-regional-buy="${esc(product.id)}" ${stock <= 0 ? "disabled" : ""}>${stock <= 0 ? "售完" : variants.length > 1 || hasBulk ? "選擇規格" : "加入購物車"}</button><button class="secondary-btn" data-regional-detail="${esc(product.id)}">詳情</button></div>
-      </div>
-    </article>`;
-  }).join("");
+  grid.innerHTML = visible.length ? visible.map(productCardMarkup).join("") :
+    `<div class="empty-state" data-regional-empty>${activeCategory === allProducts ? "目前沒有可訂購的商品。" : "此系列目前尚無商品。"}</div>`;
   renderingProducts = false;
 }
 
 function renderFilters() {
   const host = $("#category-filters");
   if (!host) return;
-  const current = host.querySelector(".filter-btn.on")?.dataset.category || allProducts;
-  const categories = catalogCategories(products);
-  const chosen = categories.includes(current) ? current : allProducts;
-  host.innerHTML = categories.map((name) => `<button class="filter-btn${name === chosen ? " on" : ""}" type="button" data-regional-category="${esc(name)}" data-category="${esc(name)}" aria-pressed="${name === chosen}">${esc(name)}</button>`).join("");
+  const chosen = storeRoute.category || allProducts;
+  host.innerHTML = catalogCategories(products).map((name) => `<a class="filter-btn${name === chosen ? " on" : ""}" href="${esc(collectionHref(name))}" data-category="${esc(name)}"${name === chosen ? ' aria-current="page"' : ""}>${esc(name)}</a>`).join("");
+}
+
+function variantChoiceMarkup(variant) {
+  const disabled = variant.stock <= 0;
+  const selected = variant.id === selectedVariantId;
+  const discount = discountText(variant);
+  return `<button type="button" role="radio" aria-checked="${selected}" class="variant-choice variant-layout-v2${selected ? " on" : ""}" data-regional-variant="${esc(variant.id)}"${disabled ? " disabled" : ""}>
+    <span class="variant-layout-row variant-layout-top">
+      <span class="variant-layout-capacity">${esc(variant.capacity || variant.name)}</span>
+      <strong class="variant-layout-price">${money(basePriceFor(variant))}</strong>
+    </span>
+    <span class="variant-layout-row variant-layout-bottom">
+      <span class="variant-layout-pill">${esc(variant.capacity ? variant.name : "商品規格")}</span>
+      <span class="variant-layout-stock">${disabled ? "售完" : `剩餘數量 ${variant.stock}`}</span>
+    </span>
+    ${discount ? `<span class="variant-layout-discount">多件優惠｜${esc(discount)}</span>` : ""}
+  </button>`;
 }
 
 function renderProductDetail() {
-  if (!selectedProduct) return;
-  const variants = normalizeVariants(selectedProduct);
-  const selectedVariant = variants.find((row) => row.id === selectedVariantId) || variants[0];
-  selectedVariantId = selectedVariant?.id || null;
   const body = $("#product-detail-body");
-  if (!body) return;
+  if (!selectedProduct || !body) return;
+  const variants = normalizeVariants(selectedProduct);
+  const selected = variants.find((row) => row.id === selectedVariantId) || variants[0];
+  const category = catalogCategory(selectedProduct.category);
+  const name = esc(selectedProduct.name);
+  const specs = String(selectedProduct.spec || "").trim();
+  const description = String(selectedProduct.description || "").trim();
+  const categoryHref = esc(collectionHref(category));
+  const related = filterProducts(products, category).filter((product) => product.id !== selectedProduct.id).slice(0, 3);
+  const discount = discountText(selected);
 
-  const variantMedia = mediaForVariant(selectedProduct, selectedVariantId);
-  const detailMedia = variantMedia.length > 1 ? variantMedia.slice(1) : [];
-  const gallery = detailMedia.length ? `<section class="product-gallery product-detail-media-column" aria-label="商品圖片">
-    <div class="product-gallery-main"><img data-gallery-main src="${esc(detailMedia[0].url)}" alt="${esc(selectedProduct.name)}"></div>
-    ${detailMedia.length > 1 ? `<div class="product-gallery-thumbs">${detailMedia.map((row, index) => `<button type="button" class="gallery-thumb${index === 0 ? " on" : ""}" data-gallery-thumb="${esc(row.id)}" data-gallery-url="${esc(row.url)}" aria-label="檢視商品圖片 ${index + 1}"><img src="${esc(row.url)}" alt=""></button>`).join("")}</div>` : ""}
-  </section>` : "";
-
-  body.innerHTML = `<div class="product-detail regional-product-detail regional-product-detail-v2${detailMedia.length ? "" : " detail-gallery-empty"}">
-    ${gallery}
-    <section class="product-detail-copy product-detail-info-column">
-      <span class="eyebrow">${esc(catalogCategory(selectedProduct.category))}</span>
-      <h2>${esc(selectedProduct.name)}</h2>
-      <p>${esc(selectedProduct.description || "")}</p>
-      <div class="variant-picker" role="radiogroup" aria-label="選擇商品規格">
-        ${variants.map((variant) => {
-          const disabled = variant.stock <= 0;
-          const discount = discountText(variant);
-          const primaryLabel = variant.capacity || variant.name || "規格";
-          const pillLabel = variant.capacity ? variant.name : "商品規格";
-          return `<button type="button" role="radio" aria-checked="${variant.id === selectedVariantId ? "true" : "false"}" class="variant-choice variant-layout-v2${variant.id === selectedVariantId ? " on" : ""}" data-regional-variant="${esc(variant.id)}" ${disabled ? "disabled" : ""}>
-            <div class="variant-layout-row variant-layout-top">
-              <span class="variant-layout-capacity">${esc(primaryLabel)}</span>
-              <strong class="variant-layout-price">${money(basePriceFor(variant))}</strong>
-            </div>
-            <div class="variant-layout-row variant-layout-bottom">
-              <span class="variant-layout-pill">${esc(pillLabel)}</span>
-              <span class="variant-layout-stock">${disabled ? "售完" : `剩餘數量 ${variant.stock}`}</span>
-            </div>
-            ${discount ? `<div class="variant-layout-discount">多件優惠｜${esc(discount)}</div>` : ""}
-          </button>`;
-        }).join("")}
+  body.innerHTML = `<nav class="select-product-breadcrumb" aria-label="目前位置">
+    <a href="${esc(storeHomeHref())}">首頁</a>
+    <a href="${categoryHref}">${esc(category)}</a>
+    <span aria-current="page">${name}</span>
+  </nav>
+  <div class="select-product-layout">
+    ${galleryMarkup(selectedProduct, selected.id)}
+    <section class="select-product-info" aria-labelledby="product-page-title">
+      <p class="select-product-category"><a href="${categoryHref}">${esc(category)}</a></p>
+      <h1 id="product-page-title">${name}</h1>
+      <p class="select-product-price" id="product-detail-price" aria-live="polite">${money(basePriceFor(selected))}</p>
+      ${description ? `<p class="select-product-description">${esc(description)}</p>` : ""}
+      <div class="variant-picker" role="radiogroup" aria-label="選擇商品規格">${variants.map(variantChoiceMarkup).join("")}</div>
+      ${discount ? `<p class="bulk-notice">數量優惠｜${esc(discount)}</p>` : ""}
+      <div class="select-product-purchase">
+        <div id="product-detail-qty-picker" class="detail-qty-picker">
+          <span class="detail-qty-label">數量</span>
+          <div class="qty detail-qty-control">
+            <button type="button" data-detail-qty="-1" aria-label="減少數量">−</button>
+            <b id="product-detail-qty-value" aria-live="polite">1</b>
+            <button type="button" data-detail-qty="1" aria-label="增加數量">＋</button>
+          </div>
+          <small id="product-detail-qty-stock"></small>
+        </div>
+        <button id="product-detail-add" class="primary-btn" type="button">加入購物車</button>
       </div>
-      ${selectedVariant && discountText(selectedVariant) ? `<div class="bulk-notice">數量優惠｜${esc(discountText(selectedVariant))}</div>` : ""}
-      ${selectedProduct.spec ? `<div class="spec">${esc(selectedProduct.spec)}</div>` : ""}
     </section>
-  </div>`;
-  updateDetailAddButton();
+  </div>
+  <div class="select-product-notes">
+    ${specs ? `<section aria-labelledby="product-spec-title"><h2 id="product-spec-title">規格與使用說明</h2><p>${esc(specs)}</p></section>` : ""}
+    <section aria-labelledby="product-shipping-title">
+      <h2 id="product-shipping-title">配送與付款</h2>
+      <p>可用的取貨和付款方式會顯示在結帳頁。</p>
+      <a href="./policies.html">訂購、退換貨與隱私說明</a>
+    </section>
+  </div>
+  ${related.length ? `<section class="select-related-products" aria-labelledby="product-related-title">
+    <div class="select-related-heading"><h2 id="product-related-title">同系列商品</h2><a href="${categoryHref}">瀏覽系列</a></div>
+    <div class="product-grid">${related.map(productCardMarkup).join("")}</div>
+  </section>` : ""}`;
+  updateDetailPurchase();
 }
 
-function openProduct(productId) {
-  const product = products.find((row) => row.id === productId);
-  if (!product) return;
-  selectedProduct = product;
-  const variants = normalizeVariants(product);
-  const firstAvailable = variants.find((variant) => variant.stock > 0) || variants[0];
-  selectedVariantId = firstAvailable?.id || null;
+function renderRequestedProduct() {
+  if (storeRoute.view !== "product") return;
+  selectedProduct = products.find((product) => product.id === storeRoute.productId) || null;
+  if (!selectedProduct) {
+    $("#product-detail-body").innerHTML = `<div class="select-product-unavailable"><h1 id="product-page-title">找不到這項商品</h1><p>商品可能已下架或網址有誤。</p><a href="${esc(collectionHref(allProducts))}">瀏覽全部商品</a></div>`;
+    return;
+  }
+  const variants = normalizeVariants(selectedProduct);
+  selectedVariantId = (variants.find((variant) => variant.stock > 0) || variants[0]).id;
+  selectedQuantity = 1;
+  setProductPageMetadata(selectedProduct);
   renderProductDetail();
-  $("#product-modal-wrap")?.classList.remove("hidden");
-  document.body.style.overflow = "hidden";
 }
 
-function updateDetailAddButton() {
+function selectedPurchaseVariant() {
+  return selectedProduct && normalizeVariants(selectedProduct).find((variant) => variant.id === selectedVariantId);
+}
+
+function remainingVariantStock(variant) {
+  const row = cart.find((item) => item.key === cartKey(selectedProduct.id, variant.id));
+  return Math.max(0, variant.stock - int(row?.qty));
+}
+
+function updateDetailPurchase() {
   const button = $("#product-detail-add");
-  if (!button || !selectedProduct) return;
-  const variant = normalizeVariants(selectedProduct).find((row) => row.id === selectedVariantId);
-  button.disabled = !variant || variant.stock <= 0;
-  button.textContent = variant && variant.stock > 0 ? `加入購物車｜${money(basePriceFor(variant))}` : "目前售完";
+  const variant = selectedPurchaseVariant();
+  if (!button || !variant) return;
+  const remaining = remainingVariantStock(variant);
+  selectedQuantity = remaining > 0 ? Math.min(remaining, Math.max(1, int(selectedQuantity))) : 1;
+  $("#product-detail-qty-picker").hidden = remaining <= 0;
+  $("#product-detail-qty-value").textContent = String(selectedQuantity);
+  $("#product-detail-qty-stock").textContent = `最多 ${remaining} 件`;
+  $('[data-detail-qty="-1"]').disabled = selectedQuantity <= 1;
+  $('[data-detail-qty="1"]').disabled = selectedQuantity >= remaining;
+  button.disabled = remaining <= 0;
+
+  const inCart = variant.stock - remaining;
+  const price = unitPriceFor(variant, inCart + selectedQuantity);
+  button.textContent = variant.stock <= 0 ? "目前售完" :
+    remaining <= 0 ? "購物車已達庫存上限" : `加入購物車｜${money(price)}${selectedQuantity > 1 ? ` × ${selectedQuantity}` : ""}`;
 }
 
 function addVariantToCart(productId, variantId, requestedQuantity = 1) {
@@ -687,16 +738,19 @@ async function refreshCartProducts() {
     .sort((a,b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0) || String(a.name || '').localeCompare(String(b.name || ''),'zh-Hant'));
 }
 
-async function loadProducts({ render = true } = {}) {
+async function loadProducts() {
   const snap = await getDocs(query(collection(db, "shopProducts"), where("active", "==", true)));
   products = snap.docs.map((row) => ({ id: row.id, ...row.data() }))
     .sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0) || String(a.name || "").localeCompare(String(b.name || ""), "zh-Hant"));
-  if (render) renderLoadedCatalog();
 }
 function renderLoadedCatalog() {
   renderFilters();
   renderProducts();
   reconcileCart();
+  renderRequestedProduct();
+  renderSelectHomeProducts(products.map((product) => ({
+    id: product.id, name: product.name, imageUrl: primaryImage(product), priceText: catalogPriceText(product),
+  })));
   const connection = $("#connection-state");
   if (connection) {
     connection.textContent = "";
@@ -706,67 +760,38 @@ function renderLoadedCatalog() {
 
 function bindCaptureHandlers() {
   document.addEventListener("click", (event) => {
-    const categoryButton = event.target.closest?.("[data-regional-category]");
-    if (categoryButton) {
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      $$("#category-filters .filter-btn").forEach((button) => {
-        const selected = button === categoryButton;
-        button.classList.toggle("on", selected);
-        button.setAttribute("aria-pressed", String(selected));
-      });
-      renderProducts();
-      return;
-    }
-
-    const buy = event.target.closest?.("[data-regional-buy]");
-    if (buy) {
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      const product = products.find((row) => row.id === buy.dataset.regionalBuy);
-      const variants = product ? normalizeVariants(product) : [];
-      if (variants.length === 1 && variants[0].stock > 0 && !bulkEnabled(variants[0])) addVariantToCart(product.id, variants[0].id);
-      else openProduct(buy.dataset.regionalBuy);
-      return;
-    }
-
-    const detail = event.target.closest?.("[data-regional-detail]");
-    if (detail) {
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      openProduct(detail.dataset.regionalDetail);
-      return;
-    }
-
     const variantButton = event.target.closest?.("[data-regional-variant]");
-    if (variantButton) {
-      event.preventDefault();
-      event.stopImmediatePropagation();
+    if (variantButton && !variantButton.disabled && selectedVariantId !== variantButton.dataset.regionalVariant) {
       selectedVariantId = variantButton.dataset.regionalVariant;
+      selectedQuantity = 1;
       renderProductDetail();
+      $("[data-regional-variant][aria-checked='true']")?.focus({ preventScroll: true });
       return;
     }
 
     const thumb = event.target.closest?.("[data-gallery-thumb]");
     if (thumb) {
-      event.preventDefault();
-      event.stopImmediatePropagation();
       const main = $("[data-gallery-main]");
       if (main) main.src = thumb.dataset.galleryUrl || "";
-      $$("[data-gallery-thumb]").forEach((button) => button.classList.toggle("on", button === thumb));
+      $$("[data-gallery-thumb]").forEach((button) => {
+        button.classList.toggle("on", button === thumb);
+        button.setAttribute("aria-pressed", String(button === thumb));
+      });
       return;
     }
 
-    if (event.target.closest?.("#product-detail-add")) {
-      if (!selectedProduct || !selectedVariantId) return;
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      const button = $("#product-detail-add");
-      const quantity = Math.max(1, int(button?.dataset.requestedQuantity || 1));
-      if (button) delete button.dataset.requestedQuantity;
+    const detailQuantity = event.target.closest?.("[data-detail-qty]");
+    if (detailQuantity && !detailQuantity.disabled) {
+      selectedQuantity += Number(detailQuantity.dataset.detailQty);
+      updateDetailPurchase();
+      return;
+    }
+
+    const detailAdd = event.target.closest?.("#product-detail-add");
+    if (detailAdd && !detailAdd.disabled && selectedProduct && selectedVariantId) {
+      const quantity = selectedQuantity;
+      selectedQuantity = 1;
       addVariantToCart(selectedProduct.id, selectedVariantId, quantity);
-      $("#product-modal-wrap")?.classList.add("hidden");
-      document.body.style.overflow = "";
       return;
     }
 
@@ -801,7 +826,7 @@ function keepRegionalViewsAuthoritative() {
   const grid = $("#product-grid");
   if (grid) {
     new MutationObserver(() => {
-      if (!renderingProducts && products.length && !grid.querySelector("[data-regional-buy], [data-regional-empty]")) {
+      if (!renderingProducts && products.length && !grid.querySelector("[data-regional-detail], [data-regional-empty]")) {
         queueMicrotask(() => {
           renderFilters();
           renderProducts();
@@ -824,15 +849,22 @@ function keepRegionalViewsAuthoritative() {
 }
 
 // Geography and public catalog/settings are independent network requests.
-const initialCatalog = Promise.all([loadSettings(), loadProducts({ render: false })])
-  .catch(error => console.error("77select regional storefront init failed", error));
+const initialSettings = loadSettings();
+const initialCatalog = loadProducts().then(() => true, (error) => {
+  console.error("77select regional storefront init failed", error);
+  return false;
+});
 market = await detectMarket();
 ensureMarketBadge();
 bindCaptureHandlers();
 keepRegionalViewsAuthoritative();
-await initialCatalog;
-renderLoadedCatalog();
-saveCart();
+if (await initialCatalog) {
+  renderLoadedCatalog();
+  saveCart();
+} else if (storeRoute.view === "product") {
+  $("#product-detail-body").innerHTML = '<div class="select-product-unavailable"><h1 id="product-page-title">商品資料暫時無法載入</h1><p>請重新整理網頁再試一次。</p></div>';
+}
+await initialSettings;
 
 onAuthStateChanged(auth, (user) => {
   const version = ++orderWatchVersion;

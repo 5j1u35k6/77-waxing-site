@@ -173,12 +173,23 @@ function setStatus(message, error = false) {
 }
 
 function renderGalleryCards() {
-  if (!activeField) return;
+  if (!activeField?.isConnected) return;
   const host = activeField.querySelector("[data-media-list]");
   if (!host) return;
   const variants = variantChoices();
   const validIds = new Set(variants.map((row) => row.id));
-  mediaState = mediaState.map((row) => validIds.has(row.variantId) || !row.variantId ? row : { ...row, variantId: "" });
+  if (variants.length) {
+    mediaState = mediaState.map((row) => validIds.has(row.variantId) || !row.variantId ? row : { ...row, variantId: "" });
+  }
+  const cover = activeField.querySelector("[data-admin-product-cover]");
+  if (cover) {
+    const url = mediaState[0]?.url || "";
+    const image = cover.querySelector("img");
+    if (url) image.src = url;
+    else image.removeAttribute("src");
+    image.hidden = !url;
+    cover.hidden = !url;
+  }
 
   if (!mediaState.length) {
     host.innerHTML = `<div class="product-media-empty">尚未加入商品圖片</div>`;
@@ -193,7 +204,7 @@ function renderGalleryCards() {
       <div class="product-media-card-body">
         ${sizeLabel}
         <label>顯示於</label>
-        <select data-media-variant>
+        <select data-media-variant ${variants.length ? "" : "disabled"}>
           <option value="" ${!row.variantId ? "selected" : ""}>所有規格共用</option>
           ${variants.map((variant) => `<option value="${esc(variant.id)}" ${row.variantId === variant.id ? "selected" : ""}>只顯示：${esc(variant.label)}</option>`).join("")}
         </select>
@@ -250,7 +261,8 @@ async function enhanceImageField(db) {
   const original = document.querySelector("#p-image");
   const form = document.querySelector("#product-form");
   if (!original || !form) return;
-  const token = `${activeEditId || "new"}:${form.dataset.variantEnhanced || "0"}`;
+  const editId = form.dataset.productId ?? activeEditId;
+  const token = `${editId || "new"}:${form.dataset.variantEnhanced || "0"}`;
   if (original.dataset.galleryEnhanced === "loading" && activeFormToken === token) return;
   if (original.dataset.galleryEnhanced === "1" && activeFormToken === token) return;
 
@@ -260,7 +272,7 @@ async function enhanceImageField(db) {
   activeFormToken = token;
   original.dataset.galleryEnhanced = "loading";
 
-  const product = await loadProduct(db, activeEditId);
+  const product = form.productRecord ?? await loadProduct(db, editId);
   if (!form.isConnected || !original.isConnected || activeField !== field || activeFormToken !== token) return;
   mediaState = normalizeMedia(product);
   const legacyValue = original.value.trim();
@@ -268,9 +280,12 @@ async function enhanceImageField(db) {
 
   field.classList.add("product-image-upload", "wide");
   field.innerHTML = `
-    <label>商品圖片</label>
     <input id="p-image" type="hidden" value="${esc(mediaState[0]?.url || "")}" data-gallery-enhanced="1">
     <input id="p-media-json" type="hidden" value="">
+    <figure class="admin-product-cover" data-admin-product-cover hidden>
+      <img alt="商品主圖預覽">
+      <figcaption>商品主圖預覽</figcaption>
+    </figure>
     <div class="product-media-upload-head">
       <div><b>商品圖庫</b><p>圖片會保留原始比例，並依畫面大小縮放。第一張圖片為商品主圖。</p></div>
       <label class="product-image-upload-button">＋ 選擇圖片<input id="p-image-file" type="file" multiple accept="image/jpeg,image/png,image/webp,image/avif"></label>

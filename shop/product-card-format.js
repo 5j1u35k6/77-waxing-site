@@ -1,6 +1,6 @@
 import { collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
 import { getPublicFirebase } from "../assets/public-firebase.js?v=20261026-audit1";
-import { catalogCategory } from "./series.js?v=20261123-select1";
+import { catalogCategory } from "./series.js?v=20261123-select2";
 
 const { db } = getPublicFirebase();
 const products = new Map();
@@ -73,13 +73,12 @@ function generatedNode(className, tag = "div") {
 }
 
 function formatCard(card) {
-  const detailButton = card.querySelector("[data-regional-detail]");
-  const buyButton = card.querySelector("[data-regional-buy]");
+  const detailLink = card.querySelector("[data-regional-detail]");
   const body = card.querySelector(".product-body");
   const actions = card.querySelector(".product-actions");
-  if (!detailButton || !body || !actions) return;
+  if (!detailLink || !body || !actions) return;
 
-  const id = String(detailButton.dataset.regionalDetail || "");
+  const id = String(detailLink.dataset.regionalDetail || "");
   const product = products.get(id);
   if (!product) return;
 
@@ -89,21 +88,7 @@ function formatCard(card) {
   const category = catalogCategory(product.category);
   const signature = `${code}|${range}|${category}|${bulk ? 1 : 0}`;
 
-  /* Keep the regional storefront's original controls in place. Moving/replacing
-     the detail button made interaction fragile because multiple storefront layers
-     observe the card DOM. We only restyle the existing control now. */
-  detailButton.type = "button";
-  if (detailButton.textContent !== "詳情") detailButton.textContent = "詳情";
-  if (detailButton.classList.contains("secondary-btn")) detailButton.classList.remove("secondary-btn");
-  for (const name of ["primary-btn", "product-detail-only"]) if (!detailButton.classList.contains(name)) detailButton.classList.add(name);
-  for (const name of ["single-detail-action", "card-format-actions"]) if (!actions.classList.contains(name)) actions.classList.add(name);
-
-  if (buyButton) {
-    if (!buyButton.hidden) buyButton.hidden = true;
-    buyButton.tabIndex = -1;
-    buyButton.setAttribute("aria-hidden", "true");
-    if (!buyButton.classList.contains("card-format-buy-sentinel")) buyButton.classList.add("card-format-buy-sentinel");
-  }
+  if (!actions.classList.contains("card-format-actions")) actions.classList.add("card-format-actions");
 
   if (!body.classList.contains("card-format-v2")) body.classList.add("card-format-v2");
   if (card.dataset.cardFormatSignature === signature && body.querySelector(".card-format-generated")) return;

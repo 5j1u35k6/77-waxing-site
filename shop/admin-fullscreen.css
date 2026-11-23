@@ -218,3 +218,124 @@ body{margin:0;background:#f1ece2;overflow-x:hidden;}
   #admin-app .table-wrap{margin-inline:-16px!important;width:calc(100% + 32px)!important;border-radius:0!important;}
   #admin-app .admin-site-link{display:none;}
 }
+
+/* The editors follow the storefront’s section and field order. */
+.admin-home-form,
+.admin-product-form{
+  display:grid;
+  gap:24px;
+}
+
+.admin-home-form .admin-section-head,
+.admin-product-form .admin-section-head{margin-bottom:0;}
+
+.admin-editor-section{
+  min-width:0;
+  display:grid;
+  align-content:start;
+  gap:14px;
+  padding:20px;
+  border:1px solid #eadfce;
+  border-radius:16px;
+  background:#fbf8f2;
+}
+
+.admin-editor-section>h3{
+  margin:0;
+  color:#473629;
+  font-size:1.1rem;
+}
+
+.admin-editor-actions{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  flex-wrap:wrap;
+}
+
+.admin-editor-link{
+  display:inline-flex;
+  align-items:center;
+  text-decoration:none;
+}
+
+.admin-home-hero,
+.admin-home-featured,
+.admin-home-series,
+.admin-product-layout{
+  display:grid;
+  align-items:start;
+  gap:16px;
+}
+
+.admin-home-hero{grid-template-columns:minmax(0,1fr) minmax(0,1.5fr);}
+.admin-home-featured{grid-template-columns:repeat(3,minmax(0,1fr));}
+.admin-home-series{grid-template-columns:repeat(4,minmax(0,1fr));}
+.admin-product-layout{grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);}
+
+.admin-home-image-preview,
+.admin-product-cover{
+  display:grid;
+  place-items:center;
+  margin:0;
+  overflow:hidden;
+  border:1px solid #eadfce;
+  border-radius:12px;
+  background:#f5ede1;
+  color:#765d43;
+  font-size:.82rem;
+}
+.admin-home-image-preview{aspect-ratio:4/3;}
+.admin-home-series .admin-home-image-preview{aspect-ratio:4/5;}
+.admin-home-image-preview img{width:100%;height:100%;object-fit:cover;}
+
+.admin-product-cover img{
+  display:block;
+  width:100%;
+  height:auto;
+  max-height:440px;
+  object-fit:contain;
+  background:#fff;
+}
+.admin-product-cover figcaption{padding:6px 10px;}
+.admin-product-cover[hidden],
+.admin-home-image-preview [hidden]{display:none;}
+
+.admin-product-gallery .product-media-upload-head,
+.admin-product-purchase .variant-editor-head{
+  align-items:stretch;
+  flex-direction:column;
+  gap:10px;
+}
+.admin-product-gallery .product-media-list{grid-template-columns:repeat(2,minmax(0,1fr));}
+.admin-product-gallery .product-media-thumb{min-height:0;}
+.admin-product-gallery .product-media-thumb img{max-height:160px;}
+.admin-product-purchase .variant-editor{margin:0;padding:12px;}
+.admin-product-purchase .variant-row{padding:12px;}
+.admin-product-purchase .variant-row-head{grid-template-columns:32px repeat(2,minmax(0,1fr));}
+.admin-product-purchase .variant-row-head>.field,
+.admin-product-purchase .variant-row-head>.variant-remove{grid-column:auto!important;}
+.admin-product-purchase .variant-row-head>.field:nth-of-type(4){grid-column:2!important;}
+.admin-product-purchase .variant-row-head>.variant-remove{grid-column:3!important;justify-self:stretch;}
+.admin-product-purchase .variant-pricing-grid{grid-template-columns:repeat(2,minmax(0,1fr));}
+.admin-product-purchase .variant-pricing-grid .bulk-threshold{grid-column:1/-1;}
+.admin-product-purchase .variant-index{grid-row:auto;margin-top:0;}
+.admin-product-status .settings-grid{align-items:center;}
+
+@media(max-width:1100px){
+  .admin-home-series{grid-template-columns:repeat(2,minmax(0,1fr));}
+  .admin-product-layout{grid-template-columns:minmax(0,1fr);}
+}
+
+@media(max-width:640px){
+  .admin-home-hero,.admin-home-featured,.admin-home-series{grid-template-columns:minmax(0,1fr);}
+  .admin-home-form .admin-section-head,
+  .admin-product-form .admin-section-head{align-items:start;flex-direction:column;}
+  .admin-editor-section{padding:12px;}
+  .admin-product-gallery .product-media-list{grid-template-columns:minmax(0,1fr);}
+  .admin-product-purchase .variant-row-head{grid-template-columns:26px minmax(0,1fr);}
+  .admin-product-purchase .variant-row-head>.field,
+  .admin-product-purchase .variant-row-head>.field:nth-of-type(4),
+  .admin-product-purchase .variant-row-head>.variant-remove{grid-column:2!important;}
+  .admin-product-purchase .variant-index{width:26px;height:26px;align-self:end;}
+}
