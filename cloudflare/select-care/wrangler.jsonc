@@ -1,0 +1,12 @@
+{
+  "name": "77select-care",
+  "main": "worker.js",
+  "compatibility_date": "2026-11-23",
+  "upload_source_maps": true,
+  "preview_urls": false,
+  "ai": { "binding": "AI" },
+  "ratelimits": [
+    { "name": "IP_LIMIT", "namespace_id": "772611231", "simple": { "limit": 30, "period": 60 } },
+    { "name": "MEMBER_LIMIT", "namespace_id": "772611232", "simple": { "limit": 6, "period": 60 } }
+  ]
+}
