@@ -7,6 +7,7 @@ import { allProducts, catalogCategories, catalogCategory, filterProducts } from 
 import { collectionHref, productHref, storeHomeHref, storeRoute } from "./select-routes.js?v=20261123-select2";
 import { renderSelectHomeProducts } from "./select-home-content.js?v=20261123-select2";
 import { setProductPageMetadata } from "./seo.js?v=20261123-select2";
+import { selectProductCard } from "./select-product-card.js?v=20261123-mobile1";
 
 const { auth, db } = getPublicFirebase();
 const CART_KEY = "77select_cart_v4";
@@ -24,6 +25,7 @@ let cart = loadCart();
 let selectedProduct = null;
 let selectedVariantId = null;
 let selectedQuantity = 1;
+const selectedAddOns = new Map();
 let currentUser = null;
 let ownOrders = [];
 let orderUnsubscribe = null;
@@ -52,6 +54,7 @@ function saveCart() {
   const count = $("#cart-count");
   if (count) count.textContent = String(cart.reduce((sum, row) => sum + int(row.qty), 0));
   renderCart();
+  updateAddOnAvailability();
   updateDetailPurchase();
 }
 
@@ -121,17 +124,6 @@ function variantLabel(variant) {
 function discountText(variant) {
   if (!bulkEnabled(variant)) return "";
   return `滿 ${variant.bulkMinQty} 件，單件 ${money(bulkPriceFor(variant))}`;
-}
-
-function productMinPrice(product) {
-  const available = normalizeVariants(product).filter((variant) => variant.stock > 0);
-  const source = available.length ? available : normalizeVariants(product);
-  const prices = source.map(basePriceFor);
-  return prices.length ? Math.min(...prices) : 0;
-}
-
-function totalStock(product) {
-  return normalizeVariants(product).reduce((sum, variant) => sum + int(variant.stock), 0);
 }
 
 function normalizeMedia(product = {}) {
@@ -207,12 +199,6 @@ function ensureMarketBadge() {
   document.documentElement.dataset.market = market.code;
 }
 
-function cardMediaMarkup(product) {
-  const image = primaryImage(product);
-  if (!image) return `<div class="product-media store-product-media">77select</div>`;
-  return `<div class="product-media store-product-media"><img src="${esc(image)}" alt="${esc(product.name)}" loading="lazy"></div>`;
-}
-
 function galleryMarkup(product, variantId) {
   const media = mediaForVariant(product, variantId);
   const first = media.find((row) => row.variantId === variantId) || media[0];
@@ -223,25 +209,18 @@ function galleryMarkup(product, variantId) {
 }
 
 function catalogPriceText(product) {
-  const amount = money(productMinPrice(product));
-  return normalizeVariants(product).length > 1 ? `${amount} 起` : amount;
+  const variants = normalizeVariants(product);
+  const available = variants.filter((variant) => variant.stock > 0);
+  const prices = (available.length ? available : variants).map(basePriceFor);
+  const minimum = Math.min(...prices);
+  const maximum = Math.max(...prices);
+  return minimum === maximum ? money(minimum) : `${money(minimum)}–${money(maximum)}`;
 }
 
 function productCardMarkup(product) {
-  const href = esc(productHref(product.id));
-  const name = esc(product.name);
-  const variants = normalizeVariants(product);
-  const stock = totalStock(product);
-  return `<article class="product-card regional-product-card">
-    <a class="select-card-image-link" href="${href}" aria-label="${name}">${cardMediaMarkup(product)}</a>
-    <div class="product-body">
-      <div class="product-top"><h3 class="product-title">${name}</h3><div class="product-price">${catalogPriceText(product)}</div></div>
-      ${variants.some(bulkEnabled) ? '<div class="bulk-badge">多件優惠</div>' : ""}
-      <p class="product-desc">${esc(product.description || "")}</p>
-      <div class="product-meta"><span>${esc(catalogCategory(product.category))}</span><span>${variants.length} 種規格${stock > 0 ? `｜共 ${stock} 件` : "｜目前售完"}</span></div>
-      <div class="product-actions single-detail-action"><a class="primary-btn product-detail-only" data-regional-detail="${esc(product.id)}" href="${href}" aria-label="${name} 詳情">詳情</a></div>
-    </div>
-  </article>`;
+  const soldOut = !normalizeVariants(product).some((variant) => variant.stock > 0);
+  return selectProductCard({ id: product.id, name: product.name, imageUrl: primaryImage(product) },
+    catalogPriceText(product), { regional: true, soldOut });
 }
 
 function renderProducts() {
@@ -279,6 +258,32 @@ function variantChoiceMarkup(variant) {
   </button>`;
 }
 
+function addOnsMarkup(product) {
+  const ids = Array.isArray(product.addOnProductIds) ? product.addOnProductIds : [];
+  const addOns = [...new Set(ids.filter((id) => typeof id === "string" && id !== product.id))].slice(0, 8)
+    .map((id) => products.find((item) => item.id === id))
+    .filter((item) => item?.active === true && normalizeVariants(item).some((variant) => variant.stock > 0));
+  if (!addOns.length) return "";
+  return `<section class="select-product-add-ons" aria-labelledby="product-add-ons-title">
+    <h2 id="product-add-ons-title">加購商品</h2>
+    <ul>${addOns.map((item) => {
+      const image = primaryImage(item);
+      const variants = normalizeVariants(item).filter((variant) => variant.stock > 0);
+      return `<li class="select-product-add-on">
+        ${image ? `<img src="${esc(image)}" alt="" loading="lazy" decoding="async">` : ""}
+        <div>
+          <a href="${esc(productHref(item.id))}">${esc(item.name)}</a>
+          <p class="select-product-add-on-price">${esc(catalogPriceText(item))}</p>
+          <select data-add-on-product="${esc(item.id)}" aria-label="加購 ${esc(item.name)}">
+            <option value="">不加購</option>
+            ${variants.map((variant) => `<option value="${esc(variant.id)}">${esc(variantLabel(variant))}｜${money(basePriceFor(variant))}</option>`).join("")}
+          </select>
+        </div>
+      </li>`;
+    }).join("")}</ul>
+  </section>`;
+}
+
 function renderProductDetail() {
   const body = $("#product-detail-body");
   if (!selectedProduct || !body) return;
@@ -288,6 +293,9 @@ function renderProductDetail() {
   const name = esc(selectedProduct.name);
   const specs = String(selectedProduct.spec || "").trim();
   const description = String(selectedProduct.description || "").trim();
+  const slogan = String(selectedProduct.slogan || "").trim() || description;
+  const precautions = String(selectedProduct.precautions || "").trim();
+  const careNotes = precautions || specs;
   const categoryHref = esc(collectionHref(category));
   const related = filterProducts(products, category).filter((product) => product.id !== selectedProduct.id).slice(0, 3);
   const discount = discountText(selected);
@@ -300,10 +308,12 @@ function renderProductDetail() {
   <div class="select-product-layout">
     ${galleryMarkup(selectedProduct, selected.id)}
     <section class="select-product-info" aria-labelledby="product-page-title">
-      <p class="select-product-category"><a href="${categoryHref}">${esc(category)}</a></p>
       <h1 id="product-page-title">${name}</h1>
+      ${slogan ? `<p class="select-product-slogan">${esc(slogan)}</p>` : ""}
+      ${careNotes ? `<section class="select-product-precautions" aria-labelledby="product-precautions-title">
+        <h2 id="product-precautions-title">${precautions ? "注意事項" : "使用說明與注意事項"}</h2><p>${esc(careNotes)}</p>
+      </section>` : ""}
       <p class="select-product-price" id="product-detail-price" aria-live="polite">${money(basePriceFor(selected))}</p>
-      ${description ? `<p class="select-product-description">${esc(description)}</p>` : ""}
       <div class="variant-picker" role="radiogroup" aria-label="選擇商品規格">${variants.map(variantChoiceMarkup).join("")}</div>
       ${discount ? `<p class="bulk-notice">數量優惠｜${esc(discount)}</p>` : ""}
       <div class="select-product-purchase">
@@ -316,12 +326,14 @@ function renderProductDetail() {
           </div>
           <small id="product-detail-qty-stock"></small>
         </div>
+        ${addOnsMarkup(selectedProduct)}
         <button id="product-detail-add" class="primary-btn" type="button">加入購物車</button>
       </div>
     </section>
   </div>
   <div class="select-product-notes">
-    ${specs ? `<section aria-labelledby="product-spec-title"><h2 id="product-spec-title">規格與使用說明</h2><p>${esc(specs)}</p></section>` : ""}
+    ${description && description !== slogan ? `<section aria-labelledby="product-description-title"><h2 id="product-description-title">商品介紹</h2><p>${esc(description)}</p></section>` : ""}
+    ${specs && specs !== careNotes ? `<section aria-labelledby="product-spec-title"><h2 id="product-spec-title">規格與使用說明</h2><p>${esc(specs)}</p></section>` : ""}
     <section aria-labelledby="product-shipping-title">
       <h2 id="product-shipping-title">配送與付款</h2>
       <p>可用的取貨和付款方式會顯示在結帳頁。</p>
@@ -332,6 +344,7 @@ function renderProductDetail() {
     <div class="select-related-heading"><h2 id="product-related-title">同系列商品</h2><a href="${categoryHref}">瀏覽系列</a></div>
     <div class="product-grid">${related.map(productCardMarkup).join("")}</div>
   </section>` : ""}`;
+  updateAddOnAvailability();
   updateDetailPurchase();
 }
 
@@ -353,16 +366,36 @@ function selectedPurchaseVariant() {
   return selectedProduct && normalizeVariants(selectedProduct).find((variant) => variant.id === selectedVariantId);
 }
 
-function remainingVariantStock(variant) {
-  const row = cart.find((item) => item.key === cartKey(selectedProduct.id, variant.id));
-  return Math.max(0, variant.stock - int(row?.qty));
+function cartQuantity(productId, variantId) {
+  return int(cart.find((item) => item.key === cartKey(productId, variantId))?.qty);
+}
+
+function updateAddOnAvailability() {
+  $$("select[data-add-on-product]").forEach((control) => {
+    const productId = control.dataset.addOnProduct;
+    const product = products.find((item) => item.id === productId);
+    const variants = normalizeVariants(product);
+    let available = false;
+    for (const option of [...control.options].slice(1)) {
+      const variant = variants.find((item) => item.id === option.value);
+      const quantity = cartQuantity(productId, option.value);
+      option.disabled = !variant || quantity >= variant.stock;
+      if (variant) option.textContent = `${variantLabel(variant)}｜${money(unitPriceFor(variant, quantity + 1))}${option.disabled ? "（已達庫存上限）" : ""}`;
+      available ||= !option.disabled;
+    }
+    const chosen = selectedAddOns.get(productId);
+    if (chosen && ![...control.options].some((option) => option.value === chosen && !option.disabled)) selectedAddOns.delete(productId);
+    control.value = selectedAddOns.get(productId) || "";
+    control.disabled = !available;
+  });
 }
 
 function updateDetailPurchase() {
   const button = $("#product-detail-add");
   const variant = selectedPurchaseVariant();
   if (!button || !variant) return;
-  const remaining = remainingVariantStock(variant);
+  const inCart = cartQuantity(selectedProduct.id, variant.id);
+  const remaining = Math.max(0, variant.stock - inCart);
   selectedQuantity = remaining > 0 ? Math.min(remaining, Math.max(1, int(selectedQuantity))) : 1;
   $("#product-detail-qty-picker").hidden = remaining <= 0;
   $("#product-detail-qty-value").textContent = String(selectedQuantity);
@@ -371,31 +404,28 @@ function updateDetailPurchase() {
   $('[data-detail-qty="1"]').disabled = selectedQuantity >= remaining;
   button.disabled = remaining <= 0;
 
-  const inCart = variant.stock - remaining;
   const price = unitPriceFor(variant, inCart + selectedQuantity);
   button.textContent = variant.stock <= 0 ? "目前售完" :
-    remaining <= 0 ? "購物車已達庫存上限" : `加入購物車｜${money(price)}${selectedQuantity > 1 ? ` × ${selectedQuantity}` : ""}`;
+    remaining <= 0 ? "購物車已達庫存上限" :
+    selectedAddOns.size ? "一併加入購物車" : `加入購物車｜${money(price)}${selectedQuantity > 1 ? ` × ${selectedQuantity}` : ""}`;
 }
 
-function addVariantToCart(productId, variantId, requestedQuantity = 1) {
-  const product = products.find((row) => row.id === productId);
-  if (!product) return;
-  const variant = normalizeVariants(product).find((row) => row.id === variantId);
-  if (!variant || variant.stock <= 0) return toast("此規格目前沒有庫存。", "error");
-  const key = cartKey(product.id, variant.id);
-  const existing = cart.find((row) => row.key === key);
-  const quantity = Math.max(1, int(requestedQuantity));
-  const nextQty = int(existing?.qty) + quantity;
-  if (nextQty > variant.stock) return toast("購物車數量已達此規格目前庫存。", "error");
-  const price = unitPriceFor(variant, nextQty);
-
-  if (existing) {
-    existing.qty = nextQty;
-    existing.price = price;
-    existing.listPrice = basePriceFor(variant);
-    existing.discountApplied = price < existing.listPrice;
-  } else {
-    cart.push({
+function addDetailSelectionToCart() {
+  const selection = [
+    { productId: selectedProduct.id, variantId: selectedVariantId, quantity: selectedQuantity },
+    ...[...selectedAddOns].map(([productId, variantId]) => ({ productId, variantId, quantity: 1 })),
+  ];
+  const next = new Map(cart.map((row) => [row.key, row]));
+  for (const { productId, variantId, quantity } of selection) {
+    const product = products.find((row) => row.id === productId);
+    const variant = product && normalizeVariants(product).find((row) => row.id === variantId);
+    if (!variant) return toast("此規格目前沒有庫存。", "error");
+    const key = cartKey(product.id, variant.id);
+    const qty = int(next.get(key)?.qty) + quantity;
+    if (qty > variant.stock) return toast("購物車數量已達此規格目前庫存。", "error");
+    const listPrice = basePriceFor(variant);
+    const price = unitPriceFor(variant, qty);
+    next.set(key, {
       key,
       productId: product.id,
       variantId: variant.id,
@@ -405,15 +435,19 @@ function addVariantToCart(productId, variantId, requestedQuantity = 1) {
       region: market.code,
       currency: market.currency,
       price,
-      listPrice: basePriceFor(variant),
+      listPrice,
       bulkMinQty: variant.bulkMinQty,
-      discountApplied: price < basePriceFor(variant),
+      discountApplied: price < listPrice,
       imageUrl: primaryImage(product, variant.id),
-      qty: quantity,
+      qty,
     });
   }
+  cart = [...next.values()];
+  selectedQuantity = 1;
+  selectedAddOns.clear();
   saveCart();
-  toast(`已加入 ${product.name}｜${variantLabel(variant)}`);
+  toast(selection.length > 1 ? `已將 ${selection.length} 項商品加入購物車` :
+    `已加入 ${selectedProduct.name}｜${variantLabel(selectedPurchaseVariant())}`);
 }
 
 function reconcileCart() {
@@ -789,9 +823,7 @@ function bindCaptureHandlers() {
 
     const detailAdd = event.target.closest?.("#product-detail-add");
     if (detailAdd && !detailAdd.disabled && selectedProduct && selectedVariantId) {
-      const quantity = selectedQuantity;
-      selectedQuantity = 1;
-      addVariantToCart(selectedProduct.id, selectedVariantId, quantity);
+      addDetailSelectionToCart();
       return;
     }
 
@@ -819,6 +851,14 @@ function bindCaptureHandlers() {
     }
   }, true);
 
+  $("#product-detail-body")?.addEventListener("change", (event) => {
+    const select = event.target.closest?.("select[data-add-on-product]");
+    if (!select) return;
+    const productId = select.dataset.addOnProduct;
+    if (select.value) selectedAddOns.set(productId, select.value);
+    else selectedAddOns.delete(productId);
+    updateDetailPurchase();
+  });
   $("#checkout-form")?.addEventListener("submit", submitOrder, true);
 }
 

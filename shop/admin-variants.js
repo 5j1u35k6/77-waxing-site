@@ -201,6 +201,7 @@ async function saveVariantProduct(event, db, auth) {
     sortOrder: Math.round(Number($("#p-sort", form).value || 0)),
     description: $("#p-description", form).value.trim(),
     spec: $("#p-spec", form).value.trim(),
+    ...form.readProductContent?.(),
     active: $("#p-active", form).checked,
     updatedAt: serverTimestamp(),
   };

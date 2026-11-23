@@ -3,9 +3,10 @@ import { browserLocalPersistence, onAuthStateChanged, setPersistence, signInAnon
 import { addDoc, collection, doc, getDoc, getDocs, onSnapshot, query, serverTimestamp, setDoc, where } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
 import { getPublicFirebase } from "../assets/public-firebase.js?v=20261026-audit1";
 import { beginCheckout, finishCheckout, cartFingerprint, validateOrderData, savePreference } from "./checkout-guard.js?v=20261026-audit1";
-import { allProducts, catalogCategories, catalogCategory, categoryFromCollectionKey, filterProducts } from "./series.js?v=20261123-select2";
-import { collectionHref, productHref, storeHomeHref, storeRoute } from "./select-routes.js?v=20261123-select2";
+import { allProducts, catalogCategories, categoryFromCollectionKey, filterProducts } from "./series.js?v=20261123-select2";
+import { collectionHref, storeHomeHref, storeRoute } from "./select-routes.js?v=20261123-select2";
 import { renderSelectHomeSettings } from "./select-home-content.js?v=20261123-select2";
+import { selectProductCard } from "./select-product-card.js?v=20261123-mobile1";
 
 const { auth, db } = getPublicFirebase();
 const DEFAULT_EMAIL_URL = "https://script.google.com/macros/s/AKfycbx6iC26KXbHWYte5XhLGNRMmG16Yydx2vPHDxYpmp4rmWn3plk__6Qwwr7Y09hLptTW/exec";
@@ -147,28 +148,15 @@ function renderFilters() {
   const categories = catalogCategories(products);
   $("#category-filters").innerHTML = categories.map((name) => `<a class="filter-btn${name === category ? " on" : ""}" href="${esc(collectionHref(name))}" data-category="${esc(name)}"${name === category ? ' aria-current="page"' : ""}>${esc(name)}</a>`).join("");
 }
-function mediaMarkup(product) {
-  if (!product.imageUrl) return `<div class="product-media">77waxing</div>`;
-  return `<div class="product-media"><img src="${esc(product.imageUrl)}" alt="${esc(product.name)}" loading="lazy"></div>`;
-}
 function renderProducts() {
   const visible = filterProducts(products, category);
   if (!visible.length) {
     $("#product-grid").innerHTML = `<div class="empty-state">${category === allProducts ? "目前沒有可訂購的商品。" : "此系列目前尚無商品。"}</div>`;
     return;
   }
-  $("#product-grid").innerHTML = visible.map((p) => {
-    const stock = Number(p.stock || 0);
-    return `<article class="product-card">
-      <a class="select-card-image-link" href="${esc(productHref(p.id))}" aria-label="${esc(p.name)}">${mediaMarkup(p)}</a>
-      <div class="product-body">
-        <div class="product-top"><h3 class="product-title">${esc(p.name)}</h3><div class="product-price">${money(p.price)}</div></div>
-        <p class="product-desc">${esc(p.description || "")}</p>
-        <div class="product-meta"><span>${esc(catalogCategory(p.category))}</span><span>${stock > 0 ? `庫存 ${stock}` : "目前售完"}</span></div>
-        <div class="product-actions single-detail-action"><a class="primary-btn product-detail-only" href="${esc(productHref(p.id))}">詳情</a></div>
-      </div>
-    </article>`;
-  }).join("");
+  $("#product-grid").innerHTML = visible.map((product) =>
+    selectProductCard(product, money(product.price), { soldOut: Number(product.stock || 0) <= 0 })
+  ).join("");
 }
 function changeQty(id, delta) {
   const row = cart.find((item) => item.id === id);

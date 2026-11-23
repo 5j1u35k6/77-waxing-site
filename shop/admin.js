@@ -3,7 +3,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/12.18.0/fireba
 import { browserLocalPersistence, getAuth, onAuthStateChanged, setPersistence, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
 import { addDoc, collection, deleteDoc, doc, getDoc, getFirestore, onSnapshot, runTransaction, serverTimestamp, setDoc, updateDoc } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
 import { firebaseConfig } from "../assets/firebase-config.js?v=20261026-audit1";
-import { catalogCategory, categoryFromCollectionKey } from "./series.js?v=20261123-select2";
+import { allProducts, catalogCategories, catalogCategory, categoryFromCollectionKey, filterProducts } from "./series.js?v=20261123-select2";
 
 const app = initializeApp(firebaseConfig, "77waxing-shop-admin");
 const auth = getAuth(app);
@@ -28,6 +28,7 @@ const DEFAULT_SETTINGS = {
 };
 const STATUS = { pending: "待確認", confirmed: "已確認", packing: "備貨中", ready: "待自取", shipped: "已出貨", completed: "已完成", cancelled: "已取消" };
 const STOREFRONT_URL = "https://5j1u35k6.github.io/77select/";
+const MAX_ADD_ON_PRODUCTS = 8;
 const SERIES_COVERS = [
   ["black-bottle", "./select-series-repair.jpg"],
   ["25-plus", "./select-series-25-plus.jpg"],
@@ -44,6 +45,8 @@ let settingsReady = false;
 let currentView = "dashboard";
 let editingProductId = null;
 let addingProduct = false;
+let activeProductCategory = allProducts;
+let productVisibility = "all";
 let listeners = [];
 let filteredOrderCache = [];
 let authVersion = 0;
@@ -68,6 +71,40 @@ function publicProductUrl(id) {
   const url = new URL(STOREFRONT_URL);
   url.searchParams.set("product", id);
   return url.href;
+}
+
+function productStock(product) {
+  const variants = Array.isArray(product.variants) ? product.variants : [];
+  const stock = (value) => Math.max(0, Math.round(Number(value) || 0));
+  return variants.length
+    ? variants.reduce((total, variant) => total + stock(variant?.stock), 0)
+    : stock(product.stock);
+}
+
+function productPriceRange(product) {
+  const variants = Array.isArray(product.variants) ? product.variants : [];
+  const prices = variants.map((variant) => Number(variant?.priceTWD ?? variant?.priceTW ?? variant?.price))
+    .filter((price) => Number.isFinite(price) && price >= 0);
+  if (!prices.length) return money(product.price);
+  const min = Math.min(...prices);
+  const max = Math.max(...prices);
+  return min === max ? money(min) : `${money(min)}–${money(max)}`;
+}
+
+function addOnProductLabel(product) {
+  if (!product) return "已移除商品";
+  if (!product.active) return `${product.name}（已下架）`;
+  if (!productStock(product)) return `${product.name}（目前售完）`;
+  return product.name;
+}
+
+function productCardImage(product) {
+  const gallery = (Array.isArray(product.media) ? product.media : []).map((row, index) => ({
+    url: String(row?.url || row?.dataUrl || row?.imageUrl || ""),
+    variant: Boolean(row?.variantId),
+    order: Number.isFinite(Number(row?.sortOrder)) ? Number(row.sortOrder) : index,
+  })).filter(({ url }) => url).sort((a, b) => Number(a.variant) - Number(b.variant) || a.order - b.order);
+  return gallery[0]?.url || product.imageUrl || "";
 }
 
 function timestampMillis(value) {
@@ -161,6 +198,8 @@ async function renderLogin() {
 }
 function mountAdmin() {
   cleanupListeners();
+  activeProductCategory = allProducts;
+  productVisibility = "all";
   $("#admin-app").innerHTML = shellMarkup();
   $$("[data-view]").forEach((button) => { button.onclick = () => showView(button.dataset.view); });
   $("#logout").onclick = () => signOut(auth);
@@ -209,12 +248,12 @@ function subscribeData() {
   listeners.push(onSnapshot(collection(db, "shopOrders"), (snap) => {
     if (version !== authVersion) return;
     orders = snap.docs.map((row) => ({ id: row.id, ...row.data() })).sort((a, b) => timestampMillis(b.createdAt) - timestampMillis(a.createdAt));
-    if (currentView !== "settings") scheduleRerender();
+    if (currentView === "orders" || currentView === "dashboard") scheduleRerender();
   }));
   listeners.push(onSnapshot(collection(db, "shopMessages"), (snap) => {
     if (version !== authVersion) return;
     messages = snap.docs.map((row) => ({ id: row.id, ...row.data() })).sort((a, b) => timestampMillis(b.createdAt) - timestampMillis(a.createdAt));
-    if (currentView !== "settings") scheduleRerender();
+    if (currentView === "messages" || currentView === "dashboard") scheduleRerender();
   }));
   listeners.push(onSnapshot(doc(db, "shopSettings", "public"), (snap) => {
     if (version !== authVersion) return;
@@ -268,14 +307,38 @@ function productForm(product = {}) {
           <input id="p-name" value="${esc(product.name || "")}" maxlength="120" required>
         </div>
         <div class="field">
-          <label for="p-description">商品簡介</label>
-          <textarea id="p-description" rows="3" maxlength="1200">${esc(product.description || "")}</textarea>
+          <label for="p-slogan">商品標語</label>
+          <input id="p-slogan" value="${esc(product.slogan || "")}" maxlength="160">
+        </div>
+        <div class="field">
+          <label for="p-precautions">注意事項</label>
+          <textarea id="p-precautions" rows="4" maxlength="2000">${esc(product.precautions || "")}</textarea>
         </div>
         <div class="field"><label for="p-price">價格 NT$</label><input id="p-price" type="number" min="0" step="1" value="${Number(product.price || 0)}" required></div>
         <div class="field"><label for="p-stock">庫存</label><input id="p-stock" type="number" min="0" step="1" value="${Number(product.stock || 0)}" required></div>
         <div data-product-variants></div>
+        <section class="admin-product-add-ons" aria-labelledby="product-add-ons-title">
+          <h4 id="product-add-ons-title">加購商品</h4>
+          <p>顧客會依這裡的順序看到已上架且有庫存的加購商品。</p>
+          <div id="p-add-on-list"></div>
+          <div class="admin-add-on-picker">
+            <div class="field">
+              <label for="p-add-on-product">選擇商品</label>
+              <select id="p-add-on-product"></select>
+            </div>
+            <button id="p-add-on-add" class="secondary-btn" type="button">加入加購商品</button>
+          </div>
+          <p class="order-date" id="p-add-on-count" aria-live="polite"></p>
+        </section>
       </section>
     </div>
+    <section class="admin-editor-section" aria-labelledby="product-description-title">
+      <h3 id="product-description-title">商品介紹</h3>
+      <div class="field">
+        <label for="p-description">介紹內容</label>
+        <textarea id="p-description" rows="4" maxlength="1200">${esc(product.description || "")}</textarea>
+      </div>
+    </section>
     <section class="admin-editor-section admin-product-spec" aria-labelledby="product-spec-title">
       <h3 id="product-spec-title">規格與使用說明</h3>
       <div class="field">
@@ -294,13 +357,93 @@ function productForm(product = {}) {
   </form>`;
 }
 
+function bindProductContent(form, product) {
+  const existing = Array.isArray(product.addOnProductIds) ? product.addOnProductIds : [];
+  let addOnIds = [...new Set(existing.filter((id) => typeof id === "string" && id && id !== product.id))]
+    .slice(0, MAX_ADD_ON_PRODUCTS);
+  const list = $("#p-add-on-list", form);
+  const picker = $("#p-add-on-product", form);
+  const add = $("#p-add-on-add", form);
+  const count = $("#p-add-on-count", form);
+
+  function renderAddOns() {
+    list.innerHTML = addOnIds.length ? `<ol>${addOnIds.map((id) => {
+      const item = products.find((row) => row.id === id);
+      const label = esc(addOnProductLabel(item));
+      return `<li><span>${label}</span><button type="button" class="mini-btn" data-remove-add-on="${esc(id)}" aria-label="移除 ${label}">移除</button></li>`;
+    }).join("")}</ol>` : "";
+    const candidates = products.filter((row) => row.id !== product.id && !addOnIds.includes(row.id));
+    picker.innerHTML = `<option value="">請選擇商品</option>${candidates.map((row) =>
+      `<option value="${esc(row.id)}">${esc(addOnProductLabel(row))}</option>`
+    ).join("")}`;
+    picker.disabled = addOnIds.length >= MAX_ADD_ON_PRODUCTS || !candidates.length;
+    add.disabled = true;
+    count.textContent = `已選 ${addOnIds.length} 件，最多 ${MAX_ADD_ON_PRODUCTS} 件。`;
+  }
+
+  picker.onchange = () => { add.disabled = !picker.value; };
+  add.onclick = () => {
+    if (!picker.value || picker.disabled || addOnIds.includes(picker.value)) return;
+    addOnIds.push(picker.value);
+    form.dataset.dirty = "1";
+    renderAddOns();
+    picker.focus();
+  };
+  list.onclick = (event) => {
+    const button = event.target.closest?.("[data-remove-add-on]");
+    if (!button) return;
+    addOnIds = addOnIds.filter((id) => id !== button.dataset.removeAddOn);
+    form.dataset.dirty = "1";
+    renderAddOns();
+    picker.focus();
+  };
+  renderAddOns();
+
+  form.readProductContent = () => ({
+    slogan: $("#p-slogan", form).value.trim(),
+    precautions: $("#p-precautions", form).value.trim(),
+    addOnProductIds: [...addOnIds],
+  });
+}
+
+function adminProductCard(product) {
+  const cover = productCardImage(product);
+  const stock = productStock(product);
+  const name = esc(product.name);
+  const id = esc(product.id);
+  return `<article class="admin-catalog-card">
+    <div class="admin-catalog-media">
+      ${cover ? `<img src="${esc(cover)}" alt="" loading="lazy" decoding="async">` : "<span>尚無商品圖片</span>"}
+    </div>
+    <div class="admin-catalog-content">
+      <div class="admin-catalog-name">
+        <h3>${name}</h3>
+        <strong>${productPriceRange(product)}</strong>
+      </div>
+      <div class="admin-catalog-meta">
+        <span>${esc(catalogCategory(product.category))}</span>
+        <span>庫存 ${stock}</span>
+        <span>排序 ${Number(product.sortOrder || 0)}</span>
+      </div>
+      <div class="admin-catalog-actions">
+        <span class="status ${product.active ? "" : "pending"}">${product.active ? "已上架" : "已下架"}</span>
+        <button class="primary-btn" type="button" data-edit="${id}" aria-label="編輯 ${name}">編輯</button>
+        <button class="mini-btn" type="button" data-toggle="${id}" aria-label="${product.active ? "下架" : "上架"} ${name}">${product.active ? "下架" : "上架"}</button>
+        <button class="mini-btn admin-catalog-delete" type="button" data-delete="${id}" aria-label="永久刪除 ${name}">永久刪除</button>
+      </div>
+    </div>
+  </article>`;
+}
+
 function renderProducts() {
   const editing = editingProductId ? products.find((row) => row.id === editingProductId) : null;
   const view = $("#admin-view");
   if (editing || addingProduct) {
-    view.innerHTML = productForm(editing || {});
+    const product = editing || { category: activeProductCategory === allProducts ? "" : activeProductCategory };
+    view.innerHTML = productForm(product);
     const form = $("#product-form");
-    form.productRecord = editing || {};
+    form.productRecord = product;
+    bindProductContent(form, product);
     form.onsubmit = saveProduct;
     $("#cancel-product-edit").onclick = () => {
       editingProductId = null;
@@ -311,23 +454,44 @@ function renderProducts() {
     return;
   }
 
-  view.innerHTML = `<div class="admin-section-head">
-    <h2>商品清單</h2>
-    <button id="new-product" class="primary-btn" type="button">新增商品</button>
-  </div>
-  <div class="table-wrap"><table class="admin-table">
-    <thead><tr><th>商品</th><th>系列</th><th>價格</th><th>庫存</th><th>排序</th><th>狀態</th><th>操作</th></tr></thead>
-    <tbody>${products.map((p) => `<tr>
-      <td><b>${esc(p.name)}</b></td><td>${esc(catalogCategory(p.category))}</td>
-      <td>${money(p.price)}</td><td>${Number(p.stock || 0)}</td><td>${Number(p.sortOrder || 0)}</td>
-      <td>${p.active ? "上架" : "下架"}</td>
-      <td><div class="admin-actions">
-        <button class="mini-btn" type="button" data-edit="${esc(p.id)}">編輯</button>
-        <button class="mini-btn" type="button" data-toggle="${esc(p.id)}">${p.active ? "下架" : "上架"}</button>
-        <button class="mini-btn" type="button" data-delete="${esc(p.id)}">永久刪除</button>
-      </div></td>
-    </tr>`).join("") || `<tr><td colspan="7">尚無商品。</td></tr>`}</tbody>
-  </table></div>`;
+  const categories = catalogCategories(products);
+  if (!categories.includes(activeProductCategory)) activeProductCategory = allProducts;
+  const visibleProducts = filterProducts(products, activeProductCategory).filter((product) =>
+    productVisibility === "all" || Boolean(product.active) === (productVisibility === "published")
+  );
+  const statusOptions = { all: "全部", published: "上架", unpublished: "下架" };
+  view.innerHTML = `<section class="admin-catalog" aria-labelledby="admin-catalog-title">
+    <div class="admin-section-head admin-catalog-head">
+      <h2 id="admin-catalog-title">商品目錄</h2>
+      <button id="new-product" class="primary-btn" type="button">新增商品</button>
+    </div>
+    <div class="admin-catalog-filters">
+      <div class="filters" id="admin-category-filters" role="group" aria-label="商品系列">
+        ${categories.map((category) => `<button type="button" class="filter-btn${category === activeProductCategory ? " on" : ""}" data-admin-category="${esc(category)}" aria-pressed="${category === activeProductCategory}">${esc(category)}</button>`).join("")}
+      </div>
+      <div class="field admin-catalog-visibility">
+        <label for="admin-product-visibility">上架狀態</label>
+        <select id="admin-product-visibility">${Object.entries(statusOptions).map(([key, label]) =>
+          `<option value="${key}" ${productVisibility === key ? "selected" : ""}>${label}</option>`
+        ).join("")}</select>
+      </div>
+    </div>
+    <div class="admin-catalog-grid">
+      ${visibleProducts.map(adminProductCard).join("") || '<p class="empty-state">沒有符合條件的商品。</p>'}
+    </div>
+  </section>`;
+  $("#admin-category-filters").onclick = (event) => {
+    const button = event.target.closest?.("[data-admin-category]");
+    if (!button || button.dataset.adminCategory === activeProductCategory) return;
+    activeProductCategory = button.dataset.adminCategory;
+    renderProducts();
+    $('#admin-category-filters [aria-pressed="true"]')?.focus();
+  };
+  $("#admin-product-visibility").onchange = (event) => {
+    productVisibility = event.target.value;
+    renderProducts();
+    $("#admin-product-visibility")?.focus();
+  };
   $("#new-product").onclick = () => {
     addingProduct = true;
     renderProducts();
@@ -341,8 +505,15 @@ function renderProducts() {
   $$("[data-toggle]").forEach((button) => { button.onclick = async () => {
     const product = products.find((row) => row.id === button.dataset.toggle);
     if (!product) return;
-    await updateDoc(doc(db, "shopProducts", product.id), { active: !product.active, updatedAt: serverTimestamp() });
-    await audit("product_toggle", product.id, String(!product.active));
+    button.disabled = true;
+    try {
+      await updateDoc(doc(db, "shopProducts", product.id), { active: !product.active, updatedAt: serverTimestamp() });
+      await audit("product_toggle", product.id, String(!product.active));
+    } catch (error) {
+      flash(error, "error");
+    } finally {
+      button.disabled = false;
+    }
   }; });
   $$("[data-delete]").forEach((button) => { button.onclick = async () => {
     const product = products.find((row) => row.id === button.dataset.delete);
@@ -366,6 +537,7 @@ async function saveProduct(event) {
     imageUrl: $("#p-image").value.trim(),
     description: $("#p-description").value.trim(),
     spec: $("#p-spec").value.trim(),
+    ...event.currentTarget.readProductContent(),
     active: bool("#p-active"),
     updatedAt: serverTimestamp(),
   };
