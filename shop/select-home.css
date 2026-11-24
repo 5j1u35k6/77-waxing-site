@@ -145,7 +145,7 @@ html body.select-store .select-header .shop-brand {
   visibility: hidden;
 }
 
-.select-store :is(.select-nav button, .select-nav a, .select-link-button, .select-collection, .select-featured-product, .select-footer a, .select-footer-text):focus-visible {
+.select-store :is(.select-nav button, .select-nav a, .select-link-button, .select-collection-link, .select-featured-product, .select-footer a, .select-footer-text):focus-visible {
   outline: 2px solid var(--select-accent);
   outline-offset: 3px;
 }
@@ -324,16 +324,23 @@ html body.select-store .select-header .shop-brand {
   font: inherit;
   font-size: clamp(15px, 1.45vw, 22px);
   text-align: start;
-  text-decoration: none;
-  cursor: pointer;
 }
 
-.select-collection:hover {
+.select-collection-link {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+}
+
+.select-collection:has(.select-collection-link:hover) {
   border-color: var(--select-accent);
+}
+
+.select-collection-link:hover {
   color: var(--select-accent);
 }
 
-.select-collection > img,
+:is(.select-collection, .select-collection-link) > img,
 .select-collection-cover {
   display: block;
   width: 100%;
@@ -350,9 +357,8 @@ html body.select-store .select-header .shop-brand {
 }
 
 .select-collection-label {
-  display: grid;
-  gap: 6px;
-  padding: 15px 12px;
+  display: block;
+  padding: 15px 12px 6px;
   line-height: 1.35;
 }
 
@@ -363,7 +369,12 @@ html body.select-store .select-header .shop-brand {
   font-size: clamp(.875rem, 1.25vw, 1rem);
   font-weight: 400;
   line-height: 1.5;
+  white-space: pre-line;
   overflow-wrap: anywhere;
+}
+
+.select-collection > .select-collection-slogan {
+  padding: 0 12px 15px;
 }
 
 .select-store :is(.select-collection-label, #shop-catalog-title, #category-filters, .select-product-breadcrumb) {
@@ -573,8 +584,11 @@ html body.select-store .select-header .shop-brand {
   }
 
   .select-collection-label {
-    min-height: 58px;
-    padding: 10px;
+    padding: 10px 10px 6px;
+  }
+
+  .select-collection > .select-collection-slogan {
+    padding: 0 10px 12px;
   }
 
   .select-footer-main {

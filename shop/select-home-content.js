@@ -1,3 +1,4 @@
+import "./select-photo-fit.js?v=20261124-series2";
 import { productHref, storeRoute } from "./select-routes.js?v=20261124-speed2";
 import { collectionKey, seriesSlogan } from "./series.js?v=20261124-series1";
 
@@ -8,8 +9,10 @@ const copySections = {
 };
 const heroImage = document.querySelector(".select-hero-media img");
 const defaultHeroImage = heroImage?.getAttribute("src");
-const defaultSeriesCovers = [...document.querySelectorAll(".select-collection[data-shop-collection]")]
-  .map((link) => ({ link, cover: link.firstElementChild.cloneNode(true) }));
+const seriesCards = [...document.querySelectorAll(".select-collection")].map((card) => {
+  const link = card.querySelector(".select-collection-link") || card;
+  return { card, link, cover: link.firstElementChild.cloneNode(true) };
+});
 const collectionSlogan = document.querySelector("[data-catalog-slogan]");
 let seriesSlogans;
 const featuredSlots = [...document.querySelectorAll(".select-featured-slot")];
@@ -17,8 +20,8 @@ let featuredIds = [];
 let publicProducts = new Map();
 
 function renderSeriesSlogans(overrides) {
-  for (const { link } of defaultSeriesCovers) {
-    const slogan = link.querySelector("[data-series-slogan]");
+  for (const { card, link } of seriesCards) {
+    const slogan = card.querySelector("[data-series-slogan]");
     if (slogan) slogan.textContent = seriesSlogan(link.dataset.shopCollection, overrides);
   }
   renderSelectCatalogSlogan();
@@ -67,6 +70,7 @@ function renderFeatured() {
     const image = document.createElement(imageUrl ? "img" : "span");
     image.className = "select-featured-image";
     if (imageUrl) {
+      image.dataset.squarePhoto = "";
       image.src = imageUrl;
       image.alt = "";
       image.loading = "lazy";
@@ -85,7 +89,10 @@ function renderFeatured() {
       price.textContent = product.priceText;
       details.append(price);
     }
-    link.append(image, details);
+    const frame = document.createElement("span");
+    frame.className = "select-square-frame";
+    frame.append(image);
+    link.append(frame, details);
     slot.removeAttribute("aria-hidden");
     slot.replaceChildren(link);
   });
@@ -111,7 +118,7 @@ export function renderSelectHomeSettings(settings = {}) {
     copy.textContent = text;
     section.append(copy);
   }
-  for (const { link, cover } of defaultSeriesCovers) {
+  for (const { link, cover } of seriesCards) {
     const url = httpsImage(content.seriesImages?.[link.dataset.shopCollection]);
     const next = url ? document.createElement("img") : cover.cloneNode(true);
     if (url) {

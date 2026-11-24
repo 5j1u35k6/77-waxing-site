@@ -5,9 +5,9 @@ import { getPublicFirebase } from "../assets/public-firebase.js?v=20261026-audit
 import { beginCheckout, finishCheckout, cartFingerprint, validateOrderData, savePreference } from "./checkout-guard.js?v=20261026-audit1";
 import { allProducts, catalogCategories, catalogCategory, filterProducts } from "./series.js?v=20261124-series1";
 import { collectionHref, enableStoreNavigation, productHref, storeHomeHref, storeRoute } from "./select-routes.js?v=20261124-speed2";
-import { renderSelectCatalogSlogan, renderSelectHomeProducts } from "./select-home-content.js?v=20261124-speed2";
+import { renderSelectCatalogSlogan, renderSelectHomeProducts } from "./select-home-content.js?v=20261124-series2";
 import { setProductPageMetadata, setStorePageMetadata } from "./seo.js?v=20261124-speed2";
-import { selectProductCard } from "./select-product-card.js?v=20261124-speed2";
+import { selectProductCard } from "./select-product-card.js?v=20261124-series2";
 import { initialPublicShopProduct, initialShopProducts } from "./initial-products.js?v=20261124-speed2";
 
 const { auth, db } = getPublicFirebase();
@@ -203,8 +203,8 @@ function galleryMarkup(product, variantId) {
   const media = mediaForVariant(product, variantId);
   const first = media.find((row) => row.variantId === variantId) || media[0];
   return `<section class="product-gallery select-product-gallery" aria-label="商品圖片">
-    <div class="product-gallery-main">${first ? `<img data-gallery-main decoding="async" fetchpriority="high" src="${esc(first.url)}" alt="${esc(product.name)}">` : '<span>暫無商品圖片</span>'}</div>
-    ${media.length > 1 ? `<div class="product-gallery-thumbs">${media.map((row, index) => `<button type="button" class="gallery-thumb${row === first ? " on" : ""}" data-gallery-thumb data-gallery-url="${esc(row.url)}" aria-label="檢視商品圖片 ${index + 1}" aria-pressed="${row === first}"><img src="${esc(row.url)}" alt="" loading="lazy"></button>`).join("")}</div>` : ""}
+    <div class="product-gallery-main select-square-frame">${first ? `<img data-square-photo data-gallery-main decoding="async" fetchpriority="high" src="${esc(first.url)}" alt="${esc(product.name)}">` : '<span>暫無商品圖片</span>'}</div>
+    ${media.length > 1 ? `<div class="product-gallery-thumbs">${media.map((row, index) => `<button type="button" class="gallery-thumb select-square-frame${row === first ? " on" : ""}" data-gallery-thumb data-gallery-url="${esc(row.url)}" aria-label="檢視商品圖片 ${index + 1}" aria-pressed="${row === first}"><img data-square-photo src="${esc(row.url)}" alt="" loading="lazy"></button>`).join("")}</div>` : ""}
   </section>`;
 }
 
@@ -270,7 +270,7 @@ function addOnsMarkup(product) {
       const image = primaryImage(item);
       const variants = normalizeVariants(item).filter((variant) => variant.stock > 0);
       return `<li class="select-product-add-on">
-        ${image ? `<img src="${esc(image)}" alt="" loading="lazy" decoding="async">` : ""}
+        ${image ? `<span class="select-product-add-on-image select-square-frame"><img data-square-photo src="${esc(image)}" alt="" loading="lazy" decoding="async"></span>` : ""}
         <div>
           <a href="${esc(productHref(item.id))}">${esc(item.name)}</a>
           <p class="select-product-add-on-price">${esc(catalogPriceText(item))}</p>

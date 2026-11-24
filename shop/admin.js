@@ -29,7 +29,7 @@ const DEFAULT_SETTINGS = {
 const STATUS = { pending: "待確認", confirmed: "已確認", packing: "備貨中", ready: "待自取", shipped: "已出貨", completed: "已完成", cancelled: "已取消" };
 const STOREFRONT_URL = "https://5j1u35k6.github.io/77select/";
 const MAX_ADD_ON_PRODUCTS = 8;
-const MAX_SERIES_SLOGAN_LENGTH = 80;
+const MAX_SERIES_DESCRIPTION_LENGTH = 600;
 const SERIES_COVERS = [
   ["black-bottle", "./select-series-repair.jpg"],
   ["25-plus", "./select-series-25-plus.jpg"],
@@ -686,15 +686,19 @@ function renderMessages() {
   }; });
 }
 
-function homepageImageField(id, label, value, defaultImage = "") {
+function homepageImageField(id, label, value, defaultImage = "", disclosure = "") {
   const preview = publicImageUrl(value) || defaultImage;
+  const input = `<label for="${esc(id)}">${esc(label)}</label>
+    <input id="${esc(id)}" ${disclosure ? 'type="text" inputmode="url"' : 'type="url"'} value="${esc(value || "")}" maxlength="2000" placeholder="https://…">`;
   return `<div class="field admin-home-image">
     <div class="admin-home-image-preview">
       <img data-preview-image="${esc(id)}" data-default-image="${esc(defaultImage)}" ${preview ? `src="${esc(preview)}"` : "hidden"} alt="${esc(label)}">
       <span ${preview ? "hidden" : ""}>尚無圖片</span>
     </div>
-    <label for="${esc(id)}">${esc(label)}</label>
-    <input id="${esc(id)}" type="url" value="${esc(value || "")}" maxlength="2000" placeholder="https://…">
+    ${disclosure ? `<details class="admin-series-cover-settings">
+      <summary>${esc(disclosure)}</summary>
+      <div class="field">${input}</div>
+    </details>` : input}
   </div>`;
 }
 
@@ -746,12 +750,12 @@ function renderHomepage() {
     </section>
     <section class="admin-editor-section" aria-labelledby="home-series-title">
       <h3 id="home-series-title">商品系列</h3>
-      <p class="order-date">首頁系列卡片和系列頁會顯示相同標語。留空會恢復預設標語。</p>
+      <p class="order-date">首頁系列卡片和系列頁會顯示相同描述。可分段輸入，留空會恢復預設描述。</p>
       <div class="admin-home-series">
         ${SERIES_COVERS.map(([id, label, defaultImage]) => `<div class="field">
-          ${homepageImageField(`h-cover-${id}`, `${label}封面網址`, home.seriesImages?.[id], defaultImage)}
-          <label for="h-slogan-${id}">${esc(label)}標語</label>
-          <input id="h-slogan-${id}" maxlength="${MAX_SERIES_SLOGAN_LENGTH}" value="${esc(seriesSlogan(id, home.seriesSlogans))}" placeholder="${esc(seriesSlogan(id))}">
+          ${homepageImageField(`h-cover-${id}`, `${label}封面圖片網址（選填）`, home.seriesImages?.[id], defaultImage, "變更系列封面")}
+          <label for="h-slogan-${id}">${esc(label)}描述</label>
+          <textarea id="h-slogan-${id}" rows="4" maxlength="${MAX_SERIES_DESCRIPTION_LENGTH}" placeholder="${esc(seriesSlogan(id))}">${esc(seriesSlogan(id, home.seriesSlogans))}</textarea>
         </div>`).join("")}
       </div>
     </section>
@@ -789,19 +793,20 @@ async function saveHomepage(event) {
   const heroTitle = value("h-title");
   if (!heroTitle) return flash("請填寫首頁主標題。", "error");
 
+  const changedSeriesFields = (field) => Object.fromEntries(SERIES_COVERS.flatMap(([id]) => {
+    const input = form.querySelector(`#h-${field}-${id}`);
+    const text = input.value.trim();
+    return text === input.defaultValue.trim() ? [] : [[id, text]];
+  }));
   const heroImageUrl = value("h-hero-image");
-  const seriesImages = Object.fromEntries(SERIES_COVERS.map(([id]) => [id, value(`h-cover-${id}`)]));
+  const seriesImages = changedSeriesFields("cover");
   if ([heroImageUrl, ...Object.values(seriesImages)].some((url) => url && !publicImageUrl(url))) {
     return flash("請使用可公開瀏覽的 HTTPS 圖片網址。", "error");
   }
 
-  const seriesSlogans = Object.fromEntries(SERIES_COVERS.flatMap(([id]) => {
-    const input = form.querySelector(`#h-slogan-${id}`);
-    const text = input.value.trim();
-    return text === input.defaultValue ? [] : [[id, text]];
-  }));
-  if (Object.values(seriesSlogans).some((text) => text.length > MAX_SERIES_SLOGAN_LENGTH)) {
-    return flash(`系列標語最多可輸入 ${MAX_SERIES_SLOGAN_LENGTH} 個字。`, "error");
+  const seriesSlogans = changedSeriesFields("slogan");
+  if (Object.values(seriesSlogans).some((text) => text.length > MAX_SERIES_DESCRIPTION_LENGTH)) {
+    return flash(`系列描述最多可輸入 ${MAX_SERIES_DESCRIPTION_LENGTH} 個字。`, "error");
   }
 
   const featuredProductIds = [0, 1, 2].map((index) => value(`h-feature-${index}`));
@@ -814,7 +819,7 @@ async function saveHomepage(event) {
     heroImageUrl,
     about: value("h-about"),
     featuredProductIds,
-    seriesImages,
+    ...(Object.keys(seriesImages).length ? { seriesImages } : {}),
     ...(Object.keys(seriesSlogans).length ? { seriesSlogans } : {}),
     reviews: value("h-reviews"),
     faq: value("h-faq"),
@@ -826,6 +831,11 @@ async function saveHomepage(event) {
     await setDoc(doc(db, "shopSettings", "public"), { heroTitle, homeContent, updatedAt: serverTimestamp() }, { merge: true });
     await audit("homepage_update", "public");
     if (!form.isConnected) return;
+    for (const [id, url] of Object.entries(seriesImages)) {
+      const input = form.querySelector(`#h-cover-${id}`);
+      input.value = url;
+      input.defaultValue = url;
+    }
     for (const id of Object.keys(seriesSlogans)) {
       const input = form.querySelector(`#h-slogan-${id}`);
       input.value = seriesSlogan(id, seriesSlogans);

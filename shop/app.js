@@ -5,8 +5,8 @@ import { getPublicFirebase } from "../assets/public-firebase.js?v=20261026-audit
 import { beginCheckout, finishCheckout, cartFingerprint, validateOrderData, savePreference } from "./checkout-guard.js?v=20261026-audit1";
 import { allProducts, catalogCategories, categoryFromCollectionKey, filterProducts } from "./series.js?v=20261124-series1";
 import { collectionHref, storeHomeHref, storeRoute } from "./select-routes.js?v=20261124-speed2";
-import { renderSelectHomeSettings } from "./select-home-content.js?v=20261124-speed2";
-import { selectProductCard } from "./select-product-card.js?v=20261124-speed2";
+import { renderSelectHomeSettings } from "./select-home-content.js?v=20261124-series2";
+import { selectProductCard } from "./select-product-card.js?v=20261124-series2";
 import { initialShopProducts } from "./initial-products.js?v=20261124-speed2";
 
 const { auth, db } = getPublicFirebase();
