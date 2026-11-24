@@ -1,0 +1,147 @@
+/* Homepage work photos. Originals remain outside the website unchanged. */
+#app > .hero {
+  position: relative;
+  isolation: isolate;
+  min-height: max(650px, calc(100svh - 76px));
+  padding: 0;
+  overflow: hidden;
+  background: #f9f6f0;
+}
+#app > .hero .hero-grid {
+  display: block;
+  width: 100%;
+  min-height: inherit;
+  gap: 0;
+  margin: 0;
+}
+#app > .hero .hero-grid > div:first-child {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  width: 56%;
+  min-height: inherit;
+  padding: 64px 24px 64px max(28px, calc((100vw - 1280px) / 2));
+}
+#app > .hero .tag {
+  max-width: 610px;
+  font-size: 11px;
+  line-height: 1.8;
+  letter-spacing: .12em;
+  margin-bottom: 20px;
+}
+#app > .hero .home-reassurance {
+  max-width: 660px;
+  margin: 0 0 22px;
+  font-size: clamp(40px, 3.8vw, 66px);
+  line-height: 1.28;
+  letter-spacing: -.035em;
+  text-wrap: pretty;
+}
+#app > .hero .home-reassurance > span {
+  white-space: normal;
+}
+#app > .hero .home-reassurance > small.home-subtitle {
+  margin-top: 17px;
+  font: 400 18px/1.75 -apple-system, BlinkMacSystemFont, "Noto Sans TC", "PingFang TC", sans-serif;
+  letter-spacing: 0;
+  white-space: normal;
+  opacity: .72;
+}
+#app > .hero .home-body-copy {
+  max-width: 520px;
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.9;
+}
+#app > .hero .btns {
+  max-width: 610px;
+  gap: 11px;
+  margin-top: 30px;
+}
+#app > .hero .btns .btn {
+  min-height: 44px;
+  padding: 10px 17px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+#app > .hero .art {
+  position: absolute;
+  z-index: 0;
+  inset: 0 0 0 46%;
+  width: 54%;
+  height: 100%;
+  min-height: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: none;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 28%, #000);
+  mask-image: linear-gradient(90deg, transparent, #000 28%, #000);
+}
+#app > .hero .art::before,
+#app > .hero .art::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 60%;
+  background: url("./home-work-treatment.webp") center 48% / cover no-repeat;
+  color: transparent;
+  font-size: 0;
+}
+#app > .hero .art::before { left: 0; right: auto; }
+#app > .hero .art::after {
+  right: 0;
+  width: 40%;
+  background-image: url("./home-work-preparation.webp");
+  background-position: 64% 50%;
+}
+/* Keep a media choice supplied by another page integration usable. */
+#app > .hero .art:has(img, video, picture, iframe)::before,
+#app > .hero .art:has(img, video, picture, iframe)::after,
+#app > .hero .art[style*="background-image"]::before,
+#app > .hero .art[style*="background-image"]::after { display: none; }
+#app > .hero .art[style*="background-image"] { background-size: cover; background-position: center; }
+#app > .hero .art img,
+#app > .hero .art video { width: 100%; height: 100%; object-fit: cover; }
+@media (max-width: 1100px) and (min-width: 901px) {
+  #app > .hero .hero-grid > div:first-child { width: 60%; padding-left: 28px; }
+  #app > .hero .art { inset-inline-start: 48%; width: 52%; }
+  #app > .hero .home-reassurance { font-size: 42px; }
+}
+@media (max-width: 900px) {
+  #app > .hero { min-height: 0; }
+  #app > .hero .hero-grid { display: flex; flex-direction: column; min-height: 0; }
+  #app > .hero .hero-grid > div:first-child {
+    width: 100%;
+    min-height: 0;
+    padding: 42px 28px 26px;
+  }
+  #app > .hero .tag { margin-bottom: 16px; }
+  #app > .hero .home-reassurance { max-width: 700px; font-size: clamp(35px, 5.7vw, 52px); }
+  #app > .hero .home-reassurance > small.home-subtitle { margin-top: 13px; font-size: 17px; }
+  #app > .hero .home-body-copy { max-width: 620px; }
+  #app > .hero .btns { margin-top: 24px; }
+  #app > .hero .art {
+    position: relative;
+    inset: auto;
+    order: 0;
+    width: 100%;
+    height: clamp(280px, 52vw, 430px);
+    -webkit-mask-image: linear-gradient(180deg, transparent, #000 22%, #000);
+    mask-image: linear-gradient(180deg, transparent, #000 22%, #000);
+  }
+  #app > .hero .art::before { width: 58%; background-position: center 55%; }
+  #app > .hero .art::after { width: 42%; background-position: 65% 50%; }
+}
+@media (max-width: 480px) {
+  #app > .hero .hero-grid > div:first-child { padding: 33px 22px 20px; }
+  #app > .hero .tag { font-size: 10px; letter-spacing: .08em; }
+  #app > .hero .home-reassurance { font-size: 35px; }
+  #app > .hero .home-reassurance > small.home-subtitle { font-size: 16px; }
+  #app > .hero .home-body-copy { font-size: 15px; line-height: 1.85; }
+  #app > .hero .btns { display: grid; grid-template-columns: 1fr; width: 100%; gap: 9px; }
+  #app > .hero .btns .btn { min-height: 43px; }
+  #app > .hero .art { height: 286px; }
+}
