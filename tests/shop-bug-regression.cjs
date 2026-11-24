@@ -28,17 +28,22 @@ async function unitTests() {
   const heroBootstrap = heroHtml.match(/<script id="shop-hero-loading">([\s\S]*?)<\/script>/)[1];
   const heroDefaults = part('shop/app.js', 'const DEFAULT_SETTINGS =', 'const STATUS =');
   const heroSource = part('shop/app.js', 'async function loadSettings()', 'async function loadProducts()');
-  const makeHero = (getDoc) => {
+  const heroApply = part('shop/select-start.js', 'function applyStoreHomeSettings(', 'function thumbnail(');
+  const makeHero = (initialShopSettings) => {
     const classes = new Set(), nodes = new Map(), timers = [];
+    const getElementById = id => {
+      const selector = '#' + id;
+      if (!nodes.has(selector)) nodes.set(selector, { textContent: id === 'hero-title' ? '77select' : '' });
+      return nodes.get(selector);
+    };
     const context = vm.createContext({
-      document: { documentElement: { classList: { add: name => classes.add(name), remove: name => classes.delete(name) } } },
+      document: { getElementById, documentElement: { classList: { add: name => classes.add(name), remove: name => classes.delete(name) } } },
       window: { setTimeout: (callback, delay) => { assert.equal(delay, 10000); timers.push(callback); } },
-      DEFAULT_EMAIL_URL: 'https://example.invalid/email', settings: {}, db: {}, doc: () => ({}), getDoc,
-      renderSelectHomeSettings() {},
-      $: selector => { if (!nodes.has(selector)) nodes.set(selector, { textContent: selector === '#hero-title' ? '77select' : '' }); return nodes.get(selector); },
+      DEFAULT_EMAIL_URL: 'https://example.invalid/email', settings: {}, db: {}, initialShopSettings,
+      authoritativeHomeApplied: false, renderSelectHomeSettings() {},
     });
-    vm.runInContext(heroBootstrap + heroDefaults + heroSource, context);
-    return { context, classes, nodes, timers };
+    vm.runInContext(heroBootstrap + heroDefaults + heroApply + heroSource, context);
+    return { context, classes, nodes, timers, getElementById };
   };
   let resolveHero;
   const slowHero = makeHero(() => new Promise(resolve => { resolveHero = resolve; }));
@@ -55,12 +60,12 @@ async function unitTests() {
   for (const value of [null, {}, { heroTitle: '' }, { heroTitle: '   ' }, { heroTitle: 123 }]) {
     const state = makeHero(async () => snap(value));
     await state.context.loadSettings();
-    assert.equal(state.nodes.get('#hero-title').textContent, '77select', 'missing or invalid title falls back to brand');
+    assert.equal(state.getElementById('hero-title').textContent, '77select', 'missing or invalid title falls back to brand');
     assert.equal(state.classes.has('shop-hero-pending'), false);
   }
   const failedHero = makeHero(async () => { throw Error('offline'); });
   await failedHero.context.loadSettings();
-  assert.equal(failedHero.nodes.get('#hero-title').textContent, '77select');
+  assert.equal(failedHero.getElementById('hero-title').textContent, '77select');
   assert.equal(failedHero.classes.has('shop-hero-pending'), false);
   const blockedModule = makeHero(async () => snap(null));
   blockedModule.timers[0]();
@@ -210,10 +215,17 @@ export const addDoc=async()=>({id:'qa'});
 async function browserTests() {
   const { chromium } = require('playwright');
   const baseDirectory = path.resolve(root, '..');
+  const standalone = path.resolve(process.env.TEST_STANDALONE_ROOT || path.join(baseDirectory, '77select'));
+  function fixtureFile(pathname) {
+    const base = pathname.startsWith('/77select/') ? standalone : root;
+    const relative = pathname.replace(/^\/(?:77select|77-waxing-site)\//, '');
+    const filename = path.resolve(base, relative, ...(pathname.endsWith('/') ? ['index.html'] : []));
+    return filename.startsWith(base + path.sep) && fs.existsSync(filename) && fs.statSync(filename).isFile() ? filename : null;
+  }
   const server = http.createServer((request, response) => {
     const pathname = new URL(request.url, 'http://test').pathname;
-    const file = path.resolve(baseDirectory, '.' + pathname, ...(pathname.endsWith('/') ? ['index.html'] : []));
-    if (!file.startsWith(baseDirectory + path.sep) || !fs.existsSync(file) || !fs.statSync(file).isFile()) return response.writeHead(404).end();
+    const file = fixtureFile(pathname);
+    if (!file) return response.writeHead(404).end();
     response.setHeader('Content-Type', file.endsWith('.js') ? 'text/javascript' : file.endsWith('.css') ? 'text/css' : 'text/html');
     response.end(fs.readFileSync(file));
   });
@@ -301,8 +313,8 @@ async function browserTests() {
         if (url.pathname.endsWith('/assets/public-firebase.js')) return route.fulfill({ contentType: 'text/javascript', body: 'export const getPublicFirebase=()=>({auth:window.__shop.auth,db:{},app:{}});', headers });
         if (/\/assets\/(member-auth|google-auth-ui|member-auth-popup-fix|account-linking)\.js$/.test(url.pathname)) return route.fulfill({ contentType: 'text/javascript', body: '', headers });
         if (url.hostname === '5j1u35k6.github.io') {
-          const file = path.resolve(baseDirectory, '.' + url.pathname);
-          if (file.startsWith(baseDirectory + path.sep) && fs.existsSync(file) && fs.statSync(file).isFile()) return route.fulfill({ path: file, contentType: file.endsWith('.js') ? 'text/javascript' : file.endsWith('.css') ? 'text/css' : undefined, headers });
+          const file = fixtureFile(url.pathname);
+          if (file) return route.fulfill({ path: file, contentType: file.endsWith('.js') ? 'text/javascript' : file.endsWith('.css') ? 'text/css' : undefined, headers });
         }
         if (url.origin !== origin) return route.fulfill({ status: 200, body: '{}', contentType: 'application/json', headers });
         return route.continue();

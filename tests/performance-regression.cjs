@@ -45,7 +45,7 @@ function context(code,values={}){const c=vm.createContext({console,Promise,Map,S
   assert.equal(updates.filter(x=>x.ref.col==='shopProducts')[0].data.stock,12);
   await assert.rejects(inventory.cancelVariantOrder({},'o',''),/原因/);
 
-  const cartCode=part('shop/regional-store.js','async function refreshCartProducts(','async function loadProducts(');
+  const cartCode=part('shop/select-catalog-model.js','function compareProducts(','export function catalogPriceText(')+part('shop/regional-store.js','async function refreshCartProducts(','async function loadProducts(');
   const requested=[];const cartContext=context("let cart=[{productId:'p1'},{productId:'p1'},{productId:'p2'}];let products=[{id:'p1',name:'A',price:1},{id:'unrelated',name:'B',price:9}];"+cartCode+";this.getProducts=()=>products;",{
     db:{},doc:(_d,_c,id)=>({id}),getDocFromServer:async ref=>{requested.push(ref.id);return {id:ref.id,...snap(ref.id==='p1'?{active:true,name:'A',price:100}:null)};},
   });
