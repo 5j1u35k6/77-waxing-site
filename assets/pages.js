@@ -13,7 +13,7 @@ if(!document.querySelector('link[rel~="icon"]')){
 if(!document.querySelector('link[href*="/assets/home-work-hero.css"]')){
   const homeStyle=document.createElement('link');
   homeStyle.rel='stylesheet';
-  homeStyle.href=`${B}/assets/home-work-hero.css?v=20261124-work1`;
+  homeStyle.href=`${B}/assets/home-work-hero.css?v=20261124-single1`;
   document.head.appendChild(homeStyle);
 }
 

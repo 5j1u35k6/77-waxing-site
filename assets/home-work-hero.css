@@ -1,11 +1,11 @@
-/* Homepage work photos. Originals remain outside the website unchanged. */
+/* Homepage work photo over the site's existing striped background. */
 #app > .hero {
   position: relative;
   isolation: isolate;
   min-height: max(650px, calc(100svh - 76px));
   padding: 0;
   overflow: hidden;
-  background: #f9f6f0;
+  background: transparent;
 }
 #app > .hero .hero-grid {
   display: block;
@@ -72,7 +72,7 @@
   position: absolute;
   z-index: 0;
   inset: 0 0 0 46%;
-  width: 54%;
+  width: auto;
   height: 100%;
   min-height: 0;
   border-radius: 0;
@@ -81,39 +81,39 @@
   -webkit-mask-image: linear-gradient(90deg, transparent, #000 28%, #000);
   mask-image: linear-gradient(90deg, transparent, #000 28%, #000);
 }
-#app > .hero .art::before,
-#app > .hero .art::after {
+#app > .hero .art::before {
   content: "";
   position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 60%;
-  background: url("./home-work-treatment.webp") center 48% / cover no-repeat;
-  color: transparent;
-  font-size: 0;
-}
-#app > .hero .art::before { left: 0; right: auto; }
-#app > .hero .art::after {
-  right: 0;
-  width: 40%;
-  background-image: url("./home-work-preparation.webp");
-  background-position: 64% 50%;
+  inset: 0;
+  background: url("./home-work-treatment.webp") center 77% / cover no-repeat;
 }
 /* Keep a media choice supplied by another page integration usable. */
 #app > .hero .art:has(img, video, picture, iframe)::before,
-#app > .hero .art:has(img, video, picture, iframe)::after,
-#app > .hero .art[style*="background-image"]::before,
-#app > .hero .art[style*="background-image"]::after { display: none; }
+#app > .hero .art[style*="background-image"]::before { display: none; }
 #app > .hero .art[style*="background-image"] { background-size: cover; background-position: center; }
 #app > .hero .art img,
 #app > .hero .art video { width: 100%; height: 100%; object-fit: cover; }
 @media (min-width: 851px) {
-  /* Extend into the existing rail reservation; the fixed navigation stays above. */
-  html.has-desktop-side-nav #app > .hero { width: calc(100% + 88px); }
+  /* Extend only the bar across the space already reserved for the rail. */
+  html.has-desktop-side-nav body:has(#app > .hero) > .header {
+    width: calc(100% + 88px);
+    z-index: 62;
+    background: #f9f6f0;
+  }
+  #app > .hero .art {
+    transition: right 0s .22s, margin-inline-end 0s .22s;
+  }
+  body:has(.desktop-side-submenu.is-open) #app > .hero .art {
+    --home-submenu-clearance: 248px;
+    transition-delay: 0s;
+  }
+}
+@media (min-width: 901px) {
+  #app > .hero .art { right: var(--home-submenu-clearance, 0px); }
 }
 @media (max-width: 1100px) and (min-width: 901px) {
   #app > .hero .hero-grid > div:first-child { width: 60%; padding-left: 28px; }
-  #app > .hero .art { inset-inline-start: 48%; width: 52%; }
+  #app > .hero .art { inset-inline-start: 48%; }
   #app > .hero .home-reassurance { font-size: 42px !important; }
 }
 @media (max-width: 900px) {
@@ -133,13 +133,13 @@
     position: relative;
     inset: auto;
     order: 0;
-    width: 100%;
-    height: clamp(280px, 52vw, 430px);
+    align-self: stretch;
+    margin-inline-end: var(--home-submenu-clearance, 0px);
+    height: clamp(280px, 74vw, 460px);
     -webkit-mask-image: linear-gradient(180deg, transparent, #000 22%, #000);
     mask-image: linear-gradient(180deg, transparent, #000 22%, #000);
   }
-  #app > .hero .art::before { width: 58%; background-position: center 55%; }
-  #app > .hero .art::after { width: 42%; background-position: 65% 50%; }
+  #app > .hero .art::before { background-position: center 68%; }
 }
 @media (max-width: 480px) {
   #app > .hero .hero-grid > div:first-child { padding: 33px 22px 20px; }
@@ -149,5 +149,7 @@
   #app > .hero .home-body-copy { font-size: 15px; line-height: 1.85; }
   #app > .hero .btns { display: grid; grid-template-columns: 1fr; width: 100%; gap: 9px; }
   #app > .hero .btns .btn { min-height: 43px; }
-  #app > .hero .art { height: 286px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #app > .hero .art { transition: none; }
 }
