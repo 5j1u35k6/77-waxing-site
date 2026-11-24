@@ -505,6 +505,7 @@ function changeQty(key, delta) {
   else {
     row.listPrice = basePriceFor(variant);
     row.price = unitPriceFor(variant, row.qty);
+    row.bulkMinQty = variant.bulkMinQty;
     row.discountApplied = row.price < row.listPrice;
   }
   saveCart();
@@ -602,7 +603,7 @@ function renderCheckoutSummary(delivery = deliveryOptions().find((row) => row.id
 
 function isCheckoutMiniVariant(variant) {
   return variant.stock > 0 && basePriceFor(variant) > 0 &&
-    /試用|體驗|旅行|隨身|小容量|迷你/u.test(variant.name);
+    /試用|體驗|旅行|隨身|小容量|小規格|迷你/u.test(variant.name);
 }
 
 function checkoutMiniVariantMarkup({ product, variant }) {
