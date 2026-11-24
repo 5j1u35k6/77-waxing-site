@@ -416,6 +416,27 @@ function updateDetailPurchase() {
     selectedAddOns.size ? "一併加入購物車" : `加入購物車｜${money(price)}${selectedQuantity > 1 ? ` × ${selectedQuantity}` : ""}`;
 }
 
+function cartRowFor(product, variant, qty) {
+  const listPrice = basePriceFor(variant);
+  const price = unitPriceFor(variant, qty);
+  return {
+    key: cartKey(product.id, variant.id),
+    productId: product.id,
+    variantId: variant.id,
+    name: product.name,
+    variantName: variant.name,
+    capacity: variant.capacity,
+    region: market.code,
+    currency: market.currency,
+    price,
+    listPrice,
+    bulkMinQty: variant.bulkMinQty,
+    discountApplied: price < listPrice,
+    imageUrl: primaryImage(product, variant.id),
+    qty,
+  };
+}
+
 function addDetailSelectionToCart() {
   const selection = [
     { productId: selectedProduct.id, variantId: selectedVariantId, quantity: selectedQuantity },
@@ -429,24 +450,7 @@ function addDetailSelectionToCart() {
     const key = cartKey(product.id, variant.id);
     const qty = int(next.get(key)?.qty) + quantity;
     if (qty > variant.stock) return toast("購物車數量已達此規格目前庫存。", "error");
-    const listPrice = basePriceFor(variant);
-    const price = unitPriceFor(variant, qty);
-    next.set(key, {
-      key,
-      productId: product.id,
-      variantId: variant.id,
-      name: product.name,
-      variantName: variant.name,
-      capacity: variant.capacity,
-      region: market.code,
-      currency: market.currency,
-      price,
-      listPrice,
-      bulkMinQty: variant.bulkMinQty,
-      discountApplied: price < listPrice,
-      imageUrl: primaryImage(product, variant.id),
-      qty,
-    });
+    next.set(key, cartRowFor(product, variant, qty));
   }
   cart = [...next.values()];
   selectedQuantity = 1;
@@ -540,6 +544,15 @@ function renderCart() {
     note?.remove();
   }
   renderingCart = false;
+  if ($("#checkout-wrap:not(.hidden)")) {
+    renderCheckoutSummary();
+    renderCheckoutMiniAddOns();
+  }
+  publishCartRows();
+}
+
+function publishCartRows() {
+  window.dispatchEvent(new CustomEvent("77select:cart-rendered", { detail: { rows: cart.map((row) => ({ ...row })) } }));
 }
 
 function deliveryOptions() {
@@ -567,6 +580,9 @@ function openCheckout() {
   updateCheckoutOptions();
   $("#checkout-wrap")?.classList.remove("hidden");
   document.body.style.overflow = "hidden";
+  const more = $("[data-checkout-mini-more]");
+  if (more) more.setAttribute("aria-expanded", "false");
+  renderCheckoutMiniAddOns();
 }
 
 function updateCheckoutOptions() {
@@ -576,8 +592,90 @@ function updateCheckoutOptions() {
   $("#payment-options").innerHTML = payments.map((row, index) => `<label class="check-line"><input type="radio" name="payment" value="${esc(row.id)}" ${index === 0 ? "checked" : ""}><span>${esc(row.label)}</span></label>`).join("");
   $("#store-fields")?.classList.toggle("hidden", delivery.id === "pickup");
   if ($("#delivery-note")) $("#delivery-note").textContent = delivery.id === "pickup" ? String(settings.pickupNote || "") : "請填寫取貨門市名稱與店號；訂單確認後再依店家通知完成付款與交付。";
+  renderCheckoutSummary(delivery);
+}
+
+function renderCheckoutSummary(delivery = deliveryOptions().find((row) => row.id === $("input[name=delivery]:checked")?.value) || deliveryOptions()[0]) {
   const subtotal = cart.reduce((sum, row) => sum + Number(row.price || 0) * int(row.qty), 0);
   $("#checkout-summary").innerHTML = `${cart.map((row) => `<div class="totals-line"><span>${esc(row.name)}｜${esc([row.variantName, row.capacity].filter(Boolean).join("｜"))} × ${int(row.qty)}${row.discountApplied ? "（多件優惠）" : ""}</span><b>${money(Number(row.price || 0) * int(row.qty))}</b></div>`).join("")}<div class="totals-line"><span>運費／處理費</span><b>${money(delivery.fee)}</b></div><div class="totals-line total"><span>預估總計</span><b>${money(subtotal + delivery.fee)}</b></div>`;
+}
+
+function isCheckoutMiniVariant(variant) {
+  return variant.stock > 0 && basePriceFor(variant) > 0 &&
+    /試用|體驗|旅行|隨身|小容量|迷你/u.test(variant.name);
+}
+
+function checkoutMiniVariantMarkup({ product, variant }) {
+  const key = cartKey(product.id, variant.id);
+  const option = variantLabel(variant);
+  const label = [product.name, option].join(" ");
+  return `<div class="checkout-mini-row" data-checkout-mini-item="${esc(key)}" data-product-id="${esc(product.id)}" data-variant-id="${esc(variant.id)}">
+    <div class="checkout-mini-copy">
+      <strong>${esc(product.name)}</strong>
+      <span>${esc(option)} <span data-checkout-mini-price></span></span>
+    </div>
+    <div class="checkout-mini-quantity" role="group" aria-label="${esc(label)}數量">
+      <button type="button" data-checkout-mini-step="-1" aria-label="減少 ${esc(label)} 一件">−</button>
+      <output aria-live="polite" data-checkout-mini-quantity></output>
+      <button type="button" data-checkout-mini-step="1" aria-label="增加 ${esc(label)} 一件">＋</button>
+    </div>
+  </div>`;
+}
+
+function renderCheckoutMiniAddOns() {
+  const section = $("#checkout-mini-add-ons");
+  const host = section?.querySelector("[data-checkout-mini-list]");
+  if (!host) return;
+  const choices = products.filter((product) => product.active === true)
+    .flatMap((product) => normalizeVariants(product).filter(isCheckoutMiniVariant)
+      .map((variant) => ({ product, variant })));
+  section.hidden = !choices.length;
+  if (!choices.length) return;
+  const signature = JSON.stringify(choices.map(({ product, variant }) =>
+    [product.id, product.name, variant.id, variant.name, variant.capacity]));
+  const expanded = $("[data-checkout-mini-more]", host)?.getAttribute("aria-expanded") === "true";
+  if (host.dataset.options !== signature) {
+    host.innerHTML = `<div class="checkout-mini-rows" id="checkout-mini-rows">${choices.map(checkoutMiniVariantMarkup).join("")}</div>
+      <button class="secondary-btn checkout-mini-more" type="button" data-checkout-mini-more aria-expanded="${expanded}" aria-controls="checkout-mini-rows">顯示其他小規格</button>`;
+    host.dataset.options = signature;
+  }
+  let hasMore = false;
+  $$("[data-checkout-mini-item]", host).forEach((row, index) => {
+    const { product, variant } = choices[index];
+    const quantity = cartQuantity(product.id, variant.id);
+    const additional = index >= 3 && quantity === 0;
+    hasMore ||= additional;
+    row.hidden = additional && !expanded;
+    const output = $("[data-checkout-mini-quantity]", row);
+    if (output.textContent !== String(quantity)) output.textContent = String(quantity);
+    const price = $("[data-checkout-mini-price]", row);
+    const unitPrice = money(unitPriceFor(variant, Math.max(1, quantity)));
+    if (price.textContent !== unitPrice) price.textContent = unitPrice;
+    $('[data-checkout-mini-step="-1"]', row).disabled = !quantity;
+    $('[data-checkout-mini-step="1"]', row).disabled = quantity >= variant.stock;
+  });
+  const more = $("[data-checkout-mini-more]", host);
+  more.hidden = !hasMore;
+  const moreLabel = expanded ? "收合其他小規格" : "顯示其他小規格";
+  if (more.textContent !== moreLabel) more.textContent = moreLabel;
+}
+
+function changeCheckoutMiniQuantity(button) {
+  if ($("#checkout-submit")?.disabled) return;
+  const row = button.closest("[data-checkout-mini-item]");
+  const product = products.find((item) => item.id === row?.dataset.productId && item.active === true);
+  const variant = product && normalizeVariants(product).find((item) => item.id === row.dataset.variantId);
+  if (!variant || !isCheckoutMiniVariant(variant)) return;
+  const direction = Number(button.dataset.checkoutMiniStep);
+  const key = cartKey(product.id, variant.id);
+  if (cartQuantity(product.id, variant.id)) {
+    changeQty(key, direction);
+  } else if (direction === 1) {
+    cart.push(cartRowFor(product, variant, 1));
+    saveCart();
+  }
+  if (row.hidden) $("[data-checkout-mini-more]")?.focus({ preventScroll: true });
+  else if (button.disabled) row.querySelector("button:not(:disabled)")?.focus({ preventScroll: true });
 }
 
 function validEmail(value) {
@@ -649,7 +747,6 @@ async function submitOrder(event) {
     if (ownerUid !== currentUser?.uid) throw new Error("會員登入狀態已變更，請重新確認訂購資料。");
     if (!cart.length) throw new Error("購物車內容已失效，請重新選擇商品。");
     if (cartFingerprint(cart) !== originalCart) {
-      updateCheckoutOptions();
       throw new Error("商品價格或可購買數量已更新，請確認購物車與總計後再送出。");
     }
     for (const row of cart) {
@@ -800,6 +897,18 @@ function renderLoadedCatalog() {
 
 function bindCaptureHandlers() {
   document.addEventListener("click", (event) => {
+    const miniStep = event.target.closest?.("[data-checkout-mini-step]");
+    if (miniStep && !miniStep.disabled) {
+      changeCheckoutMiniQuantity(miniStep);
+      return;
+    }
+    const miniMore = event.target.closest?.("[data-checkout-mini-more]");
+    if (miniMore) {
+      miniMore.setAttribute("aria-expanded", String(miniMore.getAttribute("aria-expanded") !== "true"));
+      renderCheckoutMiniAddOns();
+      return;
+    }
+
     const variantButton = event.target.closest?.("[data-regional-variant]");
     if (variantButton && !variantButton.disabled && selectedVariantId !== variantButton.dataset.regionalVariant) {
       selectedVariantId = variantButton.dataset.regionalVariant;
@@ -904,6 +1013,7 @@ initialPublicShopProduct.then((product) => {
 });
 
 // Geography and public catalog/settings are independent network requests.
+window.addEventListener("77select:cart-render-request", publishCartRows);
 const initialSettings = loadSettings();
 const initialCatalog = loadProducts().then(() => true, (error) => {
   console.error("77select regional storefront init failed", error);

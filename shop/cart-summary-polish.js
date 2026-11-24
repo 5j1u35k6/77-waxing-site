@@ -57,19 +57,16 @@ function cartRowLabel(row) {
 }
 
 function noteDiscountTotal() {
-  const cartNotes = $$("#cart-items .promo-bridge-note");
-  const notes = cartNotes.length ? cartNotes : $$("#checkout-summary .promo-bridge-line");
-  return notes.reduce((sum, node) => {
+  return $$("#cart-items .promo-bridge-note").reduce((sum, node) => {
     const text = node.dataset.originalPromoText || node.textContent || "";
-    if (!/[-−]\s*(NT\$|HK\$)/.test(text)) return sum;
-    const match = text.match(/[-−]\s*((?:NT\$|HK\$)\s*[0-9,]+)/);
+    const match = text.match(/｜[-−]\s*((?:NT\$|HK\$)\s*[0-9,]+)\s*$/);
     return sum + parseMoney(match?.[1] || "0");
   }, 0);
 }
 
 function promotionNotes() {
   const notes = [];
-  $$("#cart-items .promo-bridge-note, #checkout-summary .promo-bridge-line").forEach((node) => {
+  $$("#cart-items .promo-bridge-note").forEach((node) => {
     const text = (node.dataset.originalPromoText || node.textContent || "").trim();
     if (text && !notes.includes(text)) notes.push(text);
   });
@@ -100,16 +97,12 @@ function syncCartMath() {
     const existing = foot.querySelector(".cart-math-breakdown");
     const rows = $$("#cart-items .regional-cart-row,#cart-items .cart-row");
     const subtotalBeforeDiscount = rows.reduce((sum, row) => sum + cartRowSubtotal(row), 0);
-    const finalTotal = parseMoney(subtotalEl.textContent);
     const currency = currencyOf(subtotalEl.textContent || document.documentElement.dataset.market);
-    const discountFromDiff = subtotalBeforeDiscount > finalTotal ? subtotalBeforeDiscount - finalTotal : 0;
-    const discount = Math.max(discountFromDiff, noteDiscountTotal());
+    const discount = noteDiscountTotal();
 
-    const label = totalLine.querySelector("span");
     if (!subtotalBeforeDiscount || discount <= 0) {
       existing?.remove();
       cartDiscountOpen = false;
-      if (label && label.textContent !== "商品小計") label.textContent = "商品小計";
       return;
     }
 
@@ -133,7 +126,6 @@ function syncCartMath() {
       box.dataset.mathHtml = html;
       foot.insertBefore(box, totalLine);
     }
-    if (label && label.textContent !== "總計") label.textContent = "總計";
   } finally {
     applying = false;
   }
@@ -223,11 +215,8 @@ document.addEventListener("keydown", (event) => {
   toggleDiscount(button);
 }, true);
 
-new MutationObserver(scheduleSync).observe(document.documentElement, {
-  childList: true,
-  subtree: true,
-  attributes: true,
-  attributeFilter: ["class", "hidden"],
-});
-window.addEventListener("storage", scheduleSync);
+const observer = new MutationObserver(scheduleSync);
+for (const host of [$("#cart-items"), $("#cart-subtotal"), $("#checkout-summary")]) {
+  if (host) observer.observe(host, { childList: true, subtree: true });
+}
 scheduleSync();

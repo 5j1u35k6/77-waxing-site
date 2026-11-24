@@ -9,6 +9,7 @@
   <meta property="og:description" content="77select｜77waxing 官方產品選物與訂購頁">
   <meta property="og:type" content="website">
   <title>77select｜產品訂購</title>
+  <link rel="icon" type="image/svg+xml" href="./favicon-77select.svg">
   <style>.shop-hero-pending #hero-title{visibility:hidden}</style>
   <script>
     const shopSearch = new URLSearchParams(location.search);
@@ -36,6 +37,7 @@
   <link rel="stylesheet" href="./select-home.css?v=20261124-series2">
   <link rel="stylesheet" href="./select-product-page.css?v=20261124-series2">
   <link rel="stylesheet" href="./select-ai.css?v=20261123-select2">
+  <link rel="stylesheet" href="./select-checkout-mini.css?v=20261124-mini1">
 <link rel="preconnect" href="https://www.gstatic.com" crossorigin><link rel="preconnect" href="https://firestore.googleapis.com" crossorigin><link rel="preconnect" href="https://identitytoolkit.googleapis.com" crossorigin><link rel="modulepreload" href="https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js" crossorigin><link rel="modulepreload" href="https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js" crossorigin><link rel="modulepreload" href="https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js" crossorigin></head>
 <body class="select-store">
   <header class="shop-nav select-header">
@@ -275,6 +277,10 @@
               <div id="checkout-summary" class="checkout-total"></div>
               <label class="check-line checkout-terms-line"><input id="checkout-terms" type="checkbox" required><span>我已閱讀並同意 <a href="./policies.html" target="_blank" rel="noopener"><u>訂購、退換貨與隱私說明</u></a>。本站不會要求在網頁中輸入信用卡卡號。</span></label>
             </aside>
+            <section id="checkout-mini-add-ons" class="checkout-section checkout-mini-add-ons" aria-labelledby="checkout-mini-add-ons-title" hidden>
+              <h3 id="checkout-mini-add-ons-title">加購小規格商品</h3>
+              <div data-checkout-mini-list></div>
+            </section>
           </div>
         </div>
         <div class="modal-foot checkout-foot-v2"><span>確認資料無誤後送出訂單</span><button id="checkout-submit" class="primary-btn" type="submit">送出訂單</button></div>
@@ -352,12 +358,12 @@
     })();
   </script>
   <script type="module" src="./app.js?v=20261124-series2"></script>
-  <script type="module" src="./regional-store.js?v=20261124-series2"></script>
+  <script type="module" src="./regional-store.js?v=20261124-mini1"></script>
   <script type="module" src="./public-enhancements.js?v=20261124-speed2"></script>
   <script type="module" src="./quantity-checkout-polish.js?v=20261123-select2"></script>
-  <script type="module" src="./promotion-storefront.js?v=20261026-audit1"></script>
+  <script type="module" src="./promotion-storefront.js?v=20261124-cart-stability"></script>
   <script type="module" src="./checkout-submit-fix.js?v=20261026-audit1"></script>
-  <script type="module" src="./cart-summary-polish.js?v=20261026-audit1"></script>
+  <script type="module" src="./cart-summary-polish.js?v=20261124-cart-stability"></script>
   <script type="module" src="./select-ai.js?v=20261124-series1"></script>
 </body>
 </html>

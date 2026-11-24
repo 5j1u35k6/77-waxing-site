@@ -15,8 +15,10 @@ let market = document.documentElement.dataset.market === "HK"
   : { code: "TW", currency: "TWD", symbol: "NT$" };
 
 let products = [];
+let hasProductSnapshot = false;
 let settings = {};
 let currentUser = auth.currentUser || null;
+let liveCartRows;
 let applying = false;
 let scheduled = false;
 const checkoutPatches = new WeakMap();
@@ -48,6 +50,10 @@ function loadCart() {
   } catch {
     return [];
   }
+}
+
+function currentCartRows() {
+  return liveCartRows ?? loadCart();
 }
 
 function normalizeVariants(product = {}) {
@@ -163,7 +169,7 @@ function findVariant(productId, variantId) {
   return { product, variant };
 }
 
-function reconcileCartRows(rows = loadCart()) {
+function reconcileCartRows(rows = currentCartRows()) {
   refreshMarket();
   return rows.map((row) => {
     const { product, variant } = findVariant(row.productId, row.variantId);
@@ -378,6 +384,7 @@ function syncUi() {
   if (applying) return;
   applying = true;
   try {
+    if (!hasProductSnapshot) return;
     patchCartUi();
     patchCheckoutUi();
   } finally {
@@ -498,12 +505,12 @@ async function submitPromotedOrder(event) {
   const form = event.target;
   if (!beginCheckout(form)) return;
   const ownerUid = currentUser.uid;
-  const originalCart = cartFingerprint(loadCart());
+  const originalCart = cartFingerprint(currentCartRows());
   const originalPricing = JSON.stringify(cartPricing());
   if (button) button.disabled = true;
   try {
     await refreshData();
-    const rows = reconcileCartRows(loadCart());
+    const rows = reconcileCartRows();
     const pricing = cartPricing(rows);
     if (ownerUid !== currentUser?.uid) throw new Error("會員登入狀態已變更，請重新確認訂購資料。");
     if (!rows.length) throw new Error("購物車是空的。");
@@ -656,15 +663,22 @@ onSnapshot(doc(db, "shopSettings", "public"), (snap) => {
 }, console.error);
 onSnapshot(query(collection(db, "shopProducts"), where("active", "==", true)), (snap) => {
   products = snap.docs.map((row) => ({ id: row.id, ...row.data() }));
+  hasProductSnapshot = true;
   scheduleSync();
 }, console.error);
 
-new MutationObserver(scheduleSync).observe(document.documentElement, {
-  childList: true,
-  subtree: true,
-  attributes: true,
-  attributeFilter: ["class", "hidden"],
+const observer = new MutationObserver(scheduleSync);
+for (const host of [$("#cart-items"), $("#checkout-summary")]) {
+  if (host) observer.observe(host, { childList: true, subtree: true });
+}
+window.addEventListener("77select:cart-rendered", (event) => {
+  if (!Array.isArray(event.detail?.rows)) return;
+  liveCartRows = event.detail.rows;
+  scheduleSync();
 });
-window.addEventListener("storage", scheduleSync);
+window.dispatchEvent(new Event("77select:cart-render-request"));
+window.addEventListener("storage", (event) => {
+  if (event.key === CART_KEY) scheduleSync();
+});
 bindSubmitBridge();
 scheduleSync();
