@@ -34,20 +34,21 @@
 #app > .hero .home-reassurance {
   max-width: 660px;
   margin: 0 0 22px;
-  font-size: clamp(40px, 3.8vw, 66px);
-  line-height: 1.28;
-  letter-spacing: -.035em;
+  font-size: clamp(40px, 3.8vw, 66px) !important;
+  line-height: 1.28 !important;
+  letter-spacing: -.035em !important;
   text-wrap: pretty;
 }
 #app > .hero .home-reassurance > span {
   white-space: normal;
+  text-wrap: balance;
 }
 #app > .hero .home-reassurance > small.home-subtitle {
-  margin-top: 17px;
-  font: 400 18px/1.75 -apple-system, BlinkMacSystemFont, "Noto Sans TC", "PingFang TC", sans-serif;
-  letter-spacing: 0;
-  white-space: normal;
-  opacity: .72;
+  margin-top: 17px !important;
+  font: 400 18px/1.75 -apple-system, BlinkMacSystemFont, "Noto Sans TC", "PingFang TC", sans-serif !important;
+  letter-spacing: 0 !important;
+  white-space: normal !important;
+  opacity: .72 !important;
 }
 #app > .hero .home-body-copy {
   max-width: 520px;
@@ -57,13 +58,14 @@
 }
 #app > .hero .btns {
   max-width: 610px;
+  flex-wrap: wrap !important;
   gap: 11px;
   margin-top: 30px;
 }
 #app > .hero .btns .btn {
   min-height: 44px;
-  padding: 10px 17px;
-  font-size: 13px;
+  padding: 10px 17px !important;
+  font-size: 13px !important;
   line-height: 1.5;
 }
 #app > .hero .art {
@@ -105,10 +107,14 @@
 #app > .hero .art[style*="background-image"] { background-size: cover; background-position: center; }
 #app > .hero .art img,
 #app > .hero .art video { width: 100%; height: 100%; object-fit: cover; }
+@media (min-width: 851px) {
+  /* Extend into the existing rail reservation; the fixed navigation stays above. */
+  html.has-desktop-side-nav #app > .hero { width: calc(100% + 88px); }
+}
 @media (max-width: 1100px) and (min-width: 901px) {
   #app > .hero .hero-grid > div:first-child { width: 60%; padding-left: 28px; }
   #app > .hero .art { inset-inline-start: 48%; width: 52%; }
-  #app > .hero .home-reassurance { font-size: 42px; }
+  #app > .hero .home-reassurance { font-size: 42px !important; }
 }
 @media (max-width: 900px) {
   #app > .hero { min-height: 0; }
@@ -119,8 +125,8 @@
     padding: 42px 28px 26px;
   }
   #app > .hero .tag { margin-bottom: 16px; }
-  #app > .hero .home-reassurance { max-width: 700px; font-size: clamp(35px, 5.7vw, 52px); }
-  #app > .hero .home-reassurance > small.home-subtitle { margin-top: 13px; font-size: 17px; }
+  #app > .hero .home-reassurance { max-width: 700px; font-size: clamp(35px, 5.7vw, 52px) !important; }
+  #app > .hero .home-reassurance > small.home-subtitle { margin-top: 13px !important; font-size: 17px !important; }
   #app > .hero .home-body-copy { max-width: 620px; }
   #app > .hero .btns { margin-top: 24px; }
   #app > .hero .art {
@@ -138,8 +144,8 @@
 @media (max-width: 480px) {
   #app > .hero .hero-grid > div:first-child { padding: 33px 22px 20px; }
   #app > .hero .tag { font-size: 10px; letter-spacing: .08em; }
-  #app > .hero .home-reassurance { font-size: 35px; }
-  #app > .hero .home-reassurance > small.home-subtitle { font-size: 16px; }
+  #app > .hero .home-reassurance { font-size: 35px !important; }
+  #app > .hero .home-reassurance > small.home-subtitle { font-size: 16px !important; }
   #app > .hero .home-body-copy { font-size: 15px; line-height: 1.85; }
   #app > .hero .btns { display: grid; grid-template-columns: 1fr; width: 100%; gap: 9px; }
   #app > .hero .btns .btn { min-height: 43px; }
