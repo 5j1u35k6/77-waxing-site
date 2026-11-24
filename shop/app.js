@@ -1,13 +1,12 @@
 import { operationErrorText } from "../assets/interface-copy.js?v=20261026-audit1";
 import { browserLocalPersistence, onAuthStateChanged, setPersistence, signInAnonymously } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
-import { addDoc, collection, doc, getDoc, getDocs, onSnapshot, query, serverTimestamp, setDoc, where } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
+import { addDoc, collection, doc, getDocs, onSnapshot, query, serverTimestamp, setDoc, where } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
 import { getPublicFirebase } from "../assets/public-firebase.js?v=20261026-audit1";
 import { beginCheckout, finishCheckout, cartFingerprint, validateOrderData, savePreference } from "./checkout-guard.js?v=20261026-audit1";
-import { allProducts, catalogCategories, categoryFromCollectionKey, filterProducts } from "./series.js?v=20261124-series1";
-import { collectionHref, storeHomeHref, storeRoute } from "./select-routes.js?v=20261124-speed2";
-import { renderSelectHomeSettings } from "./select-home-content.js?v=20261124-series2";
 import { selectProductCard } from "./select-product-card.js?v=20261124-series2";
-import { initialShopProducts } from "./initial-products.js?v=20261124-speed2";
+import { initialShopProducts, initialShopSettings } from "./initial-products.js?v=20261124-series-ready";
+import { applyStoreHomeSettings, setStoreView as setTab } from "./select-start.js?v=20261124-series-ready";
+import { storeRoute } from "./select-routes.js?v=20261124-speed2";
 
 const { auth, db } = getPublicFirebase();
 const DEFAULT_EMAIL_URL = "https://script.google.com/macros/s/AKfycbx6iC26KXbHWYte5XhLGNRMmG16Yydx2vPHDxYpmp4rmWn3plk__6Qwwr7Y09hLptTW/exec";
@@ -86,18 +85,6 @@ function toast(message, type = "ok") {
   clearTimeout(toast.timer);
   toast.timer = setTimeout(() => el.classList.add("hidden"), 3200);
 }
-function setTab(name) {
-  document.documentElement.dataset.selectRoute = name;
-  $$("[data-tab]").forEach((button) => button.classList.toggle("on", button.dataset.tab === name));
-  $$("[data-view]").forEach((section) => section.classList.toggle("hidden", section.dataset.view !== name));
-  $$(".select-nav [data-tab], .select-nav [data-select-nav]").forEach((link) => {
-    const target = link.dataset.tab || link.dataset.selectNav;
-    const active = target === name;
-    link.classList.toggle("on", active);
-    if (active) link.setAttribute("aria-current", "page");
-    else link.removeAttribute("aria-current");
-  });
-}
 function openLayer(selector) {
   $(selector).classList.remove("hidden");
   document.body.style.overflow = "hidden";
@@ -108,16 +95,9 @@ function closeLayer(selector) {
 }
 
 async function loadSettings() {
-  const snap = await getDoc(doc(db, "shopSettings", "public")).catch(() => null);
+  const snap = await initialShopSettings(db).catch(() => null);
   settings = snap?.exists() ? { ...DEFAULT_SETTINGS, ...snap.data() } : { ...DEFAULT_SETTINGS };
-  $("#hero-eyebrow").textContent = settings.heroEyebrow || DEFAULT_SETTINGS.heroEyebrow;
-  const heroTitle = settings.heroTitle;
-  $("#hero-title").textContent = typeof heroTitle === "string" && heroTitle.trim() ? heroTitle : DEFAULT_SETTINGS.heroTitle;
-  $("#hero-description").textContent = settings.heroDescription || DEFAULT_SETTINGS.heroDescription;
-  const email = settings.storeEmail || DEFAULT_SETTINGS.storeEmail;
-  $("#store-email-link").textContent = email;
-  $("#store-email-link").href = `mailto:${email}`;
-  renderSelectHomeSettings(settings.homeContent);
+  if (snap?.exists()) applyStoreHomeSettings(snap.data(), true);
   document.documentElement.classList.remove("shop-hero-pending");
 }
 async function loadProducts() {
@@ -129,8 +109,6 @@ function applyProductSnapshot(snap) {
   products = snap.docs
     .map((row) => ({ id: row.id, ...row.data() }))
     .sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0) || String(a.name || "").localeCompare(String(b.name || ""), "zh-Hant"));
-  renderFilters();
-  renderProducts();
   reconcileCart();
 }
 function reconcileCart() {
@@ -147,22 +125,6 @@ function reconcileCart() {
     return qty > 0;
   });
   if (changed) saveCart(); else renderCart();
-}
-function renderFilters() {
-  const category = storeRoute.category || allProducts;
-  const categories = catalogCategories(products);
-  $("#category-filters").innerHTML = categories.map((name) => `<a class="filter-btn${name === category ? " on" : ""}" href="${esc(collectionHref(name))}" data-category="${esc(name)}"${name === category ? ' aria-current="page"' : ""}>${esc(name)}</a>`).join("");
-}
-function renderProducts() {
-  const category = storeRoute.category || allProducts;
-  const visible = filterProducts(products, category);
-  if (!visible.length) {
-    $("#product-grid").innerHTML = `<div class="empty-state">${category === allProducts ? "目前沒有可訂購的商品。" : "此系列目前尚無商品。"}</div>`;
-    return;
-  }
-  $("#product-grid").innerHTML = visible.map((product) =>
-    selectProductCard(product, money(product.price), { soldOut: Number(product.stock || 0) <= 0 })
-  ).join("");
 }
 function changeQty(id, delta) {
   const row = cart.find((item) => item.id === id);
@@ -426,22 +388,7 @@ async function ensureAuth() {
   await setPersistence(auth, browserLocalPersistence).catch(() => {});
   if (!auth.currentUser) await signInAnonymously(auth);
 }
-function syncStoreView() {
-  const title = $("#shop-catalog-title");
-  if (title && storeRoute.view === "products") {
-    title.textContent = storeRoute.category === allProducts ? "商品目錄" : storeRoute.category;
-  }
-  setTab(storeRoute.view);
-}
 function bindUI() {
-  $$("a[data-shop-home-link]").forEach((link) => {
-    link.href = storeHomeHref() + link.hash;
-  });
-  $$("a[data-shop-collection]").forEach((link) => {
-    link.href = collectionHref(categoryFromCollectionKey(link.dataset.shopCollection));
-  });
-  syncStoreView();
-  window.addEventListener("77select:route-change", syncStoreView);
   $$("[data-tab]").forEach((button) => {
     button.onclick = () => {
       setTab(button.dataset.tab);

@@ -1,24 +1,22 @@
+import "./select-start.js?v=20261124-series-ready";
 import { operationErrorText } from "../assets/interface-copy.js?v=20261026-audit1";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
-import { collection, doc, getDoc, getDocFromServer, onSnapshot, query, serverTimestamp, setDoc, where } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
+import { collection, doc, getDocFromServer, onSnapshot, query, serverTimestamp, setDoc, where } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
 import { getPublicFirebase } from "../assets/public-firebase.js?v=20261026-audit1";
 import { beginCheckout, finishCheckout, cartFingerprint, validateOrderData, savePreference } from "./checkout-guard.js?v=20261026-audit1";
 import { allProducts, catalogCategories, catalogCategory, filterProducts } from "./series.js?v=20261124-series1";
-import { collectionHref, enableStoreNavigation, productHref, storeHomeHref, storeRoute } from "./select-routes.js?v=20261124-speed2";
-import { renderSelectCatalogSlogan, renderSelectHomeProducts } from "./select-home-content.js?v=20261124-series2";
-import { setProductPageMetadata, setStorePageMetadata } from "./seo.js?v=20261124-speed2";
-import { selectProductCard } from "./select-product-card.js?v=20261124-series2";
-import { initialPublicShopProduct, initialShopProducts } from "./initial-products.js?v=20261124-speed2";
+import { collectionHref, productHref, storeHomeHref, storeRoute } from "./select-routes.js?v=20261124-speed2";
+import { renderSelectHomeProducts } from "./select-home-content.js?v=20261124-series-ready";
+import { setProductPageMetadata } from "./seo.js?v=20261124-speed2";
+import { selectProductCard } from "./select-product-card.js?v=20261124-series-ready";
+import { readPublicShopProduct, initialShopProducts, initialShopSettings } from "./initial-products.js?v=20261124-series-ready";
+
+import { int, money as formatMoney, normalizeVariants, mediaForVariant, primaryImage, compareProducts, catalogPriceText as formatCatalogPrice } from "./select-catalog-model.js?v=20261124-series-ready";
+import { MARKETS, initialMarket } from "./select-market.js?v=20261124-series-ready";
 
 const { auth, db } = getPublicFirebase();
 const CART_KEY = "77select_cart_v4";
-const MARKET_CACHE_KEY = "77select_market_v1";
 const DEFAULT_EMAIL_URL = "https://script.google.com/macros/s/AKfycbx6iC26KXbHWYte5XhLGNRMmG16Yydx2vPHDxYpmp4rmWn3plk__6Qwwr7Y09hLptTW/exec";
-
-const MARKETS = {
-  TW: { code: "TW", currency: "TWD", symbol: "NT$", locale: "zh-TW", label: "台灣" },
-  HK: { code: "HK", currency: "HKD", symbol: "HK$", locale: "zh-HK", label: "香港" },
-};
 
 let market = MARKETS.TW;
 let products = [];
@@ -34,12 +32,11 @@ let orderWatchVersion = 0;
 let settings = {};
 let renderingOrders = false;
 let renderingCart = false;
-let renderingProducts = false;
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-const int = (value) => Math.max(0, Math.round(Number(value) || 0));
+
 
 function loadCart() {
   try {
@@ -59,11 +56,7 @@ function saveCart() {
   updateDetailPurchase();
 }
 
-function money(value, currency = market.currency) {
-  const amount = Number(value || 0);
-  if (currency === "HKD") return `HK$${amount.toLocaleString("zh-HK")}`;
-  return `NT$${amount.toLocaleString("zh-TW")}`;
-}
+const money = (value, currency = market.currency) => formatMoney(value, currency);
 
 function orderCurrency(order) {
   return order?.items?.find?.((item) => item?.currency)?.currency || "TWD";
@@ -71,33 +64,6 @@ function orderCurrency(order) {
 
 function cartKey(productId, variantId) {
   return `${productId}::${variantId}`;
-}
-
-function normalizeVariants(product = {}) {
-  if (Array.isArray(product.variants) && product.variants.length) {
-    return product.variants.map((variant, index) => ({
-      id: String(variant.id || `variant-${index + 1}`),
-      name: String(variant.name || variant.label || `規格 ${index + 1}`),
-      capacity: String(variant.capacity || variant.size || ""),
-      priceTWD: int(variant.priceTWD ?? variant.priceTW ?? variant.price ?? product.price ?? 0),
-      priceHKD: int(variant.priceHKD ?? variant.priceHK ?? product.priceHKD ?? 0),
-      stock: int(variant.stock ?? product.stock ?? 0),
-      bulkMinQty: int(variant.bulkMinQty ?? variant.quantityDiscountMin ?? 0),
-      bulkPriceTWD: int(variant.bulkPriceTWD ?? variant.quantityDiscountTWD ?? 0),
-      bulkPriceHKD: int(variant.bulkPriceHKD ?? variant.quantityDiscountHKD ?? 0),
-    }));
-  }
-  return [{
-    id: "default",
-    name: "一般規格",
-    capacity: "",
-    priceTWD: int(product.price || 0),
-    priceHKD: int(product.priceHKD || product.price || 0),
-    stock: int(product.stock || 0),
-    bulkMinQty: 0,
-    bulkPriceTWD: 0,
-    bulkPriceHKD: 0,
-  }];
 }
 
 function basePriceFor(variant) {
@@ -127,63 +93,6 @@ function discountText(variant) {
   return `滿 ${variant.bulkMinQty} 件，單件 ${money(bulkPriceFor(variant))}`;
 }
 
-function normalizeMedia(product = {}) {
-  const source = Array.isArray(product.media) ? product.media : [];
-  const rows = source.map((row, index) => ({
-    id: String(row?.id || `image-${index + 1}`),
-    url: String(row?.url || row?.dataUrl || row?.imageUrl || ""),
-    variantId: String(row?.variantId || ""),
-    sortOrder: Number.isFinite(Number(row?.sortOrder)) ? Number(row.sortOrder) : index,
-  })).filter((row) => row.url).sort((a, b) => a.sortOrder - b.sortOrder);
-  if (!rows.length && product.imageUrl) rows.push({ id: "legacy-main", url: String(product.imageUrl), variantId: "", sortOrder: 0 });
-  return rows;
-}
-
-function mediaForVariant(product, variantId = "") {
-  const all = normalizeMedia(product);
-  if (!all.length) return [];
-  const shared = all.filter((row) => !row.variantId);
-  if (!variantId) return shared.length ? shared : all;
-  const specific = all.filter((row) => row.variantId === variantId);
-  const result = [...shared, ...specific];
-  return result.length ? result : all;
-}
-
-function primaryImage(product, variantId = "") {
-  return mediaForVariant(product, variantId)[0]?.url || "";
-}
-
-async function detectMarket() {
-  let cached = null;
-  try { cached = sessionStorage.getItem(MARKET_CACHE_KEY); } catch {}
-  if (cached === "HK" || cached === "TW") return MARKETS[cached];
-
-  let detected = null;
-  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "";
-  const languages = [navigator.language, ...(navigator.languages || [])].filter(Boolean).join("|");
-  if (timezone === "Asia/Hong_Kong" || /(?:^|-)HK(?:$|\|)/i.test(languages)) detected = "HK";
-  if (timezone === "Asia/Taipei" || /(?:^|-)TW(?:$|\|)/i.test(languages)) detected ||= "TW";
-
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 2200);
-  try {
-    const response = await fetch("https://api.country.is/", { cache: "no-store", signal: controller.signal });
-    if (response.ok) {
-      const data = await response.json();
-      const country = String(data?.country || "").toUpperCase();
-      if (country === "HK" || country === "TW") detected = country;
-    }
-  } catch (error) {
-    console.info("77select market IP lookup unavailable; using device locale fallback.", error?.name || error);
-  } finally {
-    clearTimeout(timer);
-  }
-
-  const result = detected === "HK" ? MARKETS.HK : MARKETS.TW;
-  try { sessionStorage.setItem(MARKET_CACHE_KEY, result.code); } catch {}
-  return result;
-}
-
 function ensureMarketBadge() {
   let badge = $("#market-badge");
   if (!badge) {
@@ -208,30 +117,21 @@ function galleryMarkup(product, variantId) {
   </section>`;
 }
 
-function catalogPriceText(product) {
-  const variants = normalizeVariants(product);
-  const available = variants.filter((variant) => variant.stock > 0);
-  const prices = (available.length ? available : variants).map(basePriceFor);
-  const minimum = Math.min(...prices);
-  const maximum = Math.max(...prices);
-  return minimum === maximum ? money(minimum) : `${money(minimum)}–${money(maximum)}`;
-}
+const catalogPriceText = (product) => formatCatalogPrice(product, market);
 
-function productCardMarkup(product) {
+function productCardMarkup(product, index) {
   const soldOut = !normalizeVariants(product).some((variant) => variant.stock > 0);
   return selectProductCard({ id: product.id, name: product.name, imageUrl: primaryImage(product) },
-    catalogPriceText(product), { regional: true, soldOut });
+    catalogPriceText(product), { regional: true, soldOut, priority: index === 0 });
 }
 
 function renderProducts() {
   const grid = $("#product-grid");
   if (!grid) return;
-  renderingProducts = true;
   const activeCategory = storeRoute.category || allProducts;
   const visible = filterProducts(products, activeCategory);
   grid.innerHTML = visible.length ? visible.map(productCardMarkup).join("") :
     `<div class="empty-state" data-regional-empty>${activeCategory === allProducts ? "目前沒有可訂購的商品。" : "此系列目前尚無商品。"}</div>`;
-  renderingProducts = false;
 }
 
 function renderFilters() {
@@ -861,7 +761,7 @@ function renderOrders() {
 }
 
 async function loadSettings() {
-  const snap = await getDoc(doc(db, "shopSettings", "public")).catch(() => null);
+  const snap = await initialShopSettings(db).catch(() => null);
   settings = snap?.exists() ? snap.data() : {};
 }
 
@@ -873,13 +773,13 @@ async function refreshCartProducts() {
     .map(row => ({ id: row.id, ...row.data() }));
   const selected = new Set(ids);
   products = [...products.filter(row => !selected.has(row.id)), ...refreshed]
-    .sort((a,b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0) || String(a.name || '').localeCompare(String(b.name || ''),'zh-Hant'));
+    .sort(compareProducts);
 }
 
 async function loadProducts() {
   const snap = await initialShopProducts(db);
   products = snap.docs.map((row) => ({ id: row.id, ...row.data() }))
-    .sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0) || String(a.name || "").localeCompare(String(b.name || ""), "zh-Hant"));
+    .sort(compareProducts);
 }
 function renderLoadedCatalog() {
   renderFilters();
@@ -979,17 +879,6 @@ function bindCaptureHandlers() {
 }
 
 function keepRegionalViewsAuthoritative() {
-  const grid = $("#product-grid");
-  if (grid) {
-    new MutationObserver(() => {
-      if (!renderingProducts && products.length && !grid.querySelector("[data-regional-detail], [data-regional-empty]")) {
-        queueMicrotask(() => {
-          renderFilters();
-          renderProducts();
-        });
-      }
-    }).observe(grid, { childList: true, subtree: true });
-  }
   const orders = $("#orders-list");
   if (orders) {
     new MutationObserver(() => {
@@ -1004,47 +893,55 @@ function keepRegionalViewsAuthoritative() {
   }
 }
 
-// A direct link can paint its product while the region and the rest of the catalog resolve.
 let catalogueReady = false;
-initialPublicShopProduct.then((product) => {
-  if (!catalogueReady && product && product.id === storeRoute.productId) {
-    setProductPageMetadata(product);
-    renderProductDetail(product, true);
+let productPreviewVersion = 0;
+const detailBody = $("#product-detail-body");
+const detailPlaceholder = detailBody.innerHTML;
+
+function renderProductPreview() {
+  const version = ++productPreviewVersion;
+  if (storeRoute.view !== "product") return;
+  const productId = storeRoute.productId;
+  detailBody.innerHTML = detailPlaceholder;
+  detailBody.setAttribute("aria-busy", "true");
+  readPublicShopProduct(productId).then((product) => {
+    if (!catalogueReady && version === productPreviewVersion && product && storeRoute.productId === productId) {
+      setProductPageMetadata(product);
+      renderProductDetail(product, true);
+    }
+  });
+}
+
+window.addEventListener("77select:route-change", () => {
+  if (!catalogueReady) {
+    renderProductPreview();
+    return;
   }
+  if (storeRoute.view === "products") {
+    renderFilters();
+    renderProducts();
+  }
+  renderRequestedProduct();
 });
 
-// Geography and public catalog/settings are independent network requests.
+// Start public reads independently of geography and member authentication.
 window.addEventListener("77select:cart-render-request", publishCartRows);
+bindCaptureHandlers();
+keepRegionalViewsAuthoritative();
+renderProductPreview();
 const initialSettings = loadSettings();
 const initialCatalog = loadProducts().then(() => true, (error) => {
   console.error("77select regional storefront init failed", error);
   window.dispatchEvent(new Event("77select:catalog-unavailable"));
   return false;
 });
-market = await detectMarket();
+market = await initialMarket;
 ensureMarketBadge();
-bindCaptureHandlers();
-keepRegionalViewsAuthoritative();
 if (await initialCatalog) {
   catalogueReady = true;
   renderLoadedCatalog();
   saveCart();
   window.dispatchEvent(new Event("77select:catalog-ready"));
-  enableStoreNavigation((route, { source }) => {
-    window.dispatchEvent(new Event("77select:route-change"));
-    setStorePageMetadata();
-    if (route.view === "products") {
-      renderSelectCatalogSlogan();
-      renderFilters();
-      renderProducts();
-    }
-    renderRequestedProduct();
-    if (source === "click") {
-      window.scrollTo({ top: 0, behavior: "instant" });
-      const heading = route.view === "product" ? "#product-page-title" : "#shop-catalog-title";
-      $(heading)?.focus({ preventScroll: true });
-    }
-  });
 }
 await initialSettings;
 

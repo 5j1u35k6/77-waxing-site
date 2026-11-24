@@ -3,11 +3,11 @@ import { productHref } from "./select-routes.js?v=20261124-speed2";
 const escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (character) =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[character]);
 
-export function selectProductCard(product, price, { regional = false, soldOut = false } = {}) {
+export function selectProductCard(product, price, { regional = false, soldOut = false, priority = false } = {}) {
   const name = escapeHtml(product.name || "商品");
   const href = escapeHtml(productHref(product.id));
   const image = product.imageUrl
-    ? `<img data-square-photo src="${escapeHtml(product.imageUrl)}" alt="" loading="lazy" decoding="async">`
+    ? `<img data-square-photo src="${escapeHtml(product.imageUrl)}" alt="" loading="${priority ? "eager" : "lazy"}"${priority ? ' fetchpriority="high"' : ""} decoding="async">`
     : '<span aria-hidden="true">77 Select</span>';
   return `<article class="product-card select-catalog-card">
     <a class="select-catalog-card-link" href="${href}"${regional ? ` data-regional-detail="${escapeHtml(product.id)}"` : ""}>

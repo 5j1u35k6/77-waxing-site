@@ -14,7 +14,26 @@
   <script>
     const shopSearch = new URLSearchParams(location.search);
     document.documentElement.dataset.selectRoute = shopSearch.has("product") ? "product" : shopSearch.has("collection") ? "products" : "shop";
-    if (shopSearch.has("product")) import("./initial-products.js?v=20261124-speed2").catch(console.error);
+    import("./initial-products.js?v=20261124-series-ready").catch(console.error);
+    const startupClicks = new AbortController();
+    let earlySeriesLink;
+    let startupScheduled = false;
+    document.addEventListener("click", (event) => {
+      if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      const link = event.target.closest?.("a[data-shop-collection]");
+      if (!link || link.target || link.hasAttribute("download")) return;
+      event.preventDefault();
+      earlySeriesLink = link;
+      if (startupScheduled) return;
+      startupScheduled = true;
+      const resume = () => import("./select-start.js?v=20261124-series-ready").then(() => {
+        startupClicks.abort();
+        earlySeriesLink.click();
+      }, () => location.assign(earlySeriesLink.href));
+      if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", resume, { once: true });
+      else resume();
+    }, { capture: true, signal: startupClicks.signal });
+    window.addEventListener("77select:navigation-ready", () => startupClicks.abort(), { once: true });
   </script>
   <script id="shop-hero-loading">
     document.documentElement.classList.add("shop-hero-pending");
@@ -100,7 +119,9 @@
                 <span id="series-name-black-bottle">黑瓶♾︎修護系列</span>
               </span>
             </a>
-            <p class="select-collection-slogan" id="series-slogan-black-bottle" data-series-slogan></p>
+            <p class="select-collection-slogan" id="series-slogan-black-bottle" data-series-slogan>把對家人的用心，放進每天的保養裡。&#32;
+溫和清潔 | 無香滋潤 | 日常修護
+無香滋潤乳 × 氨基酸溫和洗 × 修護凝膠</p>
           </article>
           <article class="select-collection">
             <a class="select-collection-link" href="./?collection=25-plus" data-shop-collection="25-plus" aria-labelledby="series-name-25-plus" aria-describedby="series-slogan-25-plus">
@@ -109,7 +130,9 @@
                 <span id="series-name-25-plus">25+系列</span>
               </span>
             </a>
-            <p class="select-collection-slogan" id="series-slogan-25-plus" data-series-slogan></p>
+            <p class="select-collection-slogan" id="series-slogan-25-plus" data-series-slogan>給25+的妳，把水潤光采留在日常裡。
+進階保養 | 水潤緊緻 | 暗沉保養
+穩膚精華水 × 水光緊緻精華液 × 美白粉</p>
           </article>
           <article class="select-collection">
             <a class="select-collection-link" href="./?collection=body-polish" data-shop-collection="body-polish" aria-labelledby="series-name-body-polish" aria-describedby="series-slogan-body-polish">
@@ -118,7 +141,9 @@
                 <span id="series-name-body-polish">身體拋光系列</span>
               </span>
             </a>
-            <p class="select-collection-slogan" id="series-slogan-body-polish" data-series-slogan></p>
+            <p class="select-collection-slogan" id="series-slogan-body-polish" data-series-slogan>短裙一穿上，雙腿自帶光。
+身體亮白 | 柔嫩膚觸 | 滋潤光澤
+毛孔淨化潔膚油 × 香氛美白乳液 × 亮白油</p>
           </article>
           <article class="select-collection">
             <a class="select-collection-link" href="./?collection=five-minutes" data-shop-collection="five-minutes" aria-labelledby="series-name-five-minutes" aria-describedby="series-slogan-five-minutes">
@@ -127,7 +152,9 @@
                 <span id="series-name-five-minutes">5分鐘出門系列</span>
               </span>
             </a>
-            <p class="select-collection-slogan" id="series-slogan-five-minutes" data-series-slogan></p>
+            <p class="select-collection-slogan" id="series-slogan-five-minutes" data-series-slogan>5分鐘就出發，今天公車慢慢搭。
+妝前保濕 | 自然提亮 | 清爽防曬
+穩膚精華水 × 清透堤量防曬乳 × 美白粉</p>
           </article>
         </div>
       </section>
@@ -330,35 +357,9 @@
       <a href="/77-waxing-site/privacy/">隱私權政策</a>
     </div>
   </footer>
-  <script id="select-product-loading">
-    (() => {
-      const route = document.documentElement.dataset.selectRoute;
-      const panel = document.querySelector(`[data-view="${route}"] [data-product-load-panel]`);
-      if (!panel) return;
-
-      const detail = document.querySelector("#product-detail-body");
-      const placeholder = detail?.querySelector(".select-product-placeholder");
-      const deadline = window.setTimeout(showFailure, 12000);
-
-      function showFailure() {
-        window.clearTimeout(deadline);
-        if (route === "product") {
-          placeholder?.remove();
-          detail?.setAttribute("aria-busy", "false");
-        }
-        panel.hidden = false;
-      }
-
-      window.addEventListener("77select:catalog-unavailable", showFailure, { once: true });
-      window.addEventListener("77select:catalog-ready", () => {
-        window.clearTimeout(deadline);
-        panel.hidden = true;
-      }, { once: true });
-      panel.querySelector("[data-product-load-retry]").addEventListener("click", () => location.reload());
-    })();
-  </script>
-  <script type="module" src="./app.js?v=20261124-series2"></script>
-  <script type="module" src="./regional-store.js?v=20261124-mini2"></script>
+  <script type="module" src="./select-start.js?v=20261124-series-ready"></script>
+  <script type="module" src="./app.js?v=20261124-series-ready"></script>
+  <script type="module" src="./regional-store.js?v=20261124-series-ready"></script>
   <script type="module" src="./public-enhancements.js?v=20261124-speed2"></script>
   <script type="module" src="./quantity-checkout-polish.js?v=20261123-select2"></script>
   <script type="module" src="./promotion-storefront.js?v=20261124-cart-stability"></script>

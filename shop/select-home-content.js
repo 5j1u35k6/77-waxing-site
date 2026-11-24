@@ -14,7 +14,9 @@ const seriesCards = [...document.querySelectorAll(".select-collection")].map((ca
   return { card, link, cover: link.firstElementChild.cloneNode(true) };
 });
 const collectionSlogan = document.querySelector("[data-catalog-slogan]");
-let seriesSlogans;
+let seriesSlogans = Object.fromEntries(seriesCards.map(({ card, link }) => [
+  link.dataset.shopCollection, card.querySelector("[data-series-slogan]")?.textContent.trim(),
+]));
 const featuredSlots = [...document.querySelectorAll(".select-featured-slot")];
 let featuredIds = [];
 let publicProducts = new Map();
@@ -22,7 +24,8 @@ let publicProducts = new Map();
 function renderSeriesSlogans(overrides) {
   for (const { card, link } of seriesCards) {
     const slogan = card.querySelector("[data-series-slogan]");
-    if (slogan) slogan.textContent = seriesSlogan(link.dataset.shopCollection, overrides);
+    const text = seriesSlogan(link.dataset.shopCollection, overrides);
+    if (slogan && slogan.textContent.trim() !== text) slogan.textContent = text;
   }
   renderSelectCatalogSlogan();
 }
@@ -120,6 +123,7 @@ export function renderSelectHomeSettings(settings = {}) {
   }
   for (const { link, cover } of seriesCards) {
     const url = httpsImage(content.seriesImages?.[link.dataset.shopCollection]);
+    if (url === (link.firstElementChild.getAttribute("src") === cover.getAttribute("src") ? "" : link.firstElementChild.src)) continue;
     const next = url ? document.createElement("img") : cover.cloneNode(true);
     if (url) {
       next.src = url;
