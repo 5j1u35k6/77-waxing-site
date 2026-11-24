@@ -81,6 +81,14 @@ async function unitTests() {
   assert.throws(() => guard.validateOrderData({ ...data, total: Infinity }), /金額/);
   assert.notEqual(guard.cartFingerprint([{ productId: 'p', variantId: 'v', qty: 3, price: 100 }]), guard.cartFingerprint([{ productId: 'p', variantId: 'v', qty: 1, price: 100 }]), 'stock changes require review');
 
+  const mini = vm.createContext({ basePriceFor: variant => variant.priceTWD });
+  vm.runInContext(part('shop/regional-store.js', 'function isCheckoutMiniVariant(', 'function checkoutMiniVariantMarkup('), mini);
+  const trial = { name: '試用包裝', capacity: '30ml', stock: 2, priceTWD: 380 };
+  assert.equal(mini.isCheckoutMiniVariant(trial), true);
+  assert.equal(mini.isCheckoutMiniVariant({ ...trial, name: '正貨包裝' }), false, '30 ml alone does not identify a tester');
+  assert.equal(mini.isCheckoutMiniVariant({ ...trial, stock: 0 }), false, 'out-of-stock testers are not offered');
+  assert.equal(mini.isCheckoutMiniVariant({ ...trial, priceTWD: 0 }), false, 'only options with a retail price are offered');
+
   let authCallback, permissionResolve, mounted = 0;
   const privateRoot = { innerHTML:'private order data' }, user = {uid:'A'};
   const identity = vm.createContext({ auth:{currentUser:user}, authVersion:0, currentUser:user,products:[],orders:[],messages:[],filteredOrderCache:[],
@@ -230,7 +238,17 @@ async function browserTests() {
               { url: 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="100" height="100" fill="tan"/></svg>') },
             ], slogan: '保養標語', precautions: '商品注意事項', addOnProductIds: ['other'],
             variants: [{ id: 'v', name: '一般', capacity: '100ml', priceTWD: 100, priceHKD: 30, stock: 10 }, { id: 'v-alt', name: '加大', capacity: '200ml', priceTWD: 140, priceHKD: 40, stock: 10 }] },
-            other: { active: true, name: '另一件商品', category: '保養', stock: 10, variants: [{ id: 'v2', name: '一般', capacity: '50ml', priceTWD: 80, priceHKD: 25, stock: 10 }] } },
+            other: { active: true, name: '另一件商品', category: '保養', stock: 10, variants: [{ id: 'v2', name: '一般', capacity: '50ml', priceTWD: 80, priceHKD: 25, stock: 10 }] },
+            mini: { active: true, name: '測試小規格商品', category: '保養', sortOrder: 10, variants: [
+              { id: 'mini-grams', name: '試用包裝', capacity: '2g', priceTWD: 20, stock: 4 },
+              { id: 'mini-10', name: '試用包裝', capacity: '10ml', priceTWD: 30, stock: 2 },
+              { id: 'mini-20', name: '試用包裝', capacity: '20ml', priceTWD: 40, stock: 1 },
+              { id: 'mini-50', name: '試用包裝', capacity: '50ml', priceTWD: 80, stock: 1 },
+              { id: 'mini-60', name: '隨身包裝', capacity: '60ml', priceTWD: 90, stock: 1 },
+              { id: 'regular-30', name: '正貨包裝', capacity: '30ml', priceTWD: 100, stock: 5 },
+              { id: 'sold-out', name: '試用包裝', capacity: '5ml', priceTWD: 10, stock: 0 },
+              { id: 'unpriced', name: '試用包裝', capacity: '3ml', priceTWD: 0, stock: 5 },
+            ] } },
           settings: { enablePickup: true, enableCashPickup: true, enableTransfer: true, promotions: [], homeContent: { about: '首頁品牌介紹', featuredProductIds: ['p', '', 'other'], seriesSlogans: { 'black-bottle': '店家標語 <日常保養>\n\n第二段說明 https://example.invalid' } } },
           orders: { 'A-old': { orderNo: 'A-old', ownerUid: 'A', items: [], total: 111, status: 'pending' }, 'B-old': { orderNo: 'B-old', ownerUid: 'B', items: [], total: 222, status: 'pending' } },
           ...(saved ? { writes: saved.writes, settings: saved.settings, orders: saved.orders } : {}),
@@ -388,12 +406,42 @@ async function browserTests() {
       await addQuantity('p', 3);
       assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('77select_cart_v4'))[0].qty), 3, 'requested quantity is committed in the same click');
       await checkout();
+      const miniSection = page.getByRole('region', { name: '加購小規格商品' });
+      await miniSection.waitFor({ state: 'visible' });
+      assert.equal(await miniSection.locator('.checkout-mini-row:not([hidden])').count(), 3);
+      assert.equal(await miniSection.locator('.checkout-mini-row').count(), 5, 'retail, unavailable, and unpriced options stay out of the offer');
+      assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('77select_cart_v4')).length), 1, 'opening checkout adds nothing automatically');
+      const moreMinis = miniSection.getByRole('button', { name: '顯示其他小規格' });
+      const miniFifty = miniSection.locator('[data-checkout-mini-item="mini::mini-50"]');
+      const addMini = miniFifty.getByRole('button', { name: /增加/ });
+      const removeMini = miniFifty.getByRole('button', { name: /減少/ });
+      const checkoutTotal = page.locator('#checkout-summary .totals-line.total b');
+      await page.locator('input[name=payment][value=transfer]').check();
+      await page.locator('#checkout-note').fill('測試備註仍保留');
+      await moreMinis.click();
+      await addMini.click();
+      assert.equal(await addMini.isDisabled(), true, 'cannot add past stock');
+      assert.match(await checkoutTotal.innerText(), /NT\$380/);
+      await miniSection.getByRole('button', { name: '收合其他小規格' }).click();
+      assert.equal(await miniFifty.isVisible(), true, 'an added option stays reachable after collapsing');
+      await removeMini.click();
+      assert.equal(await miniFifty.isVisible(), false);
+      assert.match(await checkoutTotal.innerText(), /NT\$300/);
+      await moreMinis.click();
+      await addMini.click();
+      assert.equal(await page.locator('input[name=payment]:checked').inputValue(), 'transfer');
+      assert.equal(await page.locator('#checkout-note').inputValue(), '測試備註仍保留');
+      assert.equal(await page.locator('#checkout-terms').isChecked(), true);
       await page.evaluate(() => {
         const form = document.querySelector('#checkout-form');
         form.requestSubmit(); form.requestSubmit();
       });
       await page.waitForTimeout(300);
       assert.equal(await page.evaluate(() => window.__shop.writes.length), 1, 'rapid submits create one ordinary order');
+      assert.deepEqual(await page.evaluate(() => {
+        const order = window.__shop.writes[0].data;
+        return [order.total, order.paymentMethod, order.note, order.items.find(row => row.variantId === 'mini-50')?.quantity];
+      }), [380, 'transfer', '測試備註仍保留', 1], 'checkout submission uses the added SKU and keeps existing form data');
       await page.evaluate(() => {
         window.__shop.settings.promotions = [{ id: 'two', active: true, promotionType: 'any_qty_bundle', groups: [{ minQty: 2, items: [{ productId: 'p', variantId: 'v' }] }], discount: { bundlePriceTWD: 150, bundlePriceHKD: 50 } }];
         window.__shop.persist();
@@ -401,6 +449,8 @@ async function browserTests() {
       });
       await addQuantity('p', 2);
       await checkout();
+      await moreMinis.click();
+      await addMini.click();
       await page.waitForTimeout(100);
       const discount = await page.locator('.cart-math-discount-toggle .cart-math-value').innerText();
       assert.equal(discount, 'NT$50', 'cart and checkout must not double count the same promotion');
@@ -410,7 +460,7 @@ async function browserTests() {
       });
       await page.waitForTimeout(350);
       assert.equal(await page.evaluate(() => window.__shop.writes.length), 2, 'rapid submits create one promotion order');
-      assert.equal(await page.evaluate(() => window.__shop.writes[1].data.total), 150);
+      assert.equal(await page.evaluate(() => window.__shop.writes[1].data.total), 230, 'promotional total includes the checkout add-on once');
       await addQuantity('other', 1);
       const cart = await page.evaluate(() => JSON.parse(localStorage.getItem('77select_cart_v4')));
       assert.equal(cart.length, 1, 'a promotion checkout clears the live regional cart');
@@ -480,6 +530,59 @@ async function browserTests() {
       await page.goto(origin + entry + '?product=unlisted');
       await page.getByRole('heading', { name: '找不到這項商品', exact: true }).waitFor({ state: 'visible' });
       assert.equal(await page.locator('[data-product-load-panel]:visible').count(), 0, 'an unlisted product shows the actual result');
+
+      await page.evaluate(() => {
+        localStorage.removeItem('77select_cart_v4');
+        sessionStorage.removeItem('shop-regression-fixture');
+      });
+      await page.goto(origin + entry + '?product=p');
+      await page.locator('#product-detail-add').waitFor({ state: 'visible' });
+      await page.evaluate(() => {
+        const originalWrite = Storage.prototype.setItem;
+        Storage.prototype.setItem = function (key, value) {
+          if (this === localStorage && key === '77select_cart_v4') throw new DOMException('Fixture cart storage full', 'QuotaExceededError');
+          return originalWrite.call(this, key, value);
+        };
+      });
+      await page.locator('#product-detail-add').click();
+      await page.locator('#cart-open').click();
+      await page.locator('#cart-items .regional-cart-row').waitFor({ state: 'visible' });
+      await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+      const stableCart = await page.evaluate(() => new Promise(resolve => {
+        let mutations = 0;
+        const observer = new MutationObserver(records => { mutations += records.length; });
+        observer.observe(document.querySelector('#cart-wrap'), { childList: true, subtree: true });
+        setTimeout(() => {
+          observer.disconnect();
+          resolve({
+            mutations,
+            subtotal: document.querySelector('#cart-subtotal').textContent,
+            hasDiscount: Boolean(document.querySelector('.cart-math-breakdown')),
+          });
+        }, 220);
+      }));
+      assert.deepEqual(stableCart, { mutations: 0, subtotal: 'NT$100', hasDiscount: false }, 'a failed cart write keeps a correct, stable live subtotal');
+
+      await page.evaluate(() => {
+        const variant = window.__shop.products.p.variants[0];
+        Object.assign(variant, { bulkMinQty: 2, bulkPriceTWD: 90, bulkPriceHKD: 25 });
+        window.__shop.emit('shopProducts');
+      });
+      await page.locator('[data-regional-qty][data-delta="1"]').click();
+      await page.waitForFunction(() => document.querySelector('#cart-subtotal')?.textContent === 'NT$180');
+      assert.match(await page.locator('#cart-items .cart-discount-note').innerText(), /2 件以上優惠/);
+      assert.equal(await page.locator('.cart-math-breakdown').count(), 0, 'quantity pricing remains shown on each item');
+
+      await page.evaluate(() => {
+        window.__shop.settings.promotions = [{
+          id: 'two', active: true, promotionType: 'any_qty_bundle',
+          groups: [{ minQty: 2, items: [{ productId: 'p', variantId: 'v' }] }],
+          discount: { bundlePriceTWD: 150, bundlePriceHKD: 45 },
+        }];
+        window.__shop.emit('shopSettings');
+      });
+      await page.waitForFunction(() => document.querySelector('#cart-subtotal')?.textContent === 'NT$150');
+      assert.equal(await page.locator('.cart-math-discount-toggle .cart-math-value').innerText(), 'NT$30', 'additional promotions do not count the quantity saving again');
       await context.close();
     }
   } finally {
@@ -491,5 +594,5 @@ async function browserTests() {
 (async () => {
   await unitTests();
   if (!process.argv.includes('--unit-only')) await browserTests();
-  console.log('PASS: shop + standalone wrapper account isolation, logout, atomic quantity, ordinary/promotion duplicate-submit protection, cart clearing, promotion math, idle observer convergence, legacy variants, zero-price gifts, promotion validation, status transitions, empty-filter CSV and storage failures.');
+  console.log('PASS: shop + standalone wrapper account isolation, logout, atomic quantities, checkout mini add-ons, ordinary/promotion duplicate-submit protection, cart clearing, promotion math, idle observer convergence, legacy variants, zero-price gifts, promotion validation, status transitions, empty-filter CSV and storage failures.');
 })().catch(error => { console.error(error); process.exitCode = 1; });
