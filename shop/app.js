@@ -7,6 +7,7 @@ import { allProducts, catalogCategories, categoryFromCollectionKey, filterProduc
 import { collectionHref, storeHomeHref, storeRoute } from "./select-routes.js?v=20261124-series1";
 import { renderSelectHomeSettings } from "./select-home-content.js?v=20261124-series1";
 import { selectProductCard } from "./select-product-card.js?v=20261124-series1";
+import { initialShopProducts } from "./initial-products.js";
 
 const { auth, db } = getPublicFirebase();
 const DEFAULT_EMAIL_URL = "https://script.google.com/macros/s/AKfycbx6iC26KXbHWYte5XhLGNRMmG16Yydx2vPHDxYpmp4rmWn3plk__6Qwwr7Y09hLptTW/exec";
@@ -122,6 +123,10 @@ async function loadSettings() {
 }
 async function loadProducts() {
   const snap = await getDocs(query(collection(db, "shopProducts"), where("active", "==", true)));
+  applyProductSnapshot(snap);
+}
+
+function applyProductSnapshot(snap) {
   products = snap.docs
     .map((row) => ({ id: row.id, ...row.data() }))
     .sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0) || String(a.name || "").localeCompare(String(b.name || ""), "zh-Hant"));
@@ -457,9 +462,9 @@ window.addEventListener("error", (event) => console.error("[77waxing shop]", eve
 window.addEventListener("unhandledrejection", (event) => console.error("[77waxing shop promise]", event.reason));
 bindUI();
 saveCart();
-await Promise.all([loadSettings(), loadProducts()]).catch((error) => {
+await Promise.all([loadSettings(), initialShopProducts(db).then(applyProductSnapshot)]).catch((error) => {
   console.error(error);
-  toast("商品資料暫時無法載入，請稍後重新整理。", "error");
+  if (storeRoute.view === "shop") toast("商品資料暫時無法載入，請稍後重新整理。", "error");
 });
 onAuthStateChanged(auth, (user) => {
   authVersion += 1;

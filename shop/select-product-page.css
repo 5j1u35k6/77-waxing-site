@@ -360,6 +360,25 @@ html[data-select-route="product"] #shop-product-page {
   margin: 0;
 }
 
+.select-store #shop-catalog {
+  min-height: 48vh;
+}
+
+.select-product-load-panel {
+  grid-column: 1 / -1;
+}
+
+.select-product-load-panel :is(h1, h2) {
+  margin: 0;
+  color: var(--select-ink);
+  font-family: var(--select-serif);
+  font-size: clamp(1.65rem, 4vw, 2.25rem);
+}
+
+.select-product-load-panel [hidden] {
+  display: none;
+}
+
 @media (max-width: 760px) {
   .select-store :is(#shop-catalog, .select-related-products) .product-grid {
     grid-template-columns: minmax(0, 1fr) !important;

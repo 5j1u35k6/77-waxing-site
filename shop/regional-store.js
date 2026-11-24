@@ -1,6 +1,6 @@
 import { operationErrorText } from "../assets/interface-copy.js?v=20261026-audit1";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
-import { collection, doc, getDoc, getDocFromServer, getDocs, onSnapshot, query, serverTimestamp, setDoc, where } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
+import { collection, doc, getDoc, getDocFromServer, onSnapshot, query, serverTimestamp, setDoc, where } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
 import { getPublicFirebase } from "../assets/public-firebase.js?v=20261026-audit1";
 import { beginCheckout, finishCheckout, cartFingerprint, validateOrderData, savePreference } from "./checkout-guard.js?v=20261026-audit1";
 import { allProducts, catalogCategories, catalogCategory, filterProducts } from "./series.js?v=20261124-series1";
@@ -8,6 +8,7 @@ import { collectionHref, productHref, storeHomeHref, storeRoute } from "./select
 import { renderSelectHomeProducts } from "./select-home-content.js?v=20261124-series1";
 import { setProductPageMetadata } from "./seo.js?v=20261124-series1";
 import { selectProductCard } from "./select-product-card.js?v=20261124-series1";
+import { initialShopProducts } from "./initial-products.js";
 
 const { auth, db } = getPublicFirebase();
 const CART_KEY = "77select_cart_v4";
@@ -772,7 +773,7 @@ async function refreshCartProducts() {
 }
 
 async function loadProducts() {
-  const snap = await getDocs(query(collection(db, "shopProducts"), where("active", "==", true)));
+  const snap = await initialShopProducts(db);
   products = snap.docs.map((row) => ({ id: row.id, ...row.data() }))
     .sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0) || String(a.name || "").localeCompare(String(b.name || ""), "zh-Hant"));
 }
@@ -891,6 +892,7 @@ function keepRegionalViewsAuthoritative() {
 const initialSettings = loadSettings();
 const initialCatalog = loadProducts().then(() => true, (error) => {
   console.error("77select regional storefront init failed", error);
+  window.dispatchEvent(new Event("77select:catalog-unavailable"));
   return false;
 });
 market = await detectMarket();
@@ -900,8 +902,6 @@ keepRegionalViewsAuthoritative();
 if (await initialCatalog) {
   renderLoadedCatalog();
   saveCart();
-} else if (storeRoute.view === "product") {
-  $("#product-detail-body").innerHTML = '<div class="select-product-unavailable"><h1 id="product-page-title">商品資料暫時無法載入</h1><p>請重新整理網頁再試一次。</p></div>';
 }
 await initialSettings;
 
