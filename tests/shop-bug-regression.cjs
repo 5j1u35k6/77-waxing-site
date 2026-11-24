@@ -225,10 +225,13 @@ async function browserTests() {
           catalogFixture: new URLSearchParams(location.search).get('fixtureCatalog'), catalogReads: 0, showedLoadingPanel: false,
           auth: { currentUser: null }, authCallbacks: [], subscriptions: [], writes: [],
           products: { p: { active: true, name: '測試商品', category: '黑瓶♾️修護系列', stock: 10,
-            imageUrl: '/77-waxing-site/shop/select-series-repair.jpg', slogan: '保養標語', precautions: '商品注意事項', addOnProductIds: ['other'],
+            imageUrl: '/77-waxing-site/shop/select-series-repair.jpg', media: [
+              { url: '/77-waxing-site/shop/select-series-repair.jpg' },
+              { url: 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="100" height="100" fill="tan"/></svg>') },
+            ], slogan: '保養標語', precautions: '商品注意事項', addOnProductIds: ['other'],
             variants: [{ id: 'v', name: '一般', capacity: '100ml', priceTWD: 100, priceHKD: 30, stock: 10 }, { id: 'v-alt', name: '加大', capacity: '200ml', priceTWD: 140, priceHKD: 40, stock: 10 }] },
             other: { active: true, name: '另一件商品', category: '保養', stock: 10, variants: [{ id: 'v2', name: '一般', capacity: '50ml', priceTWD: 80, priceHKD: 25, stock: 10 }] } },
-          settings: { enablePickup: true, enableCashPickup: true, enableTransfer: true, promotions: [], homeContent: { about: '首頁品牌介紹', featuredProductIds: ['p', '', 'other'], seriesSlogans: { 'black-bottle': '店家標語 <日常保養>' } } },
+          settings: { enablePickup: true, enableCashPickup: true, enableTransfer: true, promotions: [], homeContent: { about: '首頁品牌介紹', featuredProductIds: ['p', '', 'other'], seriesSlogans: { 'black-bottle': '店家標語 <日常保養>\n\n第二段說明 https://example.invalid' } } },
           orders: { 'A-old': { orderNo: 'A-old', ownerUid: 'A', items: [], total: 111, status: 'pending' }, 'B-old': { orderNo: 'B-old', ownerUid: 'B', items: [], total: 222, status: 'pending' } },
           ...(saved ? { writes: saved.writes, settings: saved.settings, orders: saved.orders } : {}),
         };
@@ -291,7 +294,10 @@ async function browserTests() {
       assert.match(await page.locator('.select-about-content').innerText(), /首頁品牌介紹/);
       const seriesLabel = '黑瓶\u267E\uFE0E修護系列';
       const blackBottle = page.getByRole('link', { name: seriesLabel, exact: true });
-      assert.equal(await blackBottle.locator('[data-series-slogan]').innerText(), '店家標語 <日常保養>');
+      const description = '店家標語 <日常保養>\n\n第二段說明 https://example.invalid';
+      const homeDescription = page.locator('#series-slogan-black-bottle');
+      assert.equal(await homeDescription.innerText(), description, 'series descriptions retain paragraph breaks on the homepage');
+      assert.equal(await homeDescription.evaluate(el => el.closest('a') === null && !el.querySelector('a')), true, 'description is text outside the series link');
       assert.equal((await page.locator('[data-series-slogan]').allTextContents()).filter(Boolean).length, 4, 'all home series use custom or default slogans');
       const marketBadge = page.getByLabel('目前地區：台灣', { exact: true });
       await marketBadge.waitFor({ state: 'visible' });
@@ -314,6 +320,7 @@ async function browserTests() {
       await page.waitForURL(/\?collection=black-bottle$/);
       await page.locator('[data-catalog-slogan]').filter({ hasText: '店家標語 <日常保養>' }).waitFor({ state: 'visible' });
       assert.equal(await page.locator('#shop-catalog-title').innerText(), seriesLabel);
+      assert.equal(await page.locator('[data-catalog-slogan]').innerText(), description, 'the series page displays the same paragraphs');
       await page.locator('[data-regional-detail="p"]').waitFor({ state: 'visible' }).catch(async (error) => {
         const state = await page.locator('main').count() ? await page.locator('main').innerText() : await page.locator('body').innerText();
         throw new Error(`Could not open the collection at ${page.url()}\n${state}\n${errors.join('\n')}`, { cause: error });
@@ -437,6 +444,19 @@ async function browserTests() {
       await page.goto(origin + entry + '?product=p');
       await page.locator('#product-detail-add').waitFor({ state: 'visible' });
       assert.deepEqual(await page.evaluate(() => [window.__shop.catalogReads, window.__shop.showedLoadingPanel]), [1, false], 'fast detail skips the loading panel');
+      const gutter = page.locator('.product-gallery-main > .select-photo-fill');
+      await gutter.waitFor({ state: 'visible' });
+      const imageFit = await page.locator('[data-gallery-main]').evaluate((image) => ({
+        fit: getComputedStyle(image).objectFit,
+        portrait: image.naturalHeight > image.naturalWidth,
+        square: Math.abs(image.clientWidth - image.clientHeight) <= 1,
+      }));
+      assert.deepEqual(imageFit, { fit: 'contain', portrait: true, square: true }, 'portrait retains its full image inside a filled square');
+      assert.equal(await gutter.getAttribute('aria-hidden'), 'true');
+      await page.getByRole('button', { name: '檢視商品圖片 2', exact: true }).click();
+      await gutter.waitFor({ state: 'detached' });
+      await page.getByRole('button', { name: '檢視商品圖片 1', exact: true }).click();
+      await gutter.waitFor({ state: 'visible' });
       await page.goto(origin + entry + '?product=p&fixtureCatalog=slow');
       await page.getByRole('heading', { name: '測試商品', exact: true }).waitFor({ state: 'visible' });
       assert.equal(await page.locator('#product-detail-price').count(), 0, 'early product content cannot show a provisional price');
