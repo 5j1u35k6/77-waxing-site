@@ -1,4 +1,4 @@
-import "./seo.js?v=20261124-series1";
+import "./seo.js?v=20261124-speed2";
 import "../assets/member-auth.js?v=20261026-audit1";
 import "../assets/google-auth-ui.js?v=20261026-audit1";
 import "../assets/member-auth-popup-fix.js?v=20261026-audit1";

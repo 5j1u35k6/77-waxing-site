@@ -4,11 +4,11 @@ import { collection, doc, getDoc, getDocFromServer, onSnapshot, query, serverTim
 import { getPublicFirebase } from "../assets/public-firebase.js?v=20261026-audit1";
 import { beginCheckout, finishCheckout, cartFingerprint, validateOrderData, savePreference } from "./checkout-guard.js?v=20261026-audit1";
 import { allProducts, catalogCategories, catalogCategory, filterProducts } from "./series.js?v=20261124-series1";
-import { collectionHref, productHref, storeHomeHref, storeRoute } from "./select-routes.js?v=20261124-series1";
-import { renderSelectHomeProducts } from "./select-home-content.js?v=20261124-series1";
-import { setProductPageMetadata } from "./seo.js?v=20261124-series1";
-import { selectProductCard } from "./select-product-card.js?v=20261124-series1";
-import { initialShopProducts } from "./initial-products.js";
+import { collectionHref, enableStoreNavigation, productHref, storeHomeHref, storeRoute } from "./select-routes.js?v=20261124-speed2";
+import { renderSelectCatalogSlogan, renderSelectHomeProducts } from "./select-home-content.js?v=20261124-speed2";
+import { setProductPageMetadata, setStorePageMetadata } from "./seo.js?v=20261124-speed2";
+import { selectProductCard } from "./select-product-card.js?v=20261124-speed2";
+import { initialPublicShopProduct, initialShopProducts } from "./initial-products.js?v=20261124-speed2";
 
 const { auth, db } = getPublicFirebase();
 const CART_KEY = "77select_cart_v4";
@@ -203,7 +203,7 @@ function galleryMarkup(product, variantId) {
   const media = mediaForVariant(product, variantId);
   const first = media.find((row) => row.variantId === variantId) || media[0];
   return `<section class="product-gallery select-product-gallery" aria-label="商品圖片">
-    <div class="product-gallery-main">${first ? `<img data-gallery-main src="${esc(first.url)}" alt="${esc(product.name)}">` : '<span>暫無商品圖片</span>'}</div>
+    <div class="product-gallery-main">${first ? `<img data-gallery-main decoding="async" fetchpriority="high" src="${esc(first.url)}" alt="${esc(product.name)}">` : '<span>暫無商品圖片</span>'}</div>
     ${media.length > 1 ? `<div class="product-gallery-thumbs">${media.map((row, index) => `<button type="button" class="gallery-thumb${row === first ? " on" : ""}" data-gallery-thumb data-gallery-url="${esc(row.url)}" aria-label="檢視商品圖片 ${index + 1}" aria-pressed="${row === first}"><img src="${esc(row.url)}" alt="" loading="lazy"></button>`).join("")}</div>` : ""}
   </section>`;
 }
@@ -284,36 +284,38 @@ function addOnsMarkup(product) {
   </section>`;
 }
 
-function renderProductDetail() {
+function renderProductDetail(product = selectedProduct, preview = false) {
   const body = $("#product-detail-body");
-  if (!selectedProduct || !body) return;
-  const variants = normalizeVariants(selectedProduct);
-  const selected = variants.find((row) => row.id === selectedVariantId) || variants[0];
-  const category = catalogCategory(selectedProduct.category);
-  const name = esc(selectedProduct.name);
-  const specs = String(selectedProduct.spec || "").trim();
-  const description = String(selectedProduct.description || "").trim();
-  const slogan = String(selectedProduct.slogan || "").trim() || description;
-  const precautions = String(selectedProduct.precautions || "").trim();
+  if (!product || !body) return;
+  const variants = normalizeVariants(product);
+  const selected = preview ? variants.find((row) => row.stock > 0) || variants[0] :
+    variants.find((row) => row.id === selectedVariantId) || variants[0];
+  const category = catalogCategory(product.category);
+  const name = esc(product.name);
+  const specs = String(product.spec || "").trim();
+  const description = String(product.description || "").trim();
+  const slogan = String(product.slogan || "").trim() || description;
+  const precautions = String(product.precautions || "").trim();
   const careNotes = precautions || specs;
   const categoryHref = esc(collectionHref(category));
-  const related = filterProducts(products, category).filter((product) => product.id !== selectedProduct.id).slice(0, 3);
+  const related = preview ? [] : filterProducts(products, category).filter((relatedProduct) => relatedProduct.id !== product.id).slice(0, 3);
   const discount = discountText(selected);
 
+  body.setAttribute("aria-busy", String(preview));
   body.innerHTML = `<nav class="select-product-breadcrumb" aria-label="目前位置">
     <a href="${esc(storeHomeHref())}">首頁</a>
     <a href="${categoryHref}">${esc(category)}</a>
     <span aria-current="page">${name}</span>
   </nav>
   <div class="select-product-layout">
-    ${galleryMarkup(selectedProduct, selected.id)}
+    ${galleryMarkup(product, selected.id)}
     <section class="select-product-info" aria-labelledby="product-page-title">
-      <h1 id="product-page-title">${name}</h1>
+      <h1 id="product-page-title" tabindex="-1">${name}</h1>
       ${slogan ? `<p class="select-product-slogan">${esc(slogan)}</p>` : ""}
       ${careNotes ? `<section class="select-product-precautions" aria-labelledby="product-precautions-title">
         <h2 id="product-precautions-title">${precautions ? "注意事項" : "使用說明與注意事項"}</h2><p>${esc(careNotes)}</p>
       </section>` : ""}
-      <p class="select-product-price" id="product-detail-price" aria-live="polite">${money(basePriceFor(selected))}</p>
+      ${preview ? "" : `<p class="select-product-price" id="product-detail-price" aria-live="polite">${money(basePriceFor(selected))}</p>
       <div class="variant-picker" role="radiogroup" aria-label="選擇商品規格">${variants.map(variantChoiceMarkup).join("")}</div>
       ${discount ? `<p class="bulk-notice">數量優惠｜${esc(discount)}</p>` : ""}
       <div class="select-product-purchase">
@@ -326,9 +328,9 @@ function renderProductDetail() {
           </div>
           <small id="product-detail-qty-stock"></small>
         </div>
-        ${addOnsMarkup(selectedProduct)}
+        ${addOnsMarkup(product)}
         <button id="product-detail-add" class="primary-btn" type="button">加入購物車</button>
-      </div>
+      </div>`}
     </section>
   </div>
   <div class="select-product-notes">
@@ -344,14 +346,18 @@ function renderProductDetail() {
     <div class="select-related-heading"><h2 id="product-related-title">同系列商品</h2><a href="${categoryHref}">瀏覽系列</a></div>
     <div class="product-grid">${related.map(productCardMarkup).join("")}</div>
   </section>` : ""}`;
-  updateAddOnAvailability();
-  updateDetailPurchase();
+  if (!preview) {
+    updateAddOnAvailability();
+    updateDetailPurchase();
+  }
 }
 
 function renderRequestedProduct() {
   if (storeRoute.view !== "product") return;
+  selectedAddOns.clear();
   selectedProduct = products.find((product) => product.id === storeRoute.productId) || null;
   if (!selectedProduct) {
+    $("#product-detail-body").setAttribute("aria-busy", "false");
     $("#product-detail-body").innerHTML = `<div class="select-product-unavailable"><h1 id="product-page-title">找不到這項商品</h1><p>商品可能已下架或網址有誤。</p><a href="${esc(collectionHref(allProducts))}">瀏覽全部商品</a></div>`;
     return;
   }
@@ -888,6 +894,15 @@ function keepRegionalViewsAuthoritative() {
   }
 }
 
+// A direct link can paint its product while the region and the rest of the catalog resolve.
+let catalogueReady = false;
+initialPublicShopProduct.then((product) => {
+  if (!catalogueReady && product && product.id === storeRoute.productId) {
+    setProductPageMetadata(product);
+    renderProductDetail(product, true);
+  }
+});
+
 // Geography and public catalog/settings are independent network requests.
 const initialSettings = loadSettings();
 const initialCatalog = loadProducts().then(() => true, (error) => {
@@ -900,8 +915,25 @@ ensureMarketBadge();
 bindCaptureHandlers();
 keepRegionalViewsAuthoritative();
 if (await initialCatalog) {
+  catalogueReady = true;
   renderLoadedCatalog();
   saveCart();
+  window.dispatchEvent(new Event("77select:catalog-ready"));
+  enableStoreNavigation((route, { source }) => {
+    window.dispatchEvent(new Event("77select:route-change"));
+    setStorePageMetadata();
+    if (route.view === "products") {
+      renderSelectCatalogSlogan();
+      renderFilters();
+      renderProducts();
+    }
+    renderRequestedProduct();
+    if (source === "click") {
+      window.scrollTo({ top: 0, behavior: "instant" });
+      const heading = route.view === "product" ? "#product-page-title" : "#shop-catalog-title";
+      $(heading)?.focus({ preventScroll: true });
+    }
+  });
 }
 await initialSettings;
 

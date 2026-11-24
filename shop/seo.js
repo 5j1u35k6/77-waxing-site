@@ -1,12 +1,13 @@
 import { allProducts } from "./series.js?v=20261124-series1";
-import { canonicalStoreHref, storeRoute } from "./select-routes.js?v=20261124-series1";
+import { canonicalStoreHref, storeRoute } from "./select-routes.js?v=20261124-speed2";
 
 const URL='https://5j1u35k6.github.io/77select/';
 
-const canonicalUrl = canonicalStoreHref();
-const TITLE = storeRoute.view === "product" ? "商品詳情｜77 Select" :
+const currentStoreTitle = () => storeRoute.view === "product" ? "商品詳情｜77 Select" :
   storeRoute.view === "products" ? (storeRoute.category === allProducts ? "商品目錄｜77 Select" : `${storeRoute.category}｜77 Select`) :
   "77select｜熱蠟後保養・居家保養商品選物";
+const canonicalUrl = canonicalStoreHref();
+const TITLE = currentStoreTitle();
 const DESCRIPTION='77select 精選熱蠟除毛後保養、肌膚舒緩與日常居家保養商品，提供台灣與香港訂購。';
 
 const setMeta=(selector,attrs)=>{
@@ -101,10 +102,25 @@ const structuredData = {
 
 jsonLd.textContent = JSON.stringify(structuredData);
 
+export function setStorePageMetadata() {
+  const url = canonicalStoreHref();
+  canonical.href = alternate.href = url;
+  setMeta('meta[property="og:url"]', { property: "og:url", content: url });
+  Object.assign(structuredData["@graph"][2], {
+    "@type": storeRoute.view === "product" ? "ItemPage" : "CollectionPage",
+    "@id": `${url}#webpage`,
+    url,
+  });
+  setPageCopy(currentStoreTitle(), DESCRIPTION);
+}
+
 export function setProductPageMetadata(product) {
   const name = String(product.name || "商品詳情");
-  const title = `${name}｜77 Select`;
   const description = String(product.description || DESCRIPTION).replace(/\s+/g, " ").trim().slice(0, 160);
+  setPageCopy(`${name}｜77 Select`, description);
+}
+
+function setPageCopy(title, description) {
   document.title = title;
   setMeta('meta[name="description"]', { name: "description", content: description });
   setMeta('meta[property="og:title"]', { property: "og:title", content: title });

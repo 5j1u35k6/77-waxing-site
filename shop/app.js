@@ -4,10 +4,10 @@ import { addDoc, collection, doc, getDoc, getDocs, onSnapshot, query, serverTime
 import { getPublicFirebase } from "../assets/public-firebase.js?v=20261026-audit1";
 import { beginCheckout, finishCheckout, cartFingerprint, validateOrderData, savePreference } from "./checkout-guard.js?v=20261026-audit1";
 import { allProducts, catalogCategories, categoryFromCollectionKey, filterProducts } from "./series.js?v=20261124-series1";
-import { collectionHref, storeHomeHref, storeRoute } from "./select-routes.js?v=20261124-series1";
-import { renderSelectHomeSettings } from "./select-home-content.js?v=20261124-series1";
-import { selectProductCard } from "./select-product-card.js?v=20261124-series1";
-import { initialShopProducts } from "./initial-products.js";
+import { collectionHref, storeHomeHref, storeRoute } from "./select-routes.js?v=20261124-speed2";
+import { renderSelectHomeSettings } from "./select-home-content.js?v=20261124-speed2";
+import { selectProductCard } from "./select-product-card.js?v=20261124-speed2";
+import { initialShopProducts } from "./initial-products.js?v=20261124-speed2";
 
 const { auth, db } = getPublicFirebase();
 const DEFAULT_EMAIL_URL = "https://script.google.com/macros/s/AKfycbx6iC26KXbHWYte5XhLGNRMmG16Yydx2vPHDxYpmp4rmWn3plk__6Qwwr7Y09hLptTW/exec";
@@ -41,7 +41,6 @@ const STATUS = {
 let settings = { ...DEFAULT_SETTINGS };
 let products = [];
 let cart = loadCart();
-const category = storeRoute.category || allProducts;
 let currentUser = null;
 let ordersUnsub = null;
 let messagesUnsub = null;
@@ -150,10 +149,12 @@ function reconcileCart() {
   if (changed) saveCart(); else renderCart();
 }
 function renderFilters() {
+  const category = storeRoute.category || allProducts;
   const categories = catalogCategories(products);
   $("#category-filters").innerHTML = categories.map((name) => `<a class="filter-btn${name === category ? " on" : ""}" href="${esc(collectionHref(name))}" data-category="${esc(name)}"${name === category ? ' aria-current="page"' : ""}>${esc(name)}</a>`).join("");
 }
 function renderProducts() {
+  const category = storeRoute.category || allProducts;
   const visible = filterProducts(products, category);
   if (!visible.length) {
     $("#product-grid").innerHTML = `<div class="empty-state">${category === allProducts ? "目前沒有可訂購的商品。" : "此系列目前尚無商品。"}</div>`;
@@ -425,6 +426,13 @@ async function ensureAuth() {
   await setPersistence(auth, browserLocalPersistence).catch(() => {});
   if (!auth.currentUser) await signInAnonymously(auth);
 }
+function syncStoreView() {
+  const title = $("#shop-catalog-title");
+  if (title && storeRoute.view === "products") {
+    title.textContent = storeRoute.category === allProducts ? "商品目錄" : storeRoute.category;
+  }
+  setTab(storeRoute.view);
+}
 function bindUI() {
   $$("a[data-shop-home-link]").forEach((link) => {
     link.href = storeHomeHref() + link.hash;
@@ -432,9 +440,8 @@ function bindUI() {
   $$("a[data-shop-collection]").forEach((link) => {
     link.href = collectionHref(categoryFromCollectionKey(link.dataset.shopCollection));
   });
-  const title = $("#shop-catalog-title");
-  if (title && storeRoute.view === "products" && category !== allProducts) title.textContent = category;
-  setTab(storeRoute.view);
+  syncStoreView();
+  window.addEventListener("77select:route-change", syncStoreView);
   $$("[data-tab]").forEach((button) => {
     button.onclick = () => {
       setTab(button.dataset.tab);

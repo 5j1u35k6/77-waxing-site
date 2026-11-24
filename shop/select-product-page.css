@@ -364,8 +364,8 @@ html[data-select-route="product"] #shop-product-page {
   min-height: 48vh;
 }
 
-.select-product-load-panel {
-  grid-column: 1 / -1;
+.select-store #toast {
+  pointer-events: none;
 }
 
 .select-product-load-panel :is(h1, h2) {
@@ -375,8 +375,15 @@ html[data-select-route="product"] #shop-product-page {
   font-size: clamp(1.65rem, 4vw, 2.25rem);
 }
 
-.select-product-load-panel [hidden] {
-  display: none;
+.select-product-pending-title {
+  position: absolute;
+  clip-path: inset(50%);
+}
+
+.select-product-placeholder {
+  aspect-ratio: 1;
+  background: var(--select-paper, #f9f6f0);
+  border-radius: 0.5rem;
 }
 
 @media (max-width: 760px) {

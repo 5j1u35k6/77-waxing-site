@@ -13,6 +13,7 @@
   <script>
     const shopSearch = new URLSearchParams(location.search);
     document.documentElement.dataset.selectRoute = shopSearch.has("product") ? "product" : shopSearch.has("collection") ? "products" : "shop";
+    if (shopSearch.has("product")) import("./initial-products.js?v=20261124-speed2").catch(console.error);
   </script>
   <script id="shop-hero-loading">
     document.documentElement.classList.add("shop-hero-pending");
@@ -33,7 +34,7 @@
   <link rel="stylesheet" href="./cart-summary-polish.css?v=20261026-audit1">
   <link rel="stylesheet" href="./checkout-submit-fix.css?v=20261026-audit1">
   <link rel="stylesheet" href="./select-home.css?v=20261124-series1">
-  <link rel="stylesheet" href="./select-product-page.css?v=20261124-load1">
+  <link rel="stylesheet" href="./select-product-page.css?v=20261124-speed2">
   <link rel="stylesheet" href="./select-ai.css?v=20261123-select2">
 <link rel="preconnect" href="https://www.gstatic.com" crossorigin><link rel="preconnect" href="https://firestore.googleapis.com" crossorigin><link rel="preconnect" href="https://identitytoolkit.googleapis.com" crossorigin><link rel="modulepreload" href="https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js" crossorigin><link rel="modulepreload" href="https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js" crossorigin><link rel="modulepreload" href="https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js" crossorigin></head>
 <body class="select-store">
@@ -62,7 +63,7 @@
     <div class="select-home" data-view="shop">
       <section class="select-hero" aria-labelledby="hero-title">
         <div class="select-hero-media">
-          <img src="./select-studio-hero.jpg" width="1122" height="1402" alt="無香修護乳液、前導精華水與全能奇蹟油的棚拍合照" fetchpriority="high">
+          <img src="./select-studio-hero.jpg" width="1122" height="1402" alt="無香修護乳液、前導精華水與全能奇蹟油的棚拍合照" loading="lazy" fetchpriority="high">
         </div>
         <div class="select-hero-content">
           <p class="select-hero-brand">77 Select</p>
@@ -164,23 +165,26 @@
           </div>
           <div id="category-filters" class="filters" aria-label="商品分類"></div>
         </div>
-        <div id="product-grid" class="product-grid">
-          <div class="select-product-unavailable select-product-load-panel" data-product-load-panel hidden>
-            <h2>商品清單</h2>
-            <p role="status" data-product-load-message>正在載入商品…</p>
-            <button type="button" class="secondary-btn" data-product-load-retry hidden>重新整理</button>
-          </div>
+        <div id="product-grid" class="product-grid"></div>
+        <div class="select-product-unavailable select-product-load-panel" data-product-load-panel hidden>
+          <h2>商品清單</h2>
+          <p role="status">商品資料暫時無法載入，請重新整理再試一次。</p>
+          <button type="button" class="secondary-btn" data-product-load-retry>重新整理</button>
         </div>
       </div>
     </section>
 
     <section id="shop-product-page" class="hidden select-product-page" data-view="product" aria-labelledby="product-page-title">
-      <div id="product-detail-body">
-        <div class="select-product-unavailable select-product-load-panel" data-product-load-panel hidden>
-          <h1 id="product-page-title">商品詳情</h1>
-          <p role="status" data-product-load-message>正在載入商品…</p>
-          <button type="button" class="secondary-btn" data-product-load-retry hidden>重新整理</button>
+      <div id="product-detail-body" aria-busy="true">
+        <h1 id="product-page-title" class="select-product-pending-title">商品詳情</h1>
+        <div class="select-product-layout" aria-hidden="true">
+          <div class="select-product-placeholder"></div>
         </div>
+      </div>
+      <div class="select-product-unavailable select-product-load-panel" data-product-load-panel hidden>
+        <h2>商品詳情</h2>
+        <p role="status">商品資料暫時無法載入，請重新整理再試一次。</p>
+        <button type="button" class="secondary-btn" data-product-load-retry>重新整理</button>
       </div>
     </section>
 
@@ -318,29 +322,30 @@
       const panel = document.querySelector(`[data-view="${route}"] [data-product-load-panel]`);
       if (!panel) return;
 
-      const retry = panel.querySelector("[data-product-load-retry]");
-      const message = panel.querySelector("[data-product-load-message]");
-      const notify = window.setTimeout(() => {
-        if (panel.isConnected) panel.hidden = false;
-      }, 550);
+      const detail = document.querySelector("#product-detail-body");
+      const placeholder = detail?.querySelector(".select-product-placeholder");
       const deadline = window.setTimeout(showFailure, 12000);
 
       function showFailure() {
-        window.clearTimeout(notify);
         window.clearTimeout(deadline);
-        if (!panel.isConnected) return;
-        message.textContent = "商品資料暫時無法載入，請重新整理再試一次。";
-        retry.hidden = false;
+        if (route === "product") {
+          placeholder?.remove();
+          detail?.setAttribute("aria-busy", "false");
+        }
         panel.hidden = false;
       }
 
       window.addEventListener("77select:catalog-unavailable", showFailure, { once: true });
-      retry.addEventListener("click", () => location.reload());
+      window.addEventListener("77select:catalog-ready", () => {
+        window.clearTimeout(deadline);
+        panel.hidden = true;
+      }, { once: true });
+      panel.querySelector("[data-product-load-retry]").addEventListener("click", () => location.reload());
     })();
   </script>
-  <script type="module" src="./app.js?v=20261124-load1"></script>
-  <script type="module" src="./regional-store.js?v=20261124-load1"></script>
-  <script type="module" src="./public-enhancements.js?v=20261124-series1"></script>
+  <script type="module" src="./app.js?v=20261124-speed2"></script>
+  <script type="module" src="./regional-store.js?v=20261124-speed2"></script>
+  <script type="module" src="./public-enhancements.js?v=20261124-speed2"></script>
   <script type="module" src="./quantity-checkout-polish.js?v=20261123-select2"></script>
   <script type="module" src="./promotion-storefront.js?v=20261026-audit1"></script>
   <script type="module" src="./checkout-submit-fix.js?v=20261026-audit1"></script>
