@@ -253,9 +253,26 @@ async function browserTests() {
           }
         }).observe(document, { subtree: true, childList: true, attributes: true, attributeFilter: ['hidden'] });
       });
+      const toFirestoreValue = (value) => {
+        if (typeof value === 'string') return { stringValue: value };
+        if (typeof value === 'boolean') return { booleanValue: value };
+        if (typeof value === 'number') return { integerValue: String(value) };
+        if (Array.isArray(value)) return { arrayValue: { values: value.map(toFirestoreValue) } };
+        return { mapValue: { fields: toFirestoreFields(value) } };
+      };
+      const toFirestoreFields = (fields) => Object.fromEntries(
+        Object.entries(fields).map(([key, value]) => [key, toFirestoreValue(value)])
+      );
       await context.route('**/*', async route => {
         const url = new URL(route.request().url());
         const headers = { 'access-control-allow-origin': '*' };
+        if (url.hostname === 'firestore.googleapis.com' && url.pathname.includes('/documents/shopProducts/')) {
+          const id = decodeURIComponent(url.pathname.split('/').pop());
+          const product = await page.evaluate(id => window.__shop.products[id], id);
+          return route.fulfill(product
+            ? { json: { fields: toFirestoreFields(product) }, headers }
+            : { status: 403, json: { error: { status: 'PERMISSION_DENIED' } }, headers });
+        }
         if (url.hostname === 'www.gstatic.com') {
           const body = url.pathname.endsWith('firebase-auth.js') ? authMock : url.pathname.endsWith('firebase-firestore.js') ? firestoreMock : 'export const initializeApp=()=>({}); export const getApps=()=>[];';
           return route.fulfill({ contentType: 'text/javascript', body, headers });
@@ -307,6 +324,20 @@ async function browserTests() {
         return Math.abs(dimensions.width - dimensions.height) <= 1;
       }), 'phone product tiles use a large square photo');
       assert.equal(await page.locator('[data-regional-detail="other"]').count(), 0, 'legacy category remains searchable under the new series name');
+      await page.evaluate(() => { window.__shop.sameDocument = true; });
+      await context.setOffline(true);
+      await page.locator('[data-regional-detail="p"]').click();
+      await page.waitForURL(url => url.searchParams.get('product') === 'p');
+      await page.locator('#product-detail-add').waitFor({ state: 'visible' });
+      assert.equal(await page.locator('#product-page-title').innerText(), '測試商品');
+      assert.deepEqual(await page.evaluate(() => [window.__shop.sameDocument, window.__shop.catalogReads, window.__shop.showedLoadingPanel]), [true, 1, false]);
+      assert.match(await page.locator('link[rel="canonical"]').getAttribute('href'), /[?]product=p$/);
+      await page.goBack();
+      await page.locator('[data-regional-detail="p"]').waitFor({ state: 'visible' });
+      await page.goForward();
+      await page.locator('#product-detail-add').waitFor({ state: 'visible' });
+      await context.setOffline(false);
+      await page.goBack();
       await page.reload();
       await page.locator('[data-regional-detail="p"]').waitFor({ state: 'visible' });
       await page.getByRole('link', { name: '更多商品', exact: true }).click();
@@ -393,6 +424,8 @@ async function browserTests() {
       await page.locator('#product-detail-add').click();
       const bundledCart = await page.evaluate(() => JSON.parse(localStorage.getItem('77select_cart_v4')));
       assert.deepEqual(bundledCart.map(row => [row.productId, row.variantId, row.qty, row.price]), [['other', 'v2', 2, 80], ['p', 'v-alt', 1, 140]], 'configured extras and main variant join the same cart using live prices');
+      // Cart totals synchronize in animation frames after the click.
+      await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
       const mutations = await page.evaluate(() => new Promise(resolve => {
         let count = 0;
         const observer = new MutationObserver(records => { count += records.length; });
@@ -404,19 +437,23 @@ async function browserTests() {
       await page.goto(origin + entry + '?product=p');
       await page.locator('#product-detail-add').waitFor({ state: 'visible' });
       assert.deepEqual(await page.evaluate(() => [window.__shop.catalogReads, window.__shop.showedLoadingPanel]), [1, false], 'fast detail skips the loading panel');
-      for (const [route, heading, result] of [
-        ['?product=p', '商品詳情', '#product-detail-add'],
-        ['?collection=black-bottle', '商品清單', '[data-regional-detail="p"]'],
-      ]) {
-        await page.goto(origin + entry + route + '&fixtureCatalog=slow');
-        const panel = page.locator('[data-product-load-panel]:visible');
-        await panel.getByRole('heading', { name: heading, exact: true }).waitFor({ state: 'visible' });
-        assert.match(await panel.getByRole('status').innerText(), /正在載入商品/);
-        assert.equal(await panel.evaluate(node => getComputedStyle(node).borderTopStyle), 'solid');
-        await page.evaluate(() => window.__shop.releaseCatalog());
-        await page.locator(result).waitFor({ state: 'visible' });
-        assert.equal(await panel.count(), 0, 'the loading panel disappears once the products arrive');
-      }
+      await page.goto(origin + entry + '?product=p&fixtureCatalog=slow');
+      await page.getByRole('heading', { name: '測試商品', exact: true }).waitFor({ state: 'visible' });
+      assert.equal(await page.locator('#product-detail-price').count(), 0, 'early product content cannot show a provisional price');
+      assert.equal(await page.locator('[data-gallery-main]').count(), 1, 'the photo can load independently of the full catalog');
+      assert.doesNotMatch(await page.locator('main').innerText(), /正在載入商品/);
+      await page.waitForFunction(() => typeof window.__shop.releaseCatalog === 'function');
+      await page.evaluate(() => window.__shop.releaseCatalog());
+      await page.locator('#product-detail-add').waitFor({ state: 'visible' });
+      assert.equal(await page.locator('[data-product-load-panel]:visible').count(), 0);
+
+      await page.goto(origin + entry + '?collection=black-bottle&fixtureCatalog=slow');
+      await page.waitForFunction(() => typeof window.__shop.releaseCatalog === 'function');
+      await page.waitForTimeout(650);
+      assert.equal(await page.locator('[data-product-load-panel]:visible').count(), 0, 'slow catalog does not show loading copy');
+      await page.evaluate(() => window.__shop.releaseCatalog());
+      await page.locator('[data-regional-detail="p"]').waitFor({ state: 'visible' });
+
       await page.goto(origin + entry + '?collection=black-bottle&fixtureCatalog=failed');
       await page.getByRole('button', { name: '重新整理', exact: true }).waitFor({ state: 'visible' });
       assert.match(await page.locator('[data-product-load-panel]:visible [role=status]').innerText(), /暫時無法載入/);
