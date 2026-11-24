@@ -185,7 +185,14 @@ const wrap=(data,id='')=>({id,exists:()=>data!=null,data:()=>data});
 const docs=ref=>Object.entries(ref.col==='shopProducts'?s.products:ref.col==='shopOrders'?s.orders:{}).filter(([,d])=>(ref.filters||[]).every(f=>d[f.key]===f.value)).map(([id,data])=>wrap(data,id));
 export async function getDoc(ref){return wrap(ref.col==='shopSettings'?s.settings:ref.col==='shopProducts'?s.products[ref.id]:ref.col==='admins'?{}:null,ref.id);}
 export async function getDocFromServer(ref){await new Promise(r=>setTimeout(r,40));return getDoc(ref);}
-export async function getDocs(ref){return {docs:docs(ref)};}
+export async function getDocs(ref){
+  if(ref.col==='shopProducts'){
+    s.catalogReads++;
+    if(s.catalogFixture==='slow') await new Promise(resolve=>{s.releaseCatalog=resolve;});
+    if(s.catalogFixture==='failed') throw new Error('Fixture network unavailable');
+  }
+  return {docs:docs(ref)};
+}
 export async function getDocsFromServer(ref){await new Promise(r=>setTimeout(r,40));return getDocs(ref);}
 export function onSnapshot(ref,cb,error){const sub={ref,cb,error,active:true};s.subscriptions.push(sub);queueMicrotask(()=>cb(ref.id?wrap(s.settings,ref.id):{docs:docs(ref)}));return()=>{sub.active=false;};}
 export async function setDoc(ref,data){s.writes.push({ref,data});await new Promise(r=>setTimeout(r,80));if(ref.col==='shopOrders'){s.orders[ref.id]=data;s.emit('shopOrders');}s.persist();}
@@ -215,6 +222,7 @@ async function browserTests() {
       await page.addInitScript(() => {
         const saved = JSON.parse(sessionStorage.getItem('shop-regression-fixture') || 'null');
         const state = window.__shop = {
+          catalogFixture: new URLSearchParams(location.search).get('fixtureCatalog'), catalogReads: 0, showedLoadingPanel: false,
           auth: { currentUser: null }, authCallbacks: [], subscriptions: [], writes: [],
           products: { p: { active: true, name: '測試商品', category: '黑瓶♾️修護系列', stock: 10,
             imageUrl: '/77-waxing-site/shop/select-series-repair.jpg', slogan: '保養標語', precautions: '商品注意事項', addOnProductIds: ['other'],
@@ -239,6 +247,11 @@ async function browserTests() {
         };
         state.persist = () => sessionStorage.setItem('shop-regression-fixture', JSON.stringify({ uid: state.auth.currentUser?.uid ?? null, writes: state.writes, settings: state.settings, orders: state.orders }));
         state.switchUser(saved ? saved.uid : 'A');
+        new MutationObserver(() => {
+          if ([...document.querySelectorAll('[data-product-load-panel]:not([hidden])')].some(panel => panel.getClientRects().length)) {
+            state.showedLoadingPanel = true;
+          }
+        }).observe(document, { subtree: true, childList: true, attributes: true, attributeFilter: ['hidden'] });
       });
       await context.route('**/*', async route => {
         const url = new URL(route.request().url());
@@ -288,6 +301,7 @@ async function browserTests() {
         const state = await page.locator('main').count() ? await page.locator('main').innerText() : await page.locator('body').innerText();
         throw new Error(`Could not open the collection at ${page.url()}\n${state}\n${errors.join('\n')}`, { cause: error });
       });
+      assert.deepEqual(await page.evaluate(() => [window.__shop.catalogReads, window.__shop.showedLoadingPanel]), [1, false], 'fast catalog shares one query and paints without showing the loading panel');
       assert.ok(await page.locator('[data-regional-detail="p"] .select-catalog-photo').evaluate(photo => {
         const dimensions = photo.getBoundingClientRect();
         return Math.abs(dimensions.width - dimensions.height) <= 1;
@@ -387,6 +401,28 @@ async function browserTests() {
       }));
       assert.equal(mutations, 0, 'storefront observers must settle instead of changing the DOM every frame');
       assert.deepEqual(errors, [], entry + ': no runtime exceptions');
+      await page.goto(origin + entry + '?product=p');
+      await page.locator('#product-detail-add').waitFor({ state: 'visible' });
+      assert.deepEqual(await page.evaluate(() => [window.__shop.catalogReads, window.__shop.showedLoadingPanel]), [1, false], 'fast detail skips the loading panel');
+      for (const [route, heading, result] of [
+        ['?product=p', '商品詳情', '#product-detail-add'],
+        ['?collection=black-bottle', '商品清單', '[data-regional-detail="p"]'],
+      ]) {
+        await page.goto(origin + entry + route + '&fixtureCatalog=slow');
+        const panel = page.locator('[data-product-load-panel]:visible');
+        await panel.getByRole('heading', { name: heading, exact: true }).waitFor({ state: 'visible' });
+        assert.match(await panel.getByRole('status').innerText(), /正在載入商品/);
+        assert.equal(await panel.evaluate(node => getComputedStyle(node).borderTopStyle), 'solid');
+        await page.evaluate(() => window.__shop.releaseCatalog());
+        await page.locator(result).waitFor({ state: 'visible' });
+        assert.equal(await panel.count(), 0, 'the loading panel disappears once the products arrive');
+      }
+      await page.goto(origin + entry + '?collection=black-bottle&fixtureCatalog=failed');
+      await page.getByRole('button', { name: '重新整理', exact: true }).waitFor({ state: 'visible' });
+      assert.match(await page.locator('[data-product-load-panel]:visible [role=status]').innerText(), /暫時無法載入/);
+      await page.goto(origin + entry + '?product=unlisted');
+      await page.getByRole('heading', { name: '找不到這項商品', exact: true }).waitFor({ state: 'visible' });
+      assert.equal(await page.locator('[data-product-load-panel]:visible').count(), 0, 'an unlisted product shows the actual result');
       await context.close();
     }
   } finally {
