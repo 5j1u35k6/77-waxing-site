@@ -9,7 +9,7 @@
   <meta property="og:description" content="77select｜77waxing 官方產品選物與訂購頁">
   <meta property="og:type" content="website">
   <title>77select｜產品訂購</title>
-  <link rel="icon" type="image/svg+xml" href="./favicon-77select.svg">
+  <link rel="icon" type="image/svg+xml" href="./favicon-77select.svg?v=20261125-brand1">
   <style>.shop-hero-pending #hero-title{visibility:hidden}</style>
   <script>
     const shopSearch = new URLSearchParams(location.search);
@@ -26,7 +26,7 @@
       earlySeriesLink = link;
       if (startupScheduled) return;
       startupScheduled = true;
-      const resume = () => import("./select-start.js?v=20261124-series-ready").then(() => {
+      const resume = () => import("./select-start.js?v=20261125-review1").then(() => {
         startupClicks.abort();
         earlySeriesLink.click();
       }, () => location.assign(earlySeriesLink.href));
@@ -50,17 +50,18 @@
   <link rel="stylesheet" href="./variant-choice-format.css?v=20261026-audit1">
   <link rel="stylesheet" href="./quantity-checkout-polish.css?v=20261026-audit1">
   <link rel="stylesheet" href="./detail-mobile-add.css?v=20261026-audit1">
-  <link rel="stylesheet" href="./marketplace-responsive.css?v=20261026-audit1">
+  <link rel="stylesheet" href="./marketplace-responsive.css?v=20261125-brand1">
   <link rel="stylesheet" href="./cart-summary-polish.css?v=20261026-audit1">
   <link rel="stylesheet" href="./checkout-submit-fix.css?v=20261026-audit1">
-  <link rel="stylesheet" href="./select-home.css?v=20261124-series2">
+  <link rel="stylesheet" href="./select-home.css?v=20261125-review1">
   <link rel="stylesheet" href="./select-product-page.css?v=20261124-series2">
   <link rel="stylesheet" href="./select-ai.css?v=20261123-select2">
   <link rel="stylesheet" href="./select-checkout-mini.css?v=20261124-mini1">
+  <link rel="stylesheet" href="./brand-wordmark.css?v=20261125-brand1">
 <link rel="preconnect" href="https://www.gstatic.com" crossorigin><link rel="preconnect" href="https://firestore.googleapis.com" crossorigin><link rel="preconnect" href="https://identitytoolkit.googleapis.com" crossorigin><link rel="modulepreload" href="https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js" crossorigin><link rel="modulepreload" href="https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js" crossorigin><link rel="modulepreload" href="https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js" crossorigin></head>
 <body class="select-store">
   <header class="shop-nav select-header">
-    <a class="shop-brand" href="./" data-shop-home-link aria-label="77 Select 首頁"><b>77</b>select<small>BY 77WAXING</small></a>
+    <a class="shop-brand select-brand-lockup" href="./" data-shop-home-link aria-label="77select 首頁"><img src="./77select-wordmark.svg?v=20261125-brand1" alt="77select" width="222" height="64"></a>
     <nav class="select-nav" aria-label="77 Select 主選單">
       <a class="select-nav-text on" href="./" data-shop-home-link data-select-nav="shop" aria-current="page">首頁</a>
       <a class="select-nav-text" href="./?collection=all" data-shop-collection="all" data-select-nav="products">更多商品</a>
@@ -87,7 +88,7 @@
           <img src="./select-studio-hero.jpg" width="1122" height="1402" alt="無香修護乳液、前導精華水與全能奇蹟油的棚拍合照" loading="lazy" fetchpriority="high">
         </div>
         <div class="select-hero-content">
-          <p class="select-hero-brand">77 Select</p>
+          <p class="select-hero-brand select-brand-lockup"><img src="./77select-wordmark.svg?v=20261125-brand1" alt="77select" width="222" height="64"></p>
           <span id="hero-eyebrow" hidden></span>
           <h1 id="hero-title">77select</h1>
           <p id="hero-description" hidden></p>
@@ -320,7 +321,7 @@
   <footer class="site-footer select-footer">
     <div class="select-footer-main">
       <div class="select-footer-brand">
-        <a href="./" data-shop-home-link>77 Select</a>
+        <a class="select-brand-lockup" href="./" data-shop-home-link aria-label="77select 首頁"><img src="./77select-wordmark.svg?v=20261125-brand1#inverse" alt="77select" width="222" height="64"></a>
         <p>77waxing 的日常保養選物</p>
       </div>
       <nav aria-label="關於 77 Select">
@@ -357,10 +358,10 @@
       <a href="/77-waxing-site/privacy/">隱私權政策</a>
     </div>
   </footer>
-  <script type="module" src="./select-start.js?v=20261124-series-ready"></script>
-  <script type="module" src="./app.js?v=20261124-series-ready"></script>
-  <script type="module" src="./regional-store.js?v=20261124-series-ready"></script>
-  <script type="module" src="./public-enhancements.js?v=20261124-speed2"></script>
+  <script type="module" src="./select-start.js?v=20261125-review1"></script>
+  <script type="module" src="./app.js?v=20261125-review1"></script>
+  <script type="module" src="./regional-store.js?v=20261125-review1"></script>
+  <script type="module" src="./public-enhancements.js?v=20261125-brand1"></script>
   <script type="module" src="./quantity-checkout-polish.js?v=20261123-select2"></script>
   <script type="module" src="./promotion-storefront.js?v=20261124-cart-stability"></script>
   <script type="module" src="./checkout-submit-fix.js?v=20261026-audit1"></script>

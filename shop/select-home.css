@@ -417,6 +417,43 @@ html body.select-store .select-header .shop-brand {
   min-height: clamp(28px, 4vw, 64px);
 }
 
+.select-review-gallery {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: start;
+  gap: clamp(14px, 2vw, 28px);
+  margin: clamp(18px, 3vw, 36px) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.select-review-gallery > li {
+  overflow: hidden;
+  border: 1px solid var(--select-rule);
+  border-radius: 12px;
+  background: var(--select-light);
+}
+
+.select-review-gallery > li:has(> img[hidden]) {
+  aspect-ratio: var(--select-review-ratio, 4 / 5);
+}
+
+.select-review-gallery img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.select-review-gallery img[hidden] {
+  display: none;
+}
+
+@media (max-width: 820px) {
+  .select-review-gallery {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 #shop-catalog {
   background: var(--select-paper);
 }

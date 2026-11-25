@@ -30,15 +30,6 @@ async function waitForAdminApp() {
   throw new Error("77select admin Firebase app did not initialize in time.");
 }
 
-function setBrandText() {
-  document.querySelectorAll(".shop-brand").forEach((brand) => {
-    if (brand.dataset.selectBrand === "1") return;
-    const small = brand.querySelector("small")?.textContent || "SHOP ADMIN";
-    brand.innerHTML = `<b>77</b>select<small>${small}</small>`;
-    brand.dataset.selectBrand = "1";
-  });
-}
-
 async function migrateBrandSettings(db, user) {
   if (!user || user.isAnonymous) return;
   const adminSnap = await getDoc(doc(db, "admins", user.uid)).catch(() => null);
@@ -379,7 +370,6 @@ try {
   });
 
   const refresh = () => {
-    setBrandText();
     enhanceImageField(db).catch((error) => console.error("77select gallery enhancement failed", error));
   };
 

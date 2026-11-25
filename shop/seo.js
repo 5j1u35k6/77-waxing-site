@@ -1,7 +1,8 @@
 import { allProducts } from "./series.js?v=20261124-series1";
 import { canonicalStoreHref, storeRoute } from "./select-routes.js?v=20261124-speed2";
 
-const URL='https://5j1u35k6.github.io/77select/';
+const STORE_URL='https://5j1u35k6.github.io/77select/';
+const BRAND_IMAGE = new URL("./77select-wordmark.svg", import.meta.url).href;
 
 const currentStoreTitle = () => storeRoute.view === "product" ? "商品詳情｜77 Select" :
   storeRoute.view === "products" ? (storeRoute.category === allProducts ? "商品目錄｜77 Select" : `${storeRoute.category}｜77 Select`) :
@@ -62,12 +63,12 @@ const structuredData = {
   '@graph':[
     {
       '@type':'OnlineStore',
-      '@id':`${URL}#store`,
+      '@id':`${STORE_URL}#store`,
       name:'77select',
-      url:URL,
+      url:STORE_URL,
       description:DESCRIPTION,
-      logo:'https://5j1u35k6.github.io/77select/77select-wordmark.svg',
-      image:'https://5j1u35k6.github.io/77select/77select-wordmark.svg',
+      logo:BRAND_IMAGE,
+      image:BRAND_IMAGE,
       areaServed:[
         {'@type':'Country','name':'台灣'},
         {'@type':'Country','name':'香港'}
@@ -76,12 +77,12 @@ const structuredData = {
     },
     {
       '@type':'WebSite',
-      '@id':`${URL}#website`,
-      url:URL,
+      '@id':`${STORE_URL}#website`,
+      url:STORE_URL,
       name:'77select',
       description:DESCRIPTION,
       inLanguage:'zh-Hant-TW',
-      publisher:{'@id':`${URL}#store`}
+      publisher:{'@id':`${STORE_URL}#store`}
     },
     {
       '@type':storeRoute.view === 'product' ? 'ItemPage' : 'CollectionPage',
@@ -90,7 +91,7 @@ const structuredData = {
       name:TITLE,
       description:DESCRIPTION,
       inLanguage:'zh-Hant-TW',
-      isPartOf:{'@id':`${URL}#website`},
+      isPartOf:{'@id':`${STORE_URL}#website`},
       about:[
         {'@type':'Thing','name':'熱蠟後保養'},
         {'@type':'Thing','name':'居家保養'},

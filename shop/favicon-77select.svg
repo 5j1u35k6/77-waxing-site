@@ -1,6 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40">
-  <title>77S</title>
-  <rect x=".6" y=".6" width="38.8" height="38.8" rx="7.4" fill="#fbf1df" stroke="#ddc29d" stroke-width="1.2"/>
-  <path d="M5.4 13h7L7 27m8.1-14h7l-5.4 14" fill="none" stroke="#9a6530" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M35.1 14.6a4.6 4.6 0 0 0-3.8-1.6c-2.65 0-4.15 1.5-4.15 3.4 0 4.3 8.3 2.2 8.3 7 0 2.1-1.8 3.6-4.35 3.6a5.6 5.6 0 0 1-4.5-2" fill="none" stroke="#4c3628" stroke-width="2.7" stroke-linecap="round"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <title>77select</title>
+  <rect width="64" height="64" rx="10" fill="#aa9381"/>
+  <path fill="#fff0d5" transform="translate(32 32) scale(.072) translate(-626 -591)" d="M619 288C650 286 674 310 672 338C670 366 668 394 664 422C707 415 748 409 785 403C815 398 843 417 846 441C849 466 829 488 803 489C752 491 703 500 654 507C647 551 640 594 641 639C641 725 677 773 752 792C783 800 812 813 815 843C819 869 792 897 758 894C703 893 647 862 607 821C560 772 542 705 547 642C549 600 554 560 560 523C529 530 500 536 469 543C434 552 407 534 406 506C405 479 427 462 452 458L568 439C571 407 572 374 569 342C566 316 589 289 619 288Z"/>
 </svg>

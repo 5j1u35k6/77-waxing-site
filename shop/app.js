@@ -5,7 +5,7 @@ import { getPublicFirebase } from "../assets/public-firebase.js?v=20261026-audit
 import { beginCheckout, finishCheckout, cartFingerprint, validateOrderData, savePreference } from "./checkout-guard.js?v=20261026-audit1";
 import { selectProductCard } from "./select-product-card.js?v=20261124-series2";
 import { initialShopProducts, initialShopSettings } from "./initial-products.js?v=20261124-series-ready";
-import { applyStoreHomeSettings, setStoreView as setTab } from "./select-start.js?v=20261124-series-ready";
+import { applyStoreHomeSettings, setStoreView as setTab } from "./select-start.js?v=20261125-review1";
 import { storeRoute } from "./select-routes.js?v=20261124-speed2";
 
 const { auth, db } = getPublicFirebase();

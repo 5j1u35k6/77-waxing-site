@@ -1,4 +1,4 @@
-import "./select-start.js?v=20261124-series-ready";
+import "./select-start.js?v=20261125-review1";
 import { operationErrorText } from "../assets/interface-copy.js?v=20261026-audit1";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
 import { collection, doc, getDocFromServer, onSnapshot, query, serverTimestamp, setDoc, where } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
@@ -6,8 +6,8 @@ import { getPublicFirebase } from "../assets/public-firebase.js?v=20261026-audit
 import { beginCheckout, finishCheckout, cartFingerprint, validateOrderData, savePreference } from "./checkout-guard.js?v=20261026-audit1";
 import { allProducts, catalogCategories, catalogCategory, filterProducts } from "./series.js?v=20261124-series1";
 import { collectionHref, productHref, storeHomeHref, storeRoute } from "./select-routes.js?v=20261124-speed2";
-import { renderSelectHomeProducts } from "./select-home-content.js?v=20261124-series-ready";
-import { setProductPageMetadata } from "./seo.js?v=20261124-speed2";
+import { renderSelectHomeProducts } from "./select-home-content.js?v=20261125-review1";
+import { setProductPageMetadata } from "./seo.js?v=20261125-brand1";
 import { selectProductCard } from "./select-product-card.js?v=20261124-series-ready";
 import { readPublicShopProduct, initialShopProducts, initialShopSettings } from "./initial-products.js?v=20261124-series-ready";
 

@@ -4,6 +4,7 @@ import { browserLocalPersistence, getAuth, onAuthStateChanged, setPersistence, s
 import { addDoc, collection, deleteDoc, doc, getDoc, getFirestore, onSnapshot, runTransaction, serverTimestamp, setDoc, updateDoc } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
 import { firebaseConfig } from "../assets/firebase-config.js?v=20261026-audit1";
 import { allProducts, catalogCategories, catalogCategory, categoryFromCollectionKey, filterProducts, seriesSlogan } from "./series.js?v=20261124-series1";
+import { bindHomepageReviewEditor, homepageReviewMarkup, normalizeReviewImages, reviewImageDocumentId } from "./admin-home-reviews.js?v=20261125-review1";
 
 const app = initializeApp(firebaseConfig, "77waxing-shop-admin");
 const auth = getAuth(app);
@@ -170,10 +171,10 @@ async function dispatchShopEmail(orderId) {
 }
 
 function loginMarkup() {
-  return `<main class="admin-login"><section class="admin-login-card"><span class="eyebrow">SHOP ADMIN</span><h1>77waxing 產品訂購後台</h1><form id="login-form"><div class="field"><label>Email</label><input name="email" type="email" autocomplete="username" required></div><div class="field" style="margin-top:12px"><label>密碼</label><input name="password" type="password" autocomplete="current-password" required></div><button class="primary-btn" style="width:100%;margin-top:18px" type="submit">登入</button><div id="login-message" class="login-message"></div></form><p class="order-date">請使用商店管理員帳號登入。</p></section></main>`;
+  return `<main class="admin-login"><section class="admin-login-card"><div class="select-login-brand select-brand-lockup"><img src="./77select-wordmark.svg?v=20261125-brand1" alt="77select" width="222" height="64"></div><h1>77select 產品訂購後台</h1><form id="login-form"><div class="field"><label>Email</label><input name="email" type="email" autocomplete="username" required></div><div class="field" style="margin-top:12px"><label>密碼</label><input name="password" type="password" autocomplete="current-password" required></div><button class="primary-btn" style="width:100%;margin-top:18px" type="submit">登入</button><div id="login-message" class="login-message"></div></form><p class="order-date">請使用商店管理員帳號登入。</p></section></main>`;
 }
 function shellMarkup() {
-  return `<div class="admin-shell"><aside class="admin-side"><a class="shop-brand" href="${STOREFRONT_URL}" target="_blank" rel="noopener"><b>77</b>select<small>SHOP ADMIN</small></a><nav class="admin-nav"><button data-view="dashboard">總覽</button><button data-view="homepage">首頁</button><button data-view="products">商品</button><button data-view="orders">訂單</button><button data-view="messages">顧客問答</button><button data-view="settings">商店設定</button></nav></aside><main class="admin-main"><div class="admin-top"><div><span class="eyebrow">PRODUCT ORDER</span><h1 id="admin-title">產品訂購後台</h1></div><div style="text-align:right"><div class="live-dot">● 即時同步</div><button id="logout" class="mini-btn" type="button">登出</button></div></div><div id="admin-message" class="admin-message" role="status"></div><section id="admin-view"></section></main></div>`;
+  return `<div class="admin-shell"><aside class="admin-side"><a class="shop-brand select-brand-lockup" href="${STOREFRONT_URL}" target="_blank" rel="noopener" aria-label="77select 商店首頁"><img src="./77select-wordmark.svg?v=20261125-brand1#inverse" alt="77select" width="222" height="64"></a><nav class="admin-nav"><button data-view="dashboard">總覽</button><button data-view="homepage">首頁</button><button data-view="products">商品</button><button data-view="orders">訂單</button><button data-view="messages">顧客問答</button><button data-view="settings">商店設定</button></nav></aside><main class="admin-main"><div class="admin-top"><div><span class="eyebrow">PRODUCT ORDER</span><h1 id="admin-title">產品訂購後台</h1></div><div style="text-align:right"><div class="live-dot">● 即時同步</div><button id="logout" class="mini-btn" type="button">登出</button></div></div><div id="admin-message" class="admin-message" role="status"></div><section id="admin-view"></section></main></div>`;
 }
 async function renderLogin() {
   cleanupListeners();
@@ -236,8 +237,12 @@ function scheduleRerender() {
 }
 function rerender() {
   if (!$("#admin-view")) return;
-  if ($("#promotion-form") || $("#product-form") || $("#homepage-form")?.dataset.dirty === "1") return;
+  if ($("#promotion-form") || $("#product-form") || homepageIsEditing()) return;
   showView(currentView);
+}
+function homepageIsEditing() {
+  const state = $("#homepage-form")?.dataset;
+  return state?.dirty === "1" || state?.reviewImageProcessing === "1";
 }
 function subscribeData() {
   const version = authVersion;
@@ -260,7 +265,7 @@ function subscribeData() {
     if (version !== authVersion) return;
     settings = snap.exists() ? { ...DEFAULT_SETTINGS, ...snap.data() } : { ...DEFAULT_SETTINGS };
     settingsReady = true;
-    if (currentView === "homepage" && $("#homepage-form")?.dataset.dirty !== "1") renderHomepage();
+    if (currentView === "homepage" && !homepageIsEditing()) renderHomepage();
     if (currentView === "settings" && $("#settings-form")?.dataset.dirty !== "1") renderSettings();
   }));
 }
@@ -761,7 +766,7 @@ function renderHomepage() {
     </section>
     <section class="admin-editor-section" aria-labelledby="home-reviews-title">
       <h3 id="home-reviews-title">顧客真實感受</h3>
-      <div class="field"><label for="h-reviews">心得內容</label><textarea id="h-reviews" rows="5" maxlength="5000">${esc(home.reviews)}</textarea></div>
+      ${homepageReviewMarkup()}
     </section>
     <section class="admin-editor-section" aria-labelledby="home-faq-title">
       <h3 id="home-faq-title">常見問題</h3>
@@ -771,6 +776,7 @@ function renderHomepage() {
   </form>`;
 
   const form = $("#homepage-form");
+  form.dataset.savedFeatured = JSON.stringify([0, 1, 2].map((index) => featured[index] || ""));
   form.addEventListener("change", (event) => {
     const preview = event.target.closest(".admin-home-image")?.querySelector("[data-preview-image]");
     if (!preview || preview.dataset.previewImage !== event.target.id) return;
@@ -780,16 +786,21 @@ function renderHomepage() {
     preview.hidden = !image;
     preview.nextElementSibling.hidden = Boolean(image);
   });
-  form.onsubmit = saveHomepage;
+  const reviews = bindHomepageReviewEditor(form, home.reviewImages, async (id) => {
+    const snapshot = await getDoc(doc(db, "shopSettings", reviewImageDocumentId(id)));
+    return snapshot.data()?.dataUrl;
+  });
+  form.onsubmit = (event) => saveHomepage(event, reviews);
 }
 
-async function saveHomepage(event) {
+async function saveHomepage(event, reviewEditor) {
   event.preventDefault();
   const form = event.currentTarget;
   const button = form.querySelector('button[type="submit"]');
-  if (button.disabled) return;
+  if (button.disabled || form.dataset.reviewImageProcessing === "1") return;
 
-  const value = (id) => form.querySelector(`#${id}`).value.trim();
+  const field = (id) => form.querySelector(`#${id}`);
+  const value = (id) => field(id).value.trim();
   const heroTitle = value("h-title");
   if (!heroTitle) return flash("請填寫首頁主標題。", "error");
 
@@ -815,22 +826,56 @@ async function saveHomepage(event) {
     return flash("明星商品請選擇不同的商品。", "error");
   }
 
+  const reviews = reviewEditor.changes();
+  const textFields = [["h-hero-image", "heroImageUrl"], ["h-about", "about"], ["h-faq", "faq"]];
+  const changedText = Object.fromEntries(textFields.flatMap(([id, key]) =>
+    value(id) === field(id).defaultValue.trim() ? [] : [[key, value(id)]]
+  ));
+  const featuredChanged = JSON.stringify(featuredProductIds) !== form.dataset.savedFeatured;
+  const titleChanged = heroTitle !== field("h-title").defaultValue.trim();
   const homeContent = {
-    heroImageUrl,
-    about: value("h-about"),
-    featuredProductIds,
+    ...changedText,
+    ...(featuredChanged ? { featuredProductIds } : {}),
     ...(Object.keys(seriesImages).length ? { seriesImages } : {}),
     ...(Object.keys(seriesSlogans).length ? { seriesSlogans } : {}),
-    reviews: value("h-reviews"),
-    faq: value("h-faq"),
+    ...(reviews ? { reviewImages: reviews.next } : {}),
+  };
+  const hasHomeChanges = Boolean(Object.keys(homeContent).length);
+  if (!titleChanged && !hasHomeChanges) {
+    form.dataset.dirty = "";
+    flash("首頁沒有需要儲存的變更。");
+    return;
+  }
+  const patch = {
+    ...(titleChanged ? { heroTitle } : {}),
+    ...(hasHomeChanges ? { homeContent } : {}),
+    updatedAt: serverTimestamp(),
   };
 
   button.disabled = true;
   form.inert = true;
   try {
-    await setDoc(doc(db, "shopSettings", "public"), { heroTitle, homeContent, updatedAt: serverTimestamp() }, { merge: true });
+    const ref = doc(db, "shopSettings", "public");
+    if (reviews) {
+      await runTransaction(db, async (transaction) => {
+        const latest = await transaction.get(ref);
+        const latestReviews = normalizeReviewImages(latest.data()?.homeContent?.reviewImages);
+        if (JSON.stringify(latestReviews) !== JSON.stringify(reviews.original)) {
+          throw new Error("其他管理者已更新顧客心得圖片，請重新整理後再編輯。");
+        }
+        for (const { id, dataUrl, width, height } of reviews.added) {
+          transaction.set(doc(db, "shopSettings", reviewImageDocumentId(id)), { dataUrl, width, height });
+        }
+        for (const { id } of reviews.removed) transaction.delete(doc(db, "shopSettings", reviewImageDocumentId(id)));
+        transaction.set(ref, patch, { merge: true });
+      });
+    } else {
+      await setDoc(ref, patch, { merge: true });
+    }
     await audit("homepage_update", "public");
     if (!form.isConnected) return;
+    for (const id of ["h-title", ...textFields.map(([fieldId]) => fieldId)]) field(id).defaultValue = value(id);
+    form.dataset.savedFeatured = JSON.stringify(featuredProductIds);
     for (const [id, url] of Object.entries(seriesImages)) {
       const input = form.querySelector(`#h-cover-${id}`);
       input.value = url;
@@ -841,6 +886,7 @@ async function saveHomepage(event) {
       input.value = seriesSlogan(id, seriesSlogans);
       input.defaultValue = input.value;
     }
+    if (reviews) reviewEditor.saved(reviews.next);
     form.dataset.dirty = "";
     flash("首頁內容已儲存。");
   } catch (error) {

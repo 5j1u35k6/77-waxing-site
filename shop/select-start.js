@@ -1,7 +1,7 @@
 import { allProducts, catalogCategories, catalogCategory, categoryFromCollectionKey, filterProducts } from "./series.js?v=20261124-series1";
 import { collectionHref, enableStoreNavigation, storeHomeHref, storeRoute } from "./select-routes.js?v=20261124-speed2";
-import { renderSelectCatalogSlogan, renderSelectHomeSettings } from "./select-home-content.js?v=20261124-series-ready";
-import { setStorePageMetadata } from "./seo.js?v=20261124-speed2";
+import { renderSelectCatalogSlogan, renderSelectHomeSettings } from "./select-home-content.js?v=20261125-review1";
+import { setStorePageMetadata } from "./seo.js?v=20261125-brand1";
 import { initialPublicCatalog, initialPublicHomeSettings, readPublicShopProduct } from "./initial-products.js?v=20261124-series-ready";
 import { catalogPriceText, compareProducts, normalizeVariants, primaryImage } from "./select-catalog-model.js?v=20261124-series-ready";
 import { catalogThumbnailById } from "./select-catalog-thumbnails.js?v=20261124-series-ready";

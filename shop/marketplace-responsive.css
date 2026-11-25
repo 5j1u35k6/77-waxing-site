@@ -1,6 +1,5 @@
 /* 77select marketplace-style responsive polish.
    Scope: storefront header + product listing only. No cart, pricing, checkout, or product data logic. */
-@import url("./brand-wordmark.css?v=20260914-logo5");
 
 /* Public storefront hero branding. Keep the official marketplace label fixed in
    the UI even if an older Firestore setting still contains the legacy wording. */

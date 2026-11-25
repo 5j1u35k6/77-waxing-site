@@ -1,12 +1,15 @@
 import "./select-photo-fit.js?v=20261124-series2";
+import { firebaseConfig } from "../assets/firebase-config.js?v=20261026-audit1";
 import { productHref, storeRoute } from "./select-routes.js?v=20261124-speed2";
 import { collectionKey, seriesSlogan } from "./series.js?v=20261124-series1";
 
 const copySections = {
   about: ".select-about-content",
-  reviews: ".select-reviews-content",
   faq: ".select-faq-content",
 };
+const reviewContent = document.querySelector(".select-reviews-content");
+let reviewManifest;
+let reviewObserver;
 const heroImage = document.querySelector(".select-hero-media img");
 const defaultHeroImage = heroImage?.getAttribute("src");
 const seriesCards = [...document.querySelectorAll(".select-collection")].map((card) => {
@@ -54,6 +57,100 @@ function featuredImage(value) {
   return /^data:image\/(?:jpeg|png|webp|gif);base64,[a-z0-9+/=]+$/i.test(imageUrl)
     ? imageUrl
     : httpsImage(imageUrl);
+}
+
+async function readReviewImage(id) {
+  const project = encodeURIComponent(firebaseConfig.projectId);
+  const url = `https://firestore.googleapis.com/v1/projects/${project}/databases/(default)/documents/shopSettings/home-review-${id}?mask.fieldPaths=dataUrl`;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 8000);
+  try {
+    const response = await fetch(url, { credentials: "omit", signal: controller.signal });
+    if (!response.ok) return "";
+    const { fields } = await response.json();
+    const image = fields?.dataUrl?.stringValue;
+    return typeof image === "string" && image.length <= 220_000 &&
+      /^data:image\/(?:webp|jpeg);base64,[a-z0-9+/=]+$/i.test(image) ? image : "";
+  } catch {
+    return "";
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function reviewDimension(value) {
+  return Number.isInteger(value) && value > 0 && value <= 1440 ? value : 0;
+}
+
+function renderReviewImages(rows) {
+  if (!reviewContent) return;
+  const images = [];
+  const seen = new Set();
+  for (const row of Array.isArray(rows) ? rows : []) {
+    if (images.length >= 6) break;
+    if (typeof row?.id !== "string" || !/^[a-z0-9-]{1,80}$/i.test(row.id) || seen.has(row.id)) continue;
+    seen.add(row.id);
+    images.push({
+      id: row.id,
+      width: reviewDimension(row.width),
+      height: reviewDimension(row.height),
+      alt: typeof row.alt === "string" ? row.alt.trim().slice(0, 300) : "",
+    });
+  }
+  const manifest = JSON.stringify(images);
+  if (reviewManifest === manifest) return;
+  reviewManifest = manifest;
+  reviewObserver?.disconnect();
+  reviewContent.replaceChildren();
+  if (!images.length) return;
+
+  const gallery = document.createElement("ul");
+  gallery.className = "select-review-gallery";
+  gallery.setAttribute("role", "list");
+  const requests = new Map();
+  images.forEach(({ id, width, height, alt }, index) => {
+    const item = document.createElement("li");
+    const image = document.createElement("img");
+    image.alt = alt || `顧客心得照片 ${index + 1}`;
+    image.decoding = "async";
+    image.hidden = true;
+    if (width && height) {
+      image.width = width;
+      image.height = height;
+      item.style.setProperty("--select-review-ratio", `${width} / ${height}`);
+    }
+    const removeFailedImage = () => {
+      item.remove();
+      if (!gallery.childElementCount) gallery.remove();
+    };
+    image.addEventListener("load", () => { image.hidden = false; }, { once: true });
+    image.addEventListener("error", removeFailedImage, { once: true });
+    requests.set(item, async () => {
+      const source = await readReviewImage(id);
+      if (!item.isConnected) return;
+      if (source) image.src = source;
+      else removeFailedImage();
+    });
+    item.append(image);
+    gallery.append(item);
+  });
+  reviewContent.append(gallery);
+
+  if (!("IntersectionObserver" in window)) {
+    requests.forEach((load) => { void load(); });
+    return;
+  }
+  reviewObserver = new IntersectionObserver((entries, observer) => {
+    for (const entry of entries) {
+      if (!entry.isIntersecting) continue;
+      const item = entry.target;
+      observer.unobserve(item);
+      const load = requests.get(item);
+      requests.delete(item);
+      if (load) void load();
+    }
+  }, { rootMargin: "350px 0px" });
+  requests.forEach((_, item) => reviewObserver.observe(item));
 }
 
 function renderFeatured() {
@@ -121,6 +218,7 @@ export function renderSelectHomeSettings(settings = {}) {
     copy.textContent = text;
     section.append(copy);
   }
+  renderReviewImages(content.reviewImages);
   for (const { link, cover } of seriesCards) {
     const url = httpsImage(content.seriesImages?.[link.dataset.shopCollection]);
     if (url === (link.firstElementChild.getAttribute("src") === cover.getAttribute("src") ? "" : link.firstElementChild.src)) continue;
